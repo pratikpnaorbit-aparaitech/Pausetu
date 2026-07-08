@@ -1,6 +1,8 @@
-import React from 'react';
-import { StyleSheet, View, Text, SafeAreaView, ScrollView, Image, TouchableOpacity, Dimensions, FlatList, Share, Alert } from 'react-native';
+import React, { useContext, useEffect, useState } from 'react';
+import { StyleSheet, View, Text, SafeAreaView, ScrollView, Image, TouchableOpacity, Dimensions, FlatList, Share, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { AppContext } from '../context/AppContext';
+import { api } from '../api/api';
 
 const { width } = Dimensions.get('window');
 
@@ -82,11 +84,121 @@ const RECENT_ENQUIRIES = [
   },
 ];
 
-const PERFORMANCE_CHART_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const PERFORMANCE_DATA_VIEWS = [65, 80, 110, 95, 140, 120, 165]; // Mock points
-
 export default function SellScreen({ navigation }) {
-  const maxView = Math.max(...PERFORMANCE_DATA_VIEWS);
+  const { userProfile, userToken, exitGuestSession } = useContext(AppContext);
+  const isGuest = userToken === 'guest';
+  const name = isGuest ? 'Guest' : userProfile?.name || 'User';
+
+  const [listings, setListings] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadData = async () => {
+      if (isGuest || !userProfile?.id) {
+        setLoading(false);
+        return;
+      }
+      try {
+        const [animRes, notifRes] = await Promise.all([
+          api.getAnimals({ sellerId: userProfile.id }),
+          api.getMyNotifications()
+        ]);
+        if (animRes.status === 'success') {
+          setListings(animRes.data.animals);
+        }
+        if (notifRes.status === 'success') {
+          setNotifications(notifRes.data.notifications || []);
+        }
+      } catch (err) {
+        console.warn('Failed to load seller portal data:', err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, [userProfile, isGuest]);
+
+  if (isGuest) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.guestContainer}>
+          <Ionicons name="lock-closed-outline" size={64} color="#94A3B8" />
+          <Text style={styles.guestTitle}>Seller Portal is Locked</Text>
+          <Text style={styles.guestSubtitle}>Please login or signup with your email to list and sell your cattle.</Text>
+          <TouchableOpacity style={styles.guestLoginButton} onPress={exitGuestSession}>
+            <Text style={styles.guestLoginButtonText}>Login / Signup</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color="#16A34A" />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Calculate dynamic stats
+  const activeCount = listings.filter(a => a.status === 'approved' && !a.isDeleted).length;
+  const pendingCount = listings.filter(a => a.status === 'pending' && !a.isDeleted).length;
+  const soldCount = listings.filter(a => a.status === 'sold' && !a.isDeleted).length;
+  const totalViews = listings.reduce((acc, a) => acc + (a.views || 0), 0);
+  const totalSales = listings.filter(a => a.status === 'sold' && !a.isDeleted).reduce((acc, a) => acc + a.price, 0);
+
+  const statsData = [
+    { id: '1', count: String(activeCount), label: 'Active Listings', icon: 'checkbox-marked-circle-outline', color: '#16A34A', trend: 'Live' },
+    { id: '2', count: String(pendingCount), label: 'Pending Approval', icon: 'clock-outline', color: '#F59E0B', trend: 'In review' },
+    { id: '3', count: String(soldCount), label: 'Sold Animals', icon: 'check-decagram-outline', color: '#3B82F6', trend: `₹${(totalSales/1000).toFixed(1)}k Sales` },
+    { id: '4', count: totalViews >= 1000 ? `${(totalViews/1000).toFixed(1)}K` : String(totalViews), label: 'Total Views', icon: 'eye-outline', color: '#8B5CF6', trend: 'Views' },
+  ];
+
+  const recentListings = listings
+    .filter(a => a.status === 'approved' && !a.isDeleted)
+    .slice(0, 5)
+    .map(a => ({
+      id: a._id,
+      name: a.title,
+      breed: a.breedId?.name || 'Breed',
+      price: `₹${a.price.toLocaleString()}`,
+      status: 'Active',
+      views: a.views || 0,
+      postedDate: 'Posted ' + new Date(a.createdAt).toLocaleDateString(),
+      image: a.photos && a.photos.length > 0 ? a.photos[0] : 'https://images.unsplash.com/photo-1546445317-29f4545e6d52?auto=format&fit=crop&w=300&q=80'
+    }));
+
+  const pendingListings = listings
+    .filter(a => a.status === 'pending' && !a.isDeleted)
+    .slice(0, 5)
+    .map(a => ({
+      id: a._id,
+      name: a.title,
+      breed: a.breedId?.name || 'Breed',
+      price: `₹${a.price.toLocaleString()}`,
+      status: 'Pending'
+    }));
+
+  const recentEnquiries = notifications
+    .filter(n => n.type === 'chat' || n.title.includes('Enquiry') || n.message.includes('inquiring'))
+    .slice(0, 3)
+    .map((n, index) => {
+      const nameMatch = n.message.match(/^([A-Za-z\s]+) (sent you|inquiring)/);
+      const animalMatch = n.message.match(/about the ([A-Za-z\s]+)\.?$/);
+      const buyerName = nameMatch ? nameMatch[1].trim() : 'Buyer';
+      const animalName = animalMatch ? animalMatch[1].replace(/\.$/, '').trim() : 'Livestock';
+      return {
+        id: n._id || String(index),
+        buyerName,
+        animal: animalName,
+        time: 'Active'
+      };
+    });
+
 
   const handleShare = async (item) => {
     try {
@@ -108,7 +220,7 @@ export default function SellScreen({ navigation }) {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Text style={styles.greetingText}>Good Morning,</Text>
-          <Text style={styles.sellerName}>Ramesh Patil</Text>
+          <Text style={styles.sellerName}>{name}</Text>
           <Text style={styles.headerSubtitle}>Here is your livestock summary today</Text>
         </View>
 
@@ -123,7 +235,7 @@ export default function SellScreen({ navigation }) {
           </TouchableOpacity>
           <TouchableOpacity activeOpacity={0.8} onPress={() => navigation.navigate('Profile')}>
             <Image
-              source={{ uri: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80' }}
+              source={{ uri: userProfile?.photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80' }}
               style={styles.avatarImage}
             />
           </TouchableOpacity>
@@ -133,7 +245,7 @@ export default function SellScreen({ navigation }) {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Quick Statistics Grid */}
         <View style={styles.statsGrid}>
-          {STATS_DATA.map((item) => (
+          {statsData.map((item) => (
             <View key={item.id} style={styles.statCard}>
               <View style={styles.statCardHeader}>
                 <Text style={styles.statCount}>{item.count}</Text>
@@ -241,13 +353,13 @@ export default function SellScreen({ navigation }) {
         <FlatList
           horizontal
           showsHorizontalScrollIndicator={false}
-          data={RECENT_LISTINGS}
+          data={recentListings}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listingsList}
           renderItem={({ item }) => (
             <View style={styles.listingCard}>
               <View style={styles.listingImageContainer}>
-                <Image source={{ uri: item.image }} style={styles.listingImage} />
+                <Image source={{ uri: item.image }} style={styles.listingImage} resizeMode="cover" />
                 <View style={styles.activeBadge}>
                   <Text style={styles.activeBadgeText}>{item.status}</Text>
                 </View>
@@ -289,7 +401,7 @@ export default function SellScreen({ navigation }) {
         {/* Pending Approval Section */}
         <Text style={styles.sectionTitle}>Pending Approval</Text>
         <View style={styles.pendingContainer}>
-          {PENDING_LISTINGS.map((item) => (
+          {pendingListings.map((item) => (
             <View key={item.id} style={styles.pendingCard}>
               <View style={styles.pendingLeft}>
                 <View style={styles.pendingImagePlaceholder}>
@@ -312,7 +424,7 @@ export default function SellScreen({ navigation }) {
         {/* Recent Enquiries Section */}
         <Text style={styles.sectionTitle}>Recent Enquiries</Text>
         <View style={styles.enquiriesContainer}>
-          {RECENT_ENQUIRIES.map((item) => (
+          {recentEnquiries.map((item) => (
             <View key={item.id} style={styles.enquiryCard}>
               <View style={styles.enquiryLeft}>
                 <View style={styles.enquiryAvatarCircle}>
@@ -345,35 +457,7 @@ export default function SellScreen({ navigation }) {
           ))}
         </View>
 
-        {/* Performance Graph Card */}
-        <Text style={styles.sectionTitle}>Weekly Views Performance</Text>
-        <View style={styles.performanceCard}>
-          <View style={styles.chartTitleRow}>
-            <View>
-              <Text style={styles.chartTitle}>Total Animal Views</Text>
-              <Text style={styles.chartSubtitle}>+18.4% weekly growth</Text>
-            </View>
-            <View style={styles.chartBadge}>
-              <Text style={styles.chartBadgeText}>Peak: Sun (165)</Text>
-            </View>
-          </View>
 
-          {/* Custom Styled Graphic Bar Chart */}
-          <View style={styles.chartCanvas}>
-            {PERFORMANCE_DATA_VIEWS.map((val, index) => {
-              // Calculate relative height percentage
-              const barHeight = Math.round((val / maxView) * 110);
-              return (
-                <View key={index} style={styles.chartColumn}>
-                  <View style={styles.barTrack}>
-                    <View style={[styles.barFill, { height: barHeight }]} />
-                  </View>
-                  <Text style={styles.chartDayLabel}>{PERFORMANCE_CHART_DAYS[index]}</Text>
-                </View>
-              );
-            })}
-          </View>
-        </View>
       </ScrollView>
 
       {/* Floating Action Button (FAB) on bottom-right */}
@@ -655,7 +739,6 @@ const styles = StyleSheet.create({
   listingImage: {
     width: '100%',
     height: '100%',
-    resizeMode: 'cover',
   },
   activeBadge: {
     position: 'absolute',
@@ -957,4 +1040,41 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 6,
   },
+  guestContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+    backgroundColor: '#F8FAFC'
+  },
+  guestTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginTop: 16,
+    marginBottom: 8
+  },
+  guestSubtitle: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 20
+  },
+  guestLoginButton: {
+    backgroundColor: '#16A34A',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.41
+  },
+  guestLoginButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 15
+  }
 });

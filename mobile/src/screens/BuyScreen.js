@@ -1,7 +1,8 @@
-import React, { useContext, useState, useCallback } from 'react';
-import { StyleSheet, View, Text, SafeAreaView, TouchableOpacity, TextInput, FlatList, Image } from 'react-native';
+import React, { useContext, useState, useCallback, useEffect } from 'react';
+import { StyleSheet, View, Text, SafeAreaView, TouchableOpacity, TextInput, FlatList, Image, ActivityIndicator } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppContext } from '../context/AppContext';
+import { api } from '../api/api';
 
 // Import Reusable Components
 import SectionHeader from '../components/SectionHeader';
@@ -158,7 +159,7 @@ const NEARBY_SELLERS = [
 ];
 
 // Standalone React.memo components to prevent unmounting/remounting of list headers and footers
-const ListHeader = React.memo(({ selectedCategory, setSelectedCategory, onViewDetails }) => {
+const ListHeader = React.memo(({ selectedCategory, setSelectedCategory, onViewDetails, featuredAnimals }) => {
   return (
     <View>
       {/* Location Card */}
@@ -211,7 +212,7 @@ const ListHeader = React.memo(({ selectedCategory, setSelectedCategory, onViewDe
                 ]}
                 onPress={() => setSelectedCategory(item.id)}
               >
-                <Image source={item.image} style={styles.categoryCardImage} />
+                <Image source={item.image} style={styles.categoryCardImage} resizeMode="contain" />
                 <Text style={[
                   styles.categoryCardName,
                   isSelected ? styles.selectedCardName : styles.unselectedCardName
@@ -231,7 +232,7 @@ const ListHeader = React.memo(({ selectedCategory, setSelectedCategory, onViewDe
         <FlatList
           horizontal
           showsHorizontalScrollIndicator={false}
-          data={FEATURED_ANIMALS}
+          data={featuredAnimals && featuredAnimals.length > 0 ? featuredAnimals : FEATURED_ANIMALS}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.featuredList}
           renderItem={({ item }) => {
@@ -239,7 +240,11 @@ const ListHeader = React.memo(({ selectedCategory, setSelectedCategory, onViewDe
               <View style={styles.animalCard}>
                 {/* Image Block */}
                 <View style={styles.imagePlaceholder}>
-                  <MaterialCommunityIcons name="image-outline" size={38} color="#94A3B8" />
+                  {item.photos && item.photos.length > 0 ? (
+                    <Image source={{ uri: item.photos[0] }} style={{ width: '100%', height: '100%', borderRadius: 12 }} />
+                  ) : (
+                    <MaterialCommunityIcons name="image-outline" size={38} color="#94A3B8" />
+                  )}
                   {/* Badges Overlay (Featured & Verified) */}
                   <View style={styles.badgeOverlayContainer}>
                     <View style={styles.featuredBadge}>
@@ -287,14 +292,13 @@ const ListHeader = React.memo(({ selectedCategory, setSelectedCategory, onViewDe
           }}
         />
       </View>
-
       {/* Latest Listings Header */}
       <SectionHeader title="Latest Listings" onActionPress={() => {}} />
     </View>
   );
 });
 
-const ListFooter = React.memo(({ onViewDetails }) => {
+const ListFooter = React.memo(({ onViewDetails, recommendedAnimals }) => {
   return (
     <View style={styles.footerSection}>
       {/* Recommended For You */}
@@ -302,7 +306,7 @@ const ListFooter = React.memo(({ onViewDetails }) => {
       <FlatList
         horizontal
         showsHorizontalScrollIndicator={false}
-        data={RECOMMENDED_ANIMALS}
+        data={recommendedAnimals && recommendedAnimals.length > 0 ? recommendedAnimals : RECOMMENDED_ANIMALS}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.recommendedList}
         renderItem={({ item }) => (
@@ -371,6 +375,41 @@ export default function BuyScreen({ navigation }) {
   const name = isGuest ? 'Guest' : userProfile?.name || 'User';
 
   const [selectedCategory, setSelectedCategory] = useState('cow');
+  const [animalsList, setAnimalsList] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchLiveListings = async () => {
+    setLoading(true);
+    try {
+      const res = await api.getAnimals({ status: 'approved' });
+      if (res.status === 'success') {
+        const mappedList = res.data.animals.map((a) => ({
+          ...a,
+          id: a._id,
+          name: a.title,
+          breed: a.breedId?.name || 'Unknown Breed',
+          age: a.age,
+          price: `₹${a.price.toLocaleString()}`,
+          sellerName: a.sellerId?.name || 'Seller',
+          location: `${a.village}, ${a.district}`,
+          isVerified: a.status === 'approved',
+          isFeatured: a.views > 200,
+          postedTime: 'Active',
+          photos: a.photos
+        }));
+        setAnimalsList(mappedList);
+      }
+    } catch (e) {
+      console.warn('[BuyScreen API Warning] Offline or failed backend:', e.message);
+      setAnimalsList([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLiveListings();
+  }, []);
 
   const handleNavigateToSell = useCallback(() => {
     navigation.navigate('Sell');
@@ -414,34 +453,42 @@ export default function BuyScreen({ navigation }) {
             </View>
           </View>
 
-          {/* FlatList replacing vertical ScrollView to implement Latest Listings cleanly */}
-          <FlatList
-            data={LATEST_LISTINGS}
-            keyExtractor={(item) => item.id}
-            ListHeaderComponent={
-              <ListHeader
-                selectedCategory={selectedCategory}
-                setSelectedCategory={setSelectedCategory}
-                onViewDetails={handleViewDetails}
-              />
-            }
-            ListFooterComponent={
-              <ListFooter
-                onViewDetails={handleViewDetails}
-              />
-            }
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-            renderItem={({ item }) => (
-              <ListingCard
-                item={item}
-                onViewDetailsPress={() => handleViewDetails(item)}
-              />
-            )}
-          />
+          {loading ? (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+              <ActivityIndicator size="large" color="#16A34A" />
+              <Text style={{ marginTop: 12, color: '#64748B', fontWeight: '600' }}>जाहिराती लोड होत आहेत... (Loading listings...)</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={animalsList}
+              keyExtractor={(item) => item.id}
+              ListHeaderComponent={
+                <ListHeader
+                  selectedCategory={selectedCategory}
+                  setSelectedCategory={setSelectedCategory}
+                  onViewDetails={handleViewDetails}
+                  featuredAnimals={animalsList.slice(0, 3)}
+                />
+              }
+              ListFooterComponent={
+                <ListFooter
+                  onViewDetails={handleViewDetails}
+                  recommendedAnimals={animalsList.slice(2, 5)}
+                />
+              }
+              contentContainerStyle={styles.scrollContent}
+              showsVerticalScrollIndicator={false}
+              renderItem={({ item }) => (
+                <ListingCard
+                  item={item}
+                  onViewDetailsPress={() => handleViewDetails(item)}
+                />
+              )}
+            />
+          )}
 
-          {/* Floating Action Button (FAB) - Slightly smaller size 48 */}
-          <TouchableOpacity style={styles.fab} activeOpacity={0.85}>
+          {/* Floating Action Button (FAB) */}
+          <TouchableOpacity style={styles.fab} activeOpacity={0.85} onPress={handleNavigateToSell}>
             <MaterialCommunityIcons name="plus" size={22} color="#FFFFFF" />
             <Text style={styles.fabLabel}>Sell Animal</Text>
           </TouchableOpacity>
@@ -712,7 +759,6 @@ const styles = StyleSheet.create({
   categoryCardImage: {
     width: 48, // Size 48x48
     height: 48,
-    resizeMode: 'contain',
     marginBottom: 6,
   },
   categoryCardName: {

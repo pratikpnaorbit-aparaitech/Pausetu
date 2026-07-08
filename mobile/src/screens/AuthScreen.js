@@ -1,21 +1,33 @@
 import React, { useState, useContext } from 'react';
-import { StyleSheet, View, Text, TextInput, TouchableOpacity, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { StyleSheet, View, Text, TextInput, TouchableOpacity, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { AppContext } from '../context/AppContext';
+import { api } from '../api/api';
 
 export default function AuthScreen({ navigation }) {
   const { login, loginAsGuest } = useContext(AppContext);
-  const [phoneNumber, setPhoneNumber] = useState('');
+  const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSendOtp = () => {
-    if (phoneNumber.trim().length >= 10) {
-      navigation.navigate('OtpVerification', { phoneNumber });
-    } else {
-      alert('Please enter a valid phone number');
-    }
+  const isValidEmail = (val) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(val.trim().toLowerCase());
   };
 
-  const handleGoogleLogin = () => {
-    login('mock-google-token-123xyz');
+  const handleSendOtp = async () => {
+    const emailTrimmed = email.trim();
+    if (isValidEmail(emailTrimmed)) {
+      setLoading(true);
+      try {
+        await api.sendOtp(emailTrimmed);
+        navigation.navigate('OtpVerification', { email: emailTrimmed });
+      } catch (err) {
+        Alert.alert('त्रुटी / Error', err.message || 'OTP पाठवण्यात अडचण आली. (Failed to send OTP.)');
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      Alert.alert('त्रुटी / Error', 'कृपया वैध ईमेल पत्ता टाका. (Please enter a valid email address.)');
+    }
   };
 
   return (
@@ -33,38 +45,29 @@ export default function AuthScreen({ navigation }) {
             <Text style={styles.subtitle}>Log in to access cattle marketplace, doctors, and resources</Text>
           </View>
 
-          {/* Phone Authentication */}
+          {/* Email Authentication */}
           <View style={styles.phoneSection}>
-            <Text style={styles.sectionLabel}>Continue with Phone Number</Text>
+            <Text style={styles.sectionLabel}>Continue with Email Address</Text>
             <View style={styles.phoneInputContainer}>
-              <Text style={styles.countryCode}>+91</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Enter Mobile Number"
+                placeholder="Enter Email Address"
                 placeholderTextColor="#90A4AE"
-                keyboardType="phone-pad"
-                maxLength={10}
-                value={phoneNumber}
-                onChangeText={setPhoneNumber}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                value={email}
+                onChangeText={setEmail}
               />
             </View>
-            <TouchableOpacity style={styles.sendButton} onPress={handleSendOtp}>
-              <Text style={styles.sendButtonText}>Send OTP</Text>
+            <TouchableOpacity style={styles.sendButton} onPress={handleSendOtp} disabled={loading}>
+              {loading ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.sendButtonText}>Continue</Text>
+              )}
             </TouchableOpacity>
           </View>
-
-          {/* Divider */}
-          <View style={styles.dividerContainer}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>OR</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          {/* Google Authentication */}
-          <TouchableOpacity style={styles.googleButton} onPress={handleGoogleLogin}>
-            <Text style={styles.googleIcon}>G</Text>
-            <Text style={styles.googleButtonText}>Continue with Google</Text>
-          </TouchableOpacity>
 
           {/* Guest Entry */}
           <TouchableOpacity style={styles.guestButton} onPress={loginAsGuest}>
@@ -180,49 +183,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#FFFFFF',
-  },
-  dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 24,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#E5E7EB',
-  },
-  dividerText: {
-    color: '#6B7280',
-    paddingHorizontal: 16,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  googleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    height: 50,
-    marginBottom: 20,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  googleIcon: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#DB4437',
-    marginRight: 10,
-  },
-  googleButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#37474F',
   },
   guestButton: {
     alignItems: 'center',

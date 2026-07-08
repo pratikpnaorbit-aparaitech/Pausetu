@@ -1,107 +1,59 @@
-import React, { useState, useMemo } from 'react';
-import { StyleSheet, View, Text, SafeAreaView, FlatList, TouchableOpacity, Image, Modal, TextInput, Share, Alert } from 'react-native';
+import React, { useState, useEffect, useContext, useMemo } from 'react';
+import { StyleSheet, View, Text, SafeAreaView, FlatList, TouchableOpacity, Image, Modal, Share, Alert, ActivityIndicator, TextInput } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { AppContext } from '../context/AppContext';
+import { animalApi } from '../api/animalApi';
 
-const MOCK_MY_LISTINGS = [
-  {
-    id: '1',
-    name: 'HF Cross Cow',
-    category: 'Cow',
-    breed: 'Holstein Friesian',
-    price: '₹55,000',
-    postedDate: 'Posted on 20 June 2026',
-    views: 312,
-    favorites: 18,
-    status: 'Active',
-    location: 'Baramati, Pune',
-    image: 'https://images.unsplash.com/photo-1546445317-29f4545e6d52?auto=format&fit=crop&w=300&q=80',
-  },
-  {
-    id: '2',
-    name: 'Murrah Buffalo',
-    category: 'Buffalo',
-    breed: 'Pure Murrah',
-    price: '₹85,000',
-    postedDate: 'Posted on 18 June 2026',
-    views: 450,
-    favorites: 24,
-    status: 'Active',
-    location: 'Hassan, Karnataka',
-    image: 'https://images.unsplash.com/photo-1570042225831-d98fa7577f1e?auto=format&fit=crop&w=300&q=80',
-  },
-  {
-    id: '3',
-    name: 'Tharparkar Cow',
-    category: 'Cow',
-    breed: 'Tharparkar',
-    price: '₹52,000',
-    postedDate: 'Posted on 25 June 2026',
-    views: 12,
-    favorites: 2,
-    status: 'Pending',
-    location: 'Saswad, Pune',
-    image: 'https://images.unsplash.com/photo-1527153857715-3908f2bacb31?auto=format&fit=crop&w=300&q=80',
-  },
-  {
-    id: '4',
-    name: 'Jamnapari Goat',
-    category: 'Goat',
-    breed: 'Jamnapari',
-    price: '₹14,000',
-    postedDate: 'Posted on 10 June 2026',
-    views: 620,
-    favorites: 42,
-    status: 'Sold',
-    location: 'Hadapsar, Pune',
-    image: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
-  },
-  {
-    id: '5',
-    name: 'Sahiwal Bull',
-    category: 'Cow',
-    breed: 'Sahiwal',
-    price: '₹75,000',
-    postedDate: 'Posted on 02 June 2026',
-    views: 95,
-    favorites: 5,
-    status: 'Rejected',
-    location: 'Sikar, Rajasthan',
-    image: 'https://images.unsplash.com/photo-1546445317-29f4545e6d52?auto=format&fit=crop&w=300&q=80',
-  },
-];
-
-const TABS = ['All', 'Active', 'Pending', 'Sold'];
+const TABS = ['All', 'Active', 'Pending', 'Sold', 'Rejected'];
 
 export default function MyListingsScreen({ navigation }) {
+  const { userProfile, userToken } = useContext(AppContext);
   const [selectedTab, setSelectedTab] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchActive, setIsSearchActive] = useState(false);
-  const [activeMenuListing, setActiveMenuListing] = useState(null); // Listing selected for bottom sheet
-  const [inventoryList, setInventoryList] = useState(MOCK_MY_LISTINGS);
+  const [activeMenuListing, setActiveMenuListing] = useState(null);
 
-  const filteredListings = useMemo(() => {
-    return inventoryList.filter((item) => {
-      // 1. Filter by Tab
-      const matchesTab =
-        selectedTab === 'All' ||
-        (selectedTab === 'Active' && item.status === 'Active') ||
-        (selectedTab === 'Pending' && item.status === 'Pending') ||
-        (selectedTab === 'Sold' && item.status === 'Sold');
+  // API states
+  const [listings, setListings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-      // 2. Filter by Search Query
-      const matchesQuery =
-        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.breed.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.location.toLowerCase().includes(searchQuery.toLowerCase());
+  useEffect(() => {
+    fetchMyListings();
 
-      return matchesTab && matchesQuery;
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchMyListings();
     });
-  }, [inventoryList, selectedTab, searchQuery]);
+
+    return unsubscribe;
+  }, [navigation, userProfile]);
+
+  const fetchMyListings = async () => {
+    if (!userProfile || !userProfile.id || userToken === 'guest') {
+      setListings([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      // Query animal listings by sellerId
+      const res = await animalApi.getMyListings(userProfile.id);
+      if (res.status === 'success' && res.data.animals) {
+        setListings(res.data.animals);
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to load seller listings.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleShareListing = async (listing) => {
     try {
       await Share.share({
-        message: `Check out my listing for ${listing.name} (${listing.breed}) on PashuSetu: ${listing.price}!`,
+        message: `Check out my listing for ${listing.title} (${listing.breedId?.name || ''}) on PashuSetu: ₹${listing.price}!`,
       });
     } catch (error) {
       console.log('Error sharing:', error);
@@ -117,8 +69,14 @@ export default function MyListingsScreen({ navigation }) {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => {
-            setInventoryList(inventoryList.filter((item) => item.id !== id));
+          onPress: async () => {
+            try {
+              await animalApi.deleteAnimal(id);
+              Alert.alert('Success', 'Listing deleted successfully.');
+              fetchMyListings();
+            } catch (err) {
+              Alert.alert('Delete Failed', err.message || 'Could not delete listing.');
+            }
             setActiveMenuListing(null);
           },
         },
@@ -126,53 +84,70 @@ export default function MyListingsScreen({ navigation }) {
     );
   };
 
-  const handleMarkAsSold = (id) => {
-    setInventoryList(
-      inventoryList.map((item) =>
-        item.id === id ? { ...item, status: 'Sold' } : item
-      )
-    );
+  const handleMarkAsSold = async (id) => {
+    try {
+      await animalApi.updateAnimal(id, { status: 'sold' });
+      Alert.alert('Listing Updated', 'Your listing is now marked as Sold.');
+      fetchMyListings();
+    } catch (err) {
+      Alert.alert('Update Failed', err.message || 'Could not update listing.');
+    }
     setActiveMenuListing(null);
-    Alert.alert('Listing Updated', 'Your listing is now marked as Sold.');
-  };
-
-  const handleDuplicateListing = (listing) => {
-    const duplicated = {
-      ...listing,
-      id: Date.now().toString(),
-      name: `${listing.name} (Copy)`,
-      views: 0,
-      favorites: 0,
-      postedDate: `Posted on today`,
-    };
-    setInventoryList([duplicated, ...inventoryList]);
-    setActiveMenuListing(null);
-    Alert.alert('Listing Duplicated', 'A copy of this listing has been created.');
   };
 
   const handleNavigateToAddAnimal = () => {
     navigation.navigate('AddAnimal');
   };
 
+  // Filtering Logic
+  const filteredListings = useMemo(() => {
+    return listings.filter((item) => {
+      // 1. Tab Status Mapping
+      const status = item.status?.toLowerCase();
+      let matchesTab = false;
+      if (selectedTab === 'All') {
+        matchesTab = true;
+      } else if (selectedTab === 'Active' && status === 'approved') {
+        matchesTab = true;
+      } else if (selectedTab === 'Pending' && status === 'pending') {
+        matchesTab = true;
+      } else if (selectedTab === 'Sold' && status === 'sold') {
+        matchesTab = true;
+      } else if (selectedTab === 'Rejected' && status === 'rejected') {
+        matchesTab = true;
+      }
+
+      // 2. Search Query Mapping
+      const breedName = item.breedId?.name || '';
+      const catName = item.categoryId?.name || '';
+      const matchesQuery =
+        item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        breedName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        catName.toLowerCase().includes(searchQuery.toLowerCase());
+
+      return matchesTab && matchesQuery;
+    });
+  }, [listings, selectedTab, searchQuery]);
+
   const renderStatusBadge = (status) => {
     let bg, color, label;
-    switch (status) {
-      case 'Active':
+    switch (status?.toLowerCase()) {
+      case 'approved':
         bg = '#DCFCE7';
         color = '#16A34A';
         label = 'Active';
         break;
-      case 'Pending':
+      case 'pending':
         bg = '#FEF3C7';
         color = '#D97706';
-        label = 'Pending Approval';
+        label = 'Pending';
         break;
-      case 'Sold':
+      case 'sold':
         bg = '#DBEAFE';
         color = '#2563EB';
         label = 'Sold';
         break;
-      case 'Rejected':
+      case 'rejected':
         bg = '#FEE2E2';
         color = '#EF4444';
         label = 'Rejected';
@@ -180,7 +155,7 @@ export default function MyListingsScreen({ navigation }) {
       default:
         bg = '#F1F5F9';
         color = '#64748B';
-        label = status;
+        label = status || 'Draft';
     }
 
     return (
@@ -189,6 +164,38 @@ export default function MyListingsScreen({ navigation }) {
       </View>
     );
   };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>My Listings</Text>
+        </View>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color="#16A34A" />
+          <Text style={{ marginTop: 12, color: 'var(--text-muted)' }}>Loading your listings...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>My Listings</Text>
+        </View>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+          <Ionicons name="cloud-offline-outline" size={48} color="var(--color-danger)" />
+          <Text style={{ fontSize: 16, fontWeight: '700', marginTop: 16 }}>Connection Failed</Text>
+          <Text style={{ textAlign: 'center', color: '#64748B', marginTop: 8, marginBottom: 20 }}>{error}</Text>
+          <TouchableOpacity style={styles.addAnimalBtn} onPress={fetchMyListings}>
+            <Text style={styles.addAnimalBtnText}>Retry Connection</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -221,9 +228,6 @@ export default function MyListingsScreen({ navigation }) {
           >
             <Ionicons name={isSearchActive ? "close" : "search-outline"} size={22} color="#0F172A" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.headerActionBtn}>
-            <MaterialCommunityIcons name="tune-variant" size={22} color="#0F172A" />
-          </TouchableOpacity>
         </View>
       </View>
 
@@ -243,7 +247,7 @@ export default function MyListingsScreen({ navigation }) {
       {/* Listings List / Empty State */}
       <FlatList
         data={filteredListings}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.id || item._id}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
@@ -251,67 +255,76 @@ export default function MyListingsScreen({ navigation }) {
             <View style={styles.emptyIconCircle}>
               <MaterialCommunityIcons name="clipboard-text-search-outline" size={50} color="#94A3B8" />
             </View>
-            <Text style={styles.emptyTitle}>No Listings Found</Text>
-            <Text style={styles.emptySubtitle}>You don't have any listings in this section. Start selling your animal today!</Text>
+            <Text style={styles.emptyTitle}>You haven't listed any animals yet.</Text>
+            <Text style={styles.emptySubtitle}>Start selling your animal on PashuSetu today!</Text>
             <TouchableOpacity style={styles.addAnimalBtn} onPress={handleNavigateToAddAnimal}>
               <Text style={styles.addAnimalBtnText}>Add Animal</Text>
             </TouchableOpacity>
           </View>
         }
-        renderItem={({ item }) => (
-          <View style={styles.listingCard}>
-            <View style={styles.cardHeader}>
-              <Image source={{ uri: item.image }} style={styles.cardThumbnail} />
-              <View style={styles.cardDetails}>
-                <View style={styles.titleRow}>
-                  <Text style={styles.cardTitle}>{item.name}</Text>
-                  <TouchableOpacity
-                    style={styles.threeDotBtn}
-                    onPress={() => setActiveMenuListing(item)}
-                  >
-                    <Ionicons name="ellipsis-vertical" size={18} color="#64748B" />
-                  </TouchableOpacity>
-                </View>
-                <Text style={styles.cardSubtitle}>{item.breed} • {item.category}</Text>
-                <Text style={styles.cardPrice}>{item.price}</Text>
-                
-                <View style={styles.locationRow}>
-                  <Ionicons name="location" size={12} color="#64748B" />
-                  <Text style={styles.locationText} numberOfLines={1}>{item.location}</Text>
+        renderItem={({ item }) => {
+          const mainImage = item.photos && item.photos.length > 0
+            ? (item.photos[0].startsWith('http') ? item.photos[0] : `http://10.0.2.2:5000${item.photos[0]}`)
+            : 'https://images.unsplash.com/photo-1546445317-29f4545e6d52?auto=format&fit=crop&w=300&q=80';
+
+          return (
+            <View style={styles.listingCard}>
+              <View style={styles.cardHeader}>
+                <Image source={{ uri: mainImage }} style={styles.cardThumbnail} />
+                <View style={styles.cardDetails}>
+                  <View style={styles.titleRow}>
+                    <Text style={styles.cardTitle}>{item.title}</Text>
+                    <TouchableOpacity
+                      style={styles.threeDotBtn}
+                      onPress={() => setActiveMenuListing(item)}
+                    >
+                      <Ionicons name="ellipsis-vertical" size={18} color="#64748B" />
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={styles.cardSubtitle}>{item.breedId?.name || 'Other Breed'} • {item.categoryId?.name || 'Cattle'}</Text>
+                  <Text style={styles.cardPrice}>₹{Number(item.price).toLocaleString()}</Text>
+                  
+                  <View style={styles.locationRow}>
+                    <Ionicons name="location" size={12} color="#64748B" />
+                    <Text style={styles.locationText} numberOfLines={1}>{item.village}, {item.district}</Text>
+                  </View>
                 </View>
               </View>
-            </View>
 
-            <View style={styles.divider} />
-
-            {/* Performance Stats Overlay */}
-            <View style={styles.cardPerformanceRow}>
-              <View style={styles.perfStat}>
-                <Ionicons name="eye-outline" size={14} color="#64748B" />
-                <Text style={styles.perfStatText}>{item.views} Views</Text>
-              </View>
-              {renderStatusBadge(item.status)}
-            </View>
-
-            {/* Action buttons inside the card */}
-            <View style={styles.cardActionsRow}>
-              <TouchableOpacity style={styles.cardActionBtn} onPress={() => handleShareListing(item)}>
-                <Ionicons name="share-social-outline" size={16} color="#64748B" />
-                <Text style={styles.cardActionBtnLabel}>Share</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.cardActionBtn} onPress={() => handleDuplicateListing(item)}>
-                <Ionicons name="copy-outline" size={16} color="#64748B" />
-                <Text style={styles.cardActionBtnLabel}>Duplicate</Text>
-              </TouchableOpacity>
-              {item.status !== 'Sold' && (
-                <TouchableOpacity style={styles.cardActionBtn} onPress={() => handleMarkAsSold(item.id)}>
-                  <Ionicons name="checkmark-done-circle-outline" size={16} color="#2563EB" />
-                  <Text style={[styles.cardActionBtnLabel, { color: '#2563EB' }]}>Mark Sold</Text>
-                </TouchableOpacity>
+              {item.status === 'rejected' && item.rejectionReason && (
+                <View style={styles.rejectionCard}>
+                  <Text style={styles.rejectionLabel}>Rejection Reason:</Text>
+                  <Text style={styles.rejectionText}>{item.rejectionReason}</Text>
+                </View>
               )}
+
+              <View style={styles.divider} />
+
+              {/* Performance Stats Overlay */}
+              <View style={styles.cardPerformanceRow}>
+                <View style={styles.perfStat}>
+                  <Ionicons name="eye-outline" size={14} color="#64748B" />
+                  <Text style={styles.perfStatText}>{item.views || 0} Views</Text>
+                </View>
+                {renderStatusBadge(item.status)}
+              </View>
+
+              {/* Action buttons inside the card */}
+              <View style={styles.cardActionsRow}>
+                <TouchableOpacity style={styles.cardActionBtn} onPress={() => handleShareListing(item)}>
+                  <Ionicons name="share-social-outline" size={16} color="#64748B" />
+                  <Text style={styles.cardActionBtnLabel}>Share</Text>
+                </TouchableOpacity>
+                {item.status?.toLowerCase() !== 'sold' && (
+                  <TouchableOpacity style={styles.cardActionBtn} onPress={() => handleMarkAsSold(item.id || item._id)}>
+                    <Ionicons name="checkmark-done-circle-outline" size={16} color="#2563EB" />
+                    <Text style={[styles.cardActionBtnLabel, { color: '#2563EB' }]}>Mark Sold</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
-          </View>
-        )}
+          );
+        }}
       />
 
       {/* Slide-Up Bottom Sheet Modal */}
@@ -331,22 +344,20 @@ export default function MyListingsScreen({ navigation }) {
             <Text style={styles.bottomSheetTitle}>Manage Listing</Text>
             {activeMenuListing && (
               <View style={styles.bottomSheetMetaRow}>
-                <Image source={{ uri: activeMenuListing.image }} style={styles.bottomSheetThumb} />
+                <Image
+                  source={{ uri: activeMenuListing.photos && activeMenuListing.photos.length > 0 ? activeMenuListing.photos[0] : 'https://images.unsplash.com/photo-1546445317-29f4545e6d52?auto=format&fit=crop&w=300&q=80' }}
+                  style={styles.bottomSheetThumb}
+                />
                 <View>
-                  <Text style={styles.bottomSheetListingName}>{activeMenuListing.name}</Text>
-                  <Text style={styles.bottomSheetListingPrice}>{activeMenuListing.price}</Text>
+                  <Text style={styles.bottomSheetListingName}>{activeMenuListing.title}</Text>
+                  <Text style={styles.bottomSheetListingPrice}>₹{Number(activeMenuListing.price).toLocaleString()}</Text>
                 </View>
               </View>
             )}
 
             <View style={styles.bottomSheetActionsList}>
-              <TouchableOpacity style={styles.bottomSheetAction} onPress={() => setActiveMenuListing(null)}>
-                <Ionicons name="create-outline" size={20} color="#0F172A" style={styles.actionIcon} />
-                <Text style={styles.actionText}>Edit Listing</Text>
-              </TouchableOpacity>
-
-              {activeMenuListing && activeMenuListing.status !== 'Sold' && (
-                <TouchableOpacity style={styles.bottomSheetAction} onPress={() => handleMarkAsSold(activeMenuListing.id)}>
+              {activeMenuListing && activeMenuListing.status?.toLowerCase() !== 'sold' && (
+                <TouchableOpacity style={styles.bottomSheetAction} onPress={() => handleMarkAsSold(activeMenuListing.id || activeMenuListing._id)}>
                   <Ionicons name="checkmark-done" size={20} color="#2563EB" style={styles.actionIcon} />
                   <Text style={[styles.actionText, { color: '#2563EB' }]}>Mark as Sold</Text>
                 </TouchableOpacity>
@@ -357,14 +368,9 @@ export default function MyListingsScreen({ navigation }) {
                 <Text style={styles.actionText}>Share Listing</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.bottomSheetAction} onPress={() => activeMenuListing && handleDuplicateListing(activeMenuListing)}>
-                <Ionicons name="copy-outline" size={20} color="#0F172A" style={styles.actionIcon} />
-                <Text style={styles.actionText}>Duplicate Listing</Text>
-              </TouchableOpacity>
-
               <TouchableOpacity
                 style={[styles.bottomSheetAction, styles.deleteAction]}
-                onPress={() => activeMenuListing && handleDeleteListing(activeMenuListing.id)}
+                onPress={() => activeMenuListing && handleDeleteListing(activeMenuListing.id || activeMenuListing._id)}
               >
                 <Ionicons name="trash-outline" size={20} color="#EF4444" style={styles.actionIcon} />
                 <Text style={[styles.actionText, { color: '#EF4444' }]}>Delete Listing</Text>
@@ -456,18 +462,53 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 40,
   },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+  },
+  emptyIconCircle: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0F172A',
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    fontSize: 13,
+    color: '#64748B',
+    textAlign: 'center',
+    marginTop: 8,
+    marginHorizontal: 24,
+    lineHeight: 20,
+  },
+  addAnimalBtn: {
+    backgroundColor: '#16A34A',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 24,
+    marginTop: 20,
+  },
+  addAnimalBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
   listingCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderColor: '#E2E8F0',
     padding: 14,
     marginBottom: 16,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.02,
-    shadowRadius: 8,
-    elevation: 2,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -476,32 +517,29 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 12,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F1F5F9',
+    marginRight: 14,
   },
   cardDetails: {
     flex: 1,
-    marginLeft: 12,
   },
   titleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   cardTitle: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#0F172A',
     flex: 1,
-    marginRight: 6,
   },
   threeDotBtn: {
-    width: 24,
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
+    padding: 4,
+    marginLeft: 6,
   },
   cardSubtitle: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#64748B',
     marginTop: 2,
   },
@@ -509,7 +547,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
     color: '#16A34A',
-    marginTop: 4,
+    marginTop: 6,
   },
   locationRow: {
     flexDirection: 'row',
@@ -520,7 +558,24 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#64748B',
     marginLeft: 4,
-    flex: 1,
+  },
+  rejectionCard: {
+    backgroundColor: '#FEF2F2',
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: '#EF4444',
+  },
+  rejectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#EF4444',
+  },
+  rejectionText: {
+    fontSize: 12,
+    color: '#EF4444',
+    marginTop: 2,
   },
   divider: {
     height: 1,
@@ -529,117 +584,68 @@ const styles = StyleSheet.create({
   },
   cardPerformanceRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
   },
   perfStat: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 16,
+    gap: 4,
   },
   perfStatText: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#64748B',
-    marginLeft: 4,
+    fontWeight: '600',
   },
   statusBadge: {
-    paddingVertical: 3,
     paddingHorizontal: 8,
-    borderRadius: 6,
-    marginLeft: 'auto',
+    paddingVertical: 3,
+    borderRadius: 8,
   },
   statusBadgeText: {
-    fontSize: 10,
-    fontWeight: 'bold',
+    fontSize: 11,
+    fontWeight: '700',
   },
   cardActionsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    marginTop: 12,
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
-    paddingTop: 10,
+    paddingTop: 12,
+    gap: 12,
   },
   cardActionBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 4,
-  },
-  cardActionBtnLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#64748B',
-    marginLeft: 4,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 20,
-  },
-  emptyIconCircle: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.02,
-    shadowRadius: 8,
-    elevation: 1,
+    borderRadius: 10,
+    paddingVertical: 8,
+    gap: 6,
   },
-  emptyTitle: {
-    fontSize: 18,
+  cardActionBtnLabel: {
+    fontSize: 12,
     fontWeight: '700',
-    color: '#0F172A',
-    marginBottom: 8,
-  },
-  emptySubtitle: {
-    fontSize: 13,
     color: '#64748B',
-    textAlign: 'center',
-    lineHeight: 18,
-    marginBottom: 24,
-  },
-  addAnimalBtn: {
-    backgroundColor: '#16A34A',
-    paddingVertical: 10,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    shadowColor: '#16A34A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  addAnimalBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#FFFFFF',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.4)',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     justifyContent: 'flex-end',
   },
   bottomSheetContainer: {
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 34,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
   },
   dragHandle: {
     width: 40,
     height: 4,
+    backgroundColor: '#CBD5E1',
     borderRadius: 2,
-    backgroundColor: '#E2E8F0',
     alignSelf: 'center',
     marginBottom: 16,
   },
@@ -652,18 +658,16 @@ const styles = StyleSheet.create({
   bottomSheetMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 16,
-    padding: 12,
     marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    paddingBottom: 16,
   },
   bottomSheetThumb: {
-    width: 44,
-    height: 44,
-    borderRadius: 8,
-    marginRight: 10,
+    width: 48,
+    height: 48,
+    borderRadius: 10,
+    marginRight: 12,
   },
   bottomSheetListingName: {
     fontSize: 14,
@@ -671,33 +675,31 @@ const styles = StyleSheet.create({
     color: '#0F172A',
   },
   bottomSheetListingPrice: {
-    fontSize: 14,
-    fontWeight: '800',
+    fontSize: 13,
     color: '#16A34A',
+    fontWeight: '600',
     marginTop: 2,
   },
   bottomSheetActionsList: {
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-    paddingTop: 6,
+    gap: 10,
   },
   bottomSheetAction: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
+    paddingVertical: 12,
   },
   actionIcon: {
     marginRight: 12,
   },
   actionText: {
     fontSize: 14,
-    color: '#0F172A',
-    fontWeight: '600',
+    fontWeight: '700',
+    color: '#1E293B',
   },
   deleteAction: {
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
-    marginTop: 6,
     paddingTop: 16,
+    marginTop: 6,
   },
 });

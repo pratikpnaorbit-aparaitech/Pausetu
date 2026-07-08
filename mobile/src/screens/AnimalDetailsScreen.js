@@ -1,8 +1,9 @@
-import React, { useState, useRef, useCallback } from 'react';
-import { StyleSheet, View, Text, ScrollView, Image, TouchableOpacity, Dimensions, Modal, Share } from 'react-native';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { StyleSheet, View, Text, ScrollView, Image, TouchableOpacity, Dimensions, Modal, Share, FlatList } from 'react-native';
 import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import SectionHeader from '../components/SectionHeader';
 import ListingCard from '../components/ListingCard';
+import { api } from '../api/api';
 
 const { width } = Dimensions.get('window');
 const GALLERY_HEIGHT = 280;
@@ -67,6 +68,41 @@ export default function AnimalDetailsScreen({ route, navigation }) {
   const [activeSlide, setActiveSlide] = useState(0);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
+  const [similarAnimals, setSimilarAnimals] = useState([]);
+
+  useEffect(() => {
+    const fetchSimilar = async () => {
+      try {
+        if (animal.categoryId) {
+          const catId = animal.categoryId._id || animal.categoryId;
+          const res = await api.getAnimals({ categoryId: catId, status: 'approved' });
+          if (res.status === 'success') {
+            const list = res.data.animals
+              .filter(a => a._id !== animal._id)
+              .slice(0, 5)
+              .map(a => ({
+                ...a,
+                id: a._id,
+                name: a.title,
+                breed: a.breedId?.name || 'Unknown Breed',
+                age: a.age,
+                price: `₹${a.price.toLocaleString()}`,
+                sellerName: a.sellerId?.name || 'Seller',
+                location: `${a.village}, ${a.district}`,
+                isVerified: a.status === 'approved',
+                isFeatured: a.views > 200,
+                postedTime: 'Active',
+                photos: a.photos
+              }));
+            setSimilarAnimals(list);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to load similar animals:', err.message);
+      }
+    };
+    fetchSimilar();
+  }, [animal]);
 
   const scrollRef = useRef(null);
 
@@ -119,13 +155,13 @@ export default function AnimalDetailsScreen({ route, navigation }) {
             ref={scrollRef}
           >
             {/* Images */}
-            {MOCK_IMAGES.map((imgUri, index) => (
-              <Image key={index} source={{ uri: imgUri }} style={styles.galleryImage} />
+            {(animal.photos && animal.photos.length > 0 ? animal.photos : MOCK_IMAGES).map((imgUri, index) => (
+              <Image key={index} source={{ uri: imgUri }} style={styles.galleryImage} resizeMode="cover" />
             ))}
 
             {/* Video Thumbnail Slide */}
             <View style={styles.videoSlide}>
-              <Image source={{ uri: MOCK_IMAGES[0] }} style={styles.galleryImage} blurRadius={3} />
+              <Image source={{ uri: animal.photos && animal.photos.length > 0 ? animal.photos[0] : MOCK_IMAGES[0] }} style={styles.galleryImage} blurRadius={3} resizeMode="cover" />
               <View style={styles.videoOverlay}>
                 <TouchableOpacity style={styles.playButtonCircle} onPress={() => setIsVideoPlaying(true)}>
                   <Ionicons name="play" size={28} color="#FFFFFF" style={styles.playIconOffset} />
@@ -137,7 +173,7 @@ export default function AnimalDetailsScreen({ route, navigation }) {
 
           {/* Pagination Indicators */}
           <View style={styles.paginationContainer}>
-            {[...Array(MOCK_IMAGES.length + 1)].map((_, index) => (
+            {[...Array((animal.photos && animal.photos.length > 0 ? animal.photos.length : MOCK_IMAGES.length) + 1)].map((_, index) => (
               <View
                 key={index}
                 style={[
@@ -181,27 +217,27 @@ export default function AnimalDetailsScreen({ route, navigation }) {
             <View style={styles.specItem}>
               <MaterialCommunityIcons name="gender-male-female" size={18} color="#16A34A" />
               <Text style={styles.specLabel}>Gender</Text>
-              <Text style={styles.specValue}>Female</Text>
+              <Text style={styles.specValue}>{animal.gender || 'Female'}</Text>
             </View>
             <View style={styles.specItem}>
               <MaterialCommunityIcons name="weight-kilogram" size={18} color="#16A34A" />
               <Text style={styles.specLabel}>Weight</Text>
-              <Text style={styles.specValue}>420 kg</Text>
+              <Text style={styles.specValue}>{animal.weight ? `${animal.weight} kg` : 'N/A'}</Text>
             </View>
             <View style={styles.specItem}>
               <MaterialCommunityIcons name="palette" size={18} color="#16A34A" />
               <Text style={styles.specLabel}>Color</Text>
-              <Text style={styles.specValue}>White & Black</Text>
+              <Text style={styles.specValue}>{animal.color || 'N/A'}</Text>
             </View>
             <View style={styles.specItem}>
               <MaterialCommunityIcons name="heart-pulse" size={18} color="#16A34A" />
               <Text style={styles.specLabel}>Health</Text>
-              <Text style={styles.specValue}>Excellent</Text>
+              <Text style={styles.specValue}>{animal.health?.healthy ? 'Healthy' : 'N/A'}</Text>
             </View>
             <View style={styles.specItem}>
               <MaterialCommunityIcons name="shield-check" size={18} color="#16A34A" />
               <Text style={styles.specLabel}>Vaccinated</Text>
-              <Text style={styles.specValue}>Yes</Text>
+              <Text style={styles.specValue}>{animal.health?.vaccinated ? 'Yes' : 'No'}</Text>
             </View>
           </View>
 
@@ -209,7 +245,7 @@ export default function AnimalDetailsScreen({ route, navigation }) {
           <View style={styles.infoCard}>
             <Text style={styles.cardSectionTitle}>Description</Text>
             <Text style={styles.descriptionText} numberOfLines={descriptionExpanded ? undefined : 3}>
-              This {animal.name} is in peak healthy condition. Highly productive dairy cow yielding around 16 liters of milk daily. Well trained, behaves very calmly during milking, and is fed premium fodder. All vaccinations are up to date with official certified records available upon request.
+              {animal.description || 'No description available for this livestock listing.'}
             </Text>
             <TouchableOpacity onPress={() => setDescriptionExpanded(!descriptionExpanded)}>
               <Text style={styles.readMoreText}>
@@ -282,7 +318,7 @@ export default function AnimalDetailsScreen({ route, navigation }) {
             <FlatList
               horizontal
               showsHorizontalScrollIndicator={false}
-              data={SIMILAR_ANIMALS}
+              data={similarAnimals}
               keyExtractor={(item) => item.id}
               contentContainerStyle={styles.similarList}
               renderItem={({ item }) => (
@@ -380,7 +416,6 @@ const styles = StyleSheet.create({
   galleryImage: {
     width: width,
     height: GALLERY_HEIGHT,
-    resizeMode: 'cover',
   },
   videoSlide: {
     width: width,

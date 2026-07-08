@@ -1,88 +1,86 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { StyleSheet, View, Text, SafeAreaView, FlatList, TouchableOpacity, Alert, Modal, ActivityIndicator } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import NotificationCard from '../components/NotificationCard';
+import { api } from '../api/api';
 
-const MOCK_NOTIFICATIONS = [
-  {
-    id: 'n1',
-    category: 'Listings',
-    title: 'Listing Approved 🎉',
-    description: 'Your Sahiwal Cow listing has been successfully verified and is now active for buyers.',
-    time: '10 min ago',
-    isRead: false,
-    icon: 'check-decagram',
-    iconColor: '#16A34A',
-    badgeText: 'Active',
-    badgeColor: '#DCFCE7',
-    badgeTextColor: '#16A34A',
-    priority: 'Low',
-  },
-  {
-    id: 'n2',
-    category: 'Messages',
-    title: 'New Buyer Enquiry 💬',
-    description: 'Amit Sharma sent you a message inquiring about the Jafarabadi Buffalo.',
-    time: '1 hour ago',
-    isRead: false,
-    icon: 'account-question-outline',
-    iconColor: '#3B82F6',
-    badgeText: 'New Message',
-    badgeColor: '#DBEAFE',
-    badgeTextColor: '#2563EB',
-    priority: 'High',
-  },
-  {
-    id: 'n3',
-    category: 'Listings',
-    title: 'Listing Rejected ⚠️',
-    description: 'Your listing for HF Cross Bull was rejected due to blurry photos. Please update photos.',
-    time: '4 hours ago',
-    isRead: true,
-    icon: 'alert-circle-outline',
-    iconColor: '#EF4444',
-    badgeText: 'Rejected',
-    badgeColor: '#FEE2E2',
-    badgeTextColor: '#EF4444',
-    priority: 'High',
-  },
-  {
-    id: 'n4',
-    category: 'Orders',
-    title: 'Listing Marked as Sold 🤝',
-    description: 'Congratulations! Your Jamnapari Goat listing has been successfully marked as sold.',
-    time: 'Yesterday',
-    isRead: true,
-    icon: 'cash-check',
-    iconColor: '#8B5CF6',
-    badgeText: 'Sold',
-    badgeColor: '#F3E8FF',
-    badgeTextColor: '#8B5CF6',
-    priority: 'Low',
-  },
-  {
-    id: 'n5',
-    category: 'System',
-    title: 'System Update ⚙️',
-    description: 'PashuSetu application upgraded to version 2.4. Enjoy faster loads and premium UI transitions.',
-    time: 'Yesterday',
-    isRead: true,
-    icon: 'cog-outline',
-    iconColor: '#64748B',
-    badgeText: 'Update',
-    badgeColor: '#F1F5F9',
-    badgeTextColor: '#64748B',
-    priority: 'Medium',
-  },
-];
+const mapBackendNotification = (n) => {
+  let category = 'System';
+  let icon = 'cog-outline';
+  let iconColor = '#64748B';
+  let badgeText = 'Update';
+  let badgeColor = '#F1F5F9';
+  let badgeTextColor = '#64748B';
+  let priority = 'Medium';
+
+  if (n.type === 'success') {
+    category = 'Listings';
+    icon = 'check-decagram';
+    iconColor = '#16A34A';
+    badgeText = 'Approved';
+    badgeColor = '#DCFCE7';
+    badgeTextColor = '#16A34A';
+    priority = 'Low';
+  } else if (n.type === 'alert') {
+    category = 'Listings';
+    icon = 'alert-circle-outline';
+    iconColor = '#EF4444';
+    badgeText = 'Rejected';
+    badgeColor = '#FEE2E2';
+    badgeTextColor = '#EF4444';
+    priority = 'High';
+  } else if (n.type === 'chat') {
+    category = 'Messages';
+    icon = 'account-question-outline';
+    iconColor = '#3B82F6';
+    badgeText = 'New Message';
+    badgeColor = '#DBEAFE';
+    badgeTextColor = '#2563EB';
+    priority = 'High';
+  }
+
+  return {
+    id: n._id,
+    category,
+    title: n.title,
+    description: n.message,
+    time: new Date(n.createdAt).toLocaleDateString(),
+    isRead: n.isRead,
+    icon,
+    iconColor,
+    badgeText,
+    badgeColor,
+    badgeTextColor,
+    priority
+  };
+};
 
 const TABS = ['All', 'Listings', 'Messages', 'Orders', 'System'];
 
 export default function NotificationsScreen({ navigation }) {
   const [selectedTab, setSelectedTab] = useState('All');
-  const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isMenuVisible, setIsMenuVisible] = useState(false);
+
+  const fetchNotifications = async () => {
+    try {
+      const res = await api.getMyNotifications();
+      if (res.status === 'success') {
+        setNotifications((res.data.notifications || []).map(mapBackendNotification));
+      }
+    } catch (err) {
+      console.warn('Failed to load notifications:', err.message);
+    } finally {
+      setLoading(false);
+      setIsRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+  }, []);
 
   const filteredNotifications = useMemo(() => {
     return notifications.filter((item) => {
@@ -90,23 +88,39 @@ export default function NotificationsScreen({ navigation }) {
     });
   }, [notifications, selectedTab]);
 
-  const handleMarkAsRead = (id) => {
-    setNotifications(
-      notifications.map((item) =>
-        item.id === id ? { ...item, isRead: true } : item
-      )
-    );
+  const handleMarkAsRead = async (id) => {
+    try {
+      await api.markAsRead(id);
+      setNotifications(
+        notifications.map((item) =>
+          item.id === id ? { ...item, isRead: true } : item
+        )
+      );
+    } catch (err) {
+      Alert.alert('Error', 'Failed to mark notification as read.');
+    }
   };
 
-  const handleMarkAllAsRead = () => {
-    setNotifications(
-      notifications.map((item) => ({ ...item, isRead: true }))
-    );
-    Alert.alert('Success', 'All notifications marked as read.');
+  const handleMarkAllAsRead = async () => {
+    try {
+      const unread = notifications.filter(n => !n.isRead);
+      await Promise.all(unread.map(n => api.markAsRead(n.id)));
+      setNotifications(
+        notifications.map((item) => ({ ...item, isRead: true }))
+      );
+      Alert.alert('Success', 'All notifications marked as read.');
+    } catch (err) {
+      Alert.alert('Error', 'Failed to mark all as read.');
+    }
   };
 
-  const handleDeleteNotification = (id) => {
-    setNotifications(notifications.filter((item) => item.id !== id));
+  const handleDeleteNotification = async (id) => {
+    try {
+      await api.deleteNotification(id);
+      setNotifications(notifications.filter((item) => item.id !== id));
+    } catch (err) {
+      Alert.alert('Error', 'Failed to delete notification.');
+    }
   };
 
   const handleDeleteAll = () => {
@@ -119,7 +133,14 @@ export default function NotificationsScreen({ navigation }) {
         {
           text: 'Clear All',
           style: 'destructive',
-          onPress: () => setNotifications([]),
+          onPress: async () => {
+            try {
+              await Promise.all(notifications.map(n => api.deleteNotification(n.id)));
+              setNotifications([]);
+            } catch (err) {
+              Alert.alert('Error', 'Failed to clear all notifications.');
+            }
+          },
         },
       ]
     );
@@ -127,10 +148,7 @@ export default function NotificationsScreen({ navigation }) {
 
   const handleRefresh = () => {
     setIsRefreshing(true);
-    setTimeout(() => {
-      setNotifications(MOCK_NOTIFICATIONS);
-      setIsRefreshing(false);
-    }, 1000);
+    fetchNotifications();
   };
 
   return (

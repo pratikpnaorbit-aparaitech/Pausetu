@@ -1,27 +1,67 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Text, SafeAreaView, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
+import React, { useState, useContext } from 'react';
+import { StyleSheet, View, Text, SafeAreaView, ScrollView, TouchableOpacity, Switch, Alert, Platform } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { AppContext } from '../context/AppContext';
 
 export default function SettingsScreen({ navigation }) {
+  const { logout, exitGuestSession, isGuest, userToken } = useContext(AppContext);
   // Theme state (system/dark/light)
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [fontSize, setFontSize] = useState('Medium'); // Small/Medium/Large
 
   const handleLogout = () => {
-    Alert.alert(
-      'Logout Confirmation',
-      'Are you sure you want to logout from PashuSetu?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: () => {
-            Alert.alert('Logged Out', 'You have been successfully logged out.');
+    const isGuestUser = isGuest || userToken === 'guest';
+    console.log('[SettingsScreen] handleLogout initiated, isGuestUser:', isGuestUser);
+
+    if (Platform.OS === 'web') {
+      const msg = isGuestUser ? 'Exit Guest Session?' : 'Are you sure you want to logout?';
+      const confirmed = window.confirm(msg);
+      console.log('[SettingsScreen] Web confirm result:', confirmed);
+      if (confirmed) {
+        if (isGuestUser) {
+          console.log('[SettingsScreen] Executing web exitGuestSession');
+          exitGuestSession();
+        } else {
+          console.log('[SettingsScreen] Executing web logout');
+          logout();
+        }
+      }
+      return;
+    }
+
+    if (isGuestUser) {
+      Alert.alert(
+        'Logout',
+        'Exit Guest Session?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Exit',
+            style: 'destructive',
+            onPress: async () => {
+              console.log('[SettingsScreen] Executing native exitGuestSession');
+              await exitGuestSession();
+            },
           },
-        },
-      ]
-    );
+        ]
+      );
+    } else {
+      Alert.alert(
+        'Logout',
+        'Are you sure you want to logout?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Logout',
+            style: 'destructive',
+            onPress: async () => {
+              console.log('[SettingsScreen] Executing native logout');
+              await logout();
+            },
+          },
+        ]
+      );
+    }
   };
 
   const handleSettingAction = (title) => {

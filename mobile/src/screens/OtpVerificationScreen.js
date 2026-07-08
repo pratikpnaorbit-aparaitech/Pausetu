@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { StyleSheet, View, Text, TextInput, TouchableOpacity, SafeAreaView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { StyleSheet, View, Text, TextInput, TouchableOpacity, SafeAreaView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AppContext } from '../context/AppContext';
+import { api } from '../api/api';
 
 export default function OtpVerificationScreen({ route, navigation }) {
   const { login } = useContext(AppContext);
-  const { phoneNumber } = route.params || { phoneNumber: 'XXXXXX' };
+  const { email } = route.params || { email: 'user@example.com' };
   const [otp, setOtp] = useState('');
-  const [timer, setTimer] = useState(30);
+  const [timer, setTimer] = useState(60);
+  const [loading, setLoading] = useState(false);
+  const [verifiedSuccess, setVerifiedSuccess] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -16,17 +19,48 @@ export default function OtpVerificationScreen({ route, navigation }) {
     return () => clearInterval(interval);
   }, []);
 
-  const handleVerify = () => {
-    if (otp.length === 6 || otp === '123456') {
-      login('mock-phone-token-555abc');
-    } else {
-      Alert.alert('Invalid OTP', 'Please enter a valid 6-digit OTP (Try 123456 as mock).');
+  const handleOtpChange = (text) => {
+    setOtp(text);
+    if (text.length === 6) {
+      handleVerify(text);
     }
   };
 
-  const handleResend = () => {
-    setTimer(30);
-    alert('Mock OTP sent successfully!');
+  const handleVerify = async (codeToVerify = otp) => {
+    if (codeToVerify.length === 6) {
+      setLoading(true);
+      try {
+        const body = await api.verifyOtp(email, codeToVerify);
+        if (body.status === 'success') {
+          setVerifiedSuccess(true);
+          setTimeout(() => {
+            login(body.data.accessToken, body.data.refreshToken, body.data.user);
+          }, 1000);
+        } else {
+          throw new Error(body.message);
+        }
+      } catch (err) {
+        Alert.alert('त्रुटी / Error', err.message || 'OTP पडताळणी अयशस्वी झाली.');
+        setOtp('');
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      Alert.alert('त्रुटी / Error', 'कृपया ६-अंकी कोड टाका. (Please enter a 6-digit verification code.)');
+    }
+  };
+
+  const handleResend = async () => {
+    setLoading(true);
+    try {
+      await api.sendOtp(email);
+      setTimer(60);
+      Alert.alert('यशस्वी (Success)', 'OTP यशस्वीरित्या पाठवला गेला आहे! (OTP sent successfully!)');
+    } catch (err) {
+      Alert.alert('त्रुटी / Error', err.message || 'OTP पुन्हा पाठवण्यात अडचण आली.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -35,44 +69,63 @@ export default function OtpVerificationScreen({ route, navigation }) {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} disabled={loading || verifiedSuccess}>
           <Text style={styles.backButtonText}>← Back</Text>
         </TouchableOpacity>
 
         <View style={styles.content}>
-          <View style={styles.iconCircle}>
-            <Ionicons name="lock-closed-outline" size={32} color="#16A34A" />
-          </View>
-          <Text style={styles.title}>Enter Verification Code</Text>
-          <Text style={styles.subtitle}>
-            We have sent a 6-digit OTP to +91 {phoneNumber}
-          </Text>
+          {verifiedSuccess ? (
+            <View style={{ alignItems: 'center' }}>
+              <View style={[styles.iconCircle, { borderColor: '#16A34A', backgroundColor: '#DCFCE7' }]}>
+                <Ionicons name="checkmark-circle-outline" size={38} color="#16A34A" />
+              </View>
+              <Text style={styles.title}>Verification Successful!</Text>
+              <Text style={[styles.subtitle, { color: '#16A34A', fontWeight: 'bold' }]}>
+                पडताळणी यशस्वी! logging you in...
+              </Text>
+            </View>
+          ) : (
+            <>
+              <View style={styles.iconCircle}>
+                <Ionicons name="lock-closed-outline" size={32} color="#16A34A" />
+              </View>
+              <Text style={styles.title}>Enter Verification Code</Text>
+              <Text style={styles.subtitle}>
+                We have sent a 6-digit OTP to {email}
+              </Text>
 
-          <TextInput
-            style={styles.otpInput}
-            placeholder="Enter 6-Digit Code"
-            placeholderTextColor="#90A4AE"
-            keyboardType="number-pad"
-            maxLength={6}
-            value={otp}
-            onChangeText={setOtp}
-            secureTextEntry={false}
-            autoFocus
-          />
+              <TextInput
+                style={styles.otpInput}
+                placeholder="Enter 6-Digit Code"
+                placeholderTextColor="#90A4AE"
+                keyboardType="number-pad"
+                maxLength={6}
+                value={otp}
+                onChangeText={handleOtpChange}
+                secureTextEntry={false}
+                autoFocus
+                editable={!loading}
+              />
 
-          <TouchableOpacity style={styles.verifyButton} onPress={handleVerify}>
-            <Text style={styles.verifyButtonText}>Verify & Proceed</Text>
-          </TouchableOpacity>
-
-          <View style={styles.resendContainer}>
-            {timer > 0 ? (
-              <Text style={styles.timerText}>Resend code in {timer}s</Text>
-            ) : (
-              <TouchableOpacity onPress={handleResend}>
-                <Text style={styles.resendText}>Resend OTP</Text>
+              <TouchableOpacity style={styles.verifyButton} onPress={() => handleVerify()} disabled={loading || otp.length < 6}>
+                {loading ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.verifyButtonText}>Verify & Proceed</Text>
+                )}
               </TouchableOpacity>
-            )}
-          </View>
+
+              <View style={styles.resendContainer}>
+                {timer > 0 ? (
+                  <Text style={styles.timerText}>Resend OTP in {timer}s</Text>
+                ) : (
+                  <TouchableOpacity onPress={handleResend} disabled={loading}>
+                    <Text style={styles.resendText}>Resend OTP</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </>
+          )}
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
