@@ -134,22 +134,29 @@ export default function LocationsPage() {
   };
 
   return (
-    <div style={{ animation: 'fadeIn 0.25s', display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'flex-start', animation: 'fadeIn 0.22s both' }}>
       
       {/* Locations tabular list */}
-      <div style={{ flex: 1, minWidth: 400, backgroundColor: '#fff', borderRadius: 'var(--radius-md)', padding: 20, border: '1px solid var(--border-color)' }}>
-        <h3 style={{ margin: '0 0 16px', fontSize: 18, fontWeight: '700', color: 'var(--text-heading)' }}>Location Master Hierarchy</h3>
+      <div style={{ flex: '1 1 500px', minWidth: 320 }}>
+        {/* Header */}
+        <div className="page-header" style={{ marginBottom: 16 }}>
+          <div>
+            <h2 className="page-title">Location Hierarchy</h2>
+            <p className="page-subtitle">{flatLocations.length} active villages mapped</p>
+          </div>
+        </div>
 
         {/* Searching & Dependent dropdown filter headers */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
+        <div className="filter-bar">
           <div style={{ position: 'relative', flex: '1 1 200px' }}>
-            <Search size={16} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <Search size={14} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
             <input
               type="text"
+              className="input input-search"
+              style={{ paddingLeft: 34 }}
               placeholder="Search State, District, Village..."
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-              style={{ width: '100%', height: 36, paddingLeft: 34, border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', fontSize: 13, outline: 'none' }}
             />
           </div>
 
@@ -157,7 +164,8 @@ export default function LocationsPage() {
           <select
             value={stateFilter}
             onChange={(e) => { setStateFilter(e.target.value); setDistrictFilter(''); setTalukaFilter(''); setCurrentPage(1); }}
-            style={{ height: 36, padding: '0 8px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', backgroundColor: '#fff' }}
+            className="input"
+            style={{ width: 140 }}
           >
             <option value="">All States</option>
             {availableStates.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -167,7 +175,8 @@ export default function LocationsPage() {
           <select
             value={districtFilter}
             onChange={(e) => { setDistrictFilter(e.target.value); setTalukaFilter(''); setCurrentPage(1); }}
-            style={{ height: 36, padding: '0 8px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', backgroundColor: '#fff' }}
+            className="input"
+            style={{ width: 140 }}
           >
             <option value="">All Districts</option>
             {availableDistricts.map((d) => <option key={d} value={d}>{d}</option>)}
@@ -177,77 +186,125 @@ export default function LocationsPage() {
           <select
             value={talukaFilter}
             onChange={(e) => { setTalukaFilter(e.target.value); setCurrentPage(1); }}
-            style={{ height: 36, padding: '0 8px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', backgroundColor: '#fff' }}
+            className="input"
+            style={{ width: 140 }}
           >
             <option value="">All Talukas</option>
             {availableTalukas.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
         </div>
 
-        {paginated.length === 0 ? (
-          <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>No location records match filters.</div>
-        ) : (
-          <>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ backgroundColor: 'var(--bg-main)', borderBottom: '1px solid var(--border-color)', textAlign: 'left' }}>
-                  <th style={{ padding: 10, cursor: 'pointer' }} onClick={() => triggerSort('stateName')}>
-                    State <ArrowUpDown size={12} style={{ marginLeft: 4 }} />
-                  </th>
-                  <th style={{ padding: 10, cursor: 'pointer' }} onClick={() => triggerSort('districtName')}>
-                    District <ArrowUpDown size={12} style={{ marginLeft: 4 }} />
-                  </th>
-                  <th style={{ padding: 10, cursor: 'pointer' }} onClick={() => triggerSort('talukaName')}>
-                    Taluka <ArrowUpDown size={12} style={{ marginLeft: 4 }} />
-                  </th>
-                  <th style={{ padding: 10, cursor: 'pointer' }} onClick={() => triggerSort('villageName')}>
-                    Village <ArrowUpDown size={12} style={{ marginLeft: 4 }} />
-                  </th>
-                  <th style={{ padding: 10 }}>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginated.map((loc) => (
-                  <tr key={loc.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                    <td style={{ padding: 10, fontWeight: '700', color: 'var(--text-heading)' }}>{loc.stateName}</td>
-                    <td style={{ padding: 10 }}>{loc.districtName}</td>
-                    <td style={{ padding: 10 }}>{loc.talukaName}</td>
-                    <td style={{ padding: 10 }}>{loc.villageName}</td>
-                    <td style={{ padding: 10 }}>
-                      <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: '700', backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary)' }}>
-                        {loc.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            {/* Pagination Strip */}
-            {totalPages > 1 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 }}>
-                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Page {currentPage} of {totalPages}</span>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button disabled={currentPage === 1} onClick={() => setCurrentPage(currentPage - 1)} style={{ padding: '4px 8px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}><ChevronLeft size={14} /></button>
-                  <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(currentPage + 1)} style={{ padding: '4px 8px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}><ChevronRight size={14} /></button>
-                </div>
+        <div className="table-container">
+          {paginated.length === 0 ? (
+            <div className="empty-state" style={{ border: 'none' }}>
+              <div className="empty-state-icon">
+                <Search size={24} color="var(--text-muted)" />
               </div>
-            )}
-          </>
-        )}
+              <h3 style={{ margin: '0 0 6px', fontWeight: '700', fontSize: 16, color: 'var(--text-heading)' }}>
+                No locations match filters
+              </h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: 0 }}>
+                Adjust dropdown values or search terms.
+              </p>
+            </div>
+          ) : (
+            <>
+              <table className="resizable-table">
+                <thead>
+                  <tr>
+                    <th style={{ cursor: 'pointer' }} onClick={() => triggerSort('stateName')}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        State <ArrowUpDown size={12} />
+                      </div>
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => triggerSort('districtName')}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        District <ArrowUpDown size={12} />
+                      </div>
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => triggerSort('talukaName')}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        Taluka <ArrowUpDown size={12} />
+                      </div>
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => triggerSort('villageName')}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        Village <ArrowUpDown size={12} />
+                      </div>
+                    </th>
+                    <th style={{ width: 110 }}>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginated.map((loc) => (
+                    <tr key={loc.id}>
+                      <td>
+                        <span style={{ fontWeight: '600', color: 'var(--text-heading)', fontSize: 13.5 }}>{loc.stateName}</span>
+                      </td>
+                      <td style={{ fontSize: 13 }}>{loc.districtName}</td>
+                      <td style={{ fontSize: 13 }}>{loc.talukaName}</td>
+                      <td style={{ fontSize: 13 }}>{loc.villageName}</td>
+                      <td>
+                        <span className="badge badge-active">{loc.status}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {/* Pagination Strip */}
+              {totalPages > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', backgroundColor: 'var(--bg-main)', borderTop: '1px solid var(--border-color)' }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    Page <strong>{currentPage}</strong> of <strong>{totalPages}</strong>
+                  </span>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      disabled={currentPage === 1}
+                      onClick={() => setCurrentPage(currentPage - 1)}
+                    >
+                      <ChevronLeft size={14} />
+                    </button>
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      disabled={currentPage === totalPages}
+                      onClick={() => setCurrentPage(currentPage + 1)}
+                    >
+                      <ChevronRight size={14} />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       {/* State creation form */}
-      <form onSubmit={handleAddState} style={{ width: 300, backgroundColor: '#fff', borderRadius: 'var(--radius-md)', padding: 20, border: '1px solid var(--border-color)', height: 'fit-content' }}>
-        <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: '700' }}>Add State</h3>
+      <form
+        onSubmit={handleAddState}
+        className="card-flat"
+        style={{ width: 300, padding: 22, height: 'fit-content', display: 'flex', flexDirection: 'column', gap: 16 }}
+      >
+        <h3 style={{ margin: 0, fontSize: 15, fontWeight: '700', color: 'var(--text-heading)' }}>
+          Add State
+        </h3>
+        
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div>
-            <label style={{ fontSize: 12, fontWeight: '600', display: 'block', marginBottom: 4 }}>State Name</label>
-            <input type="text" style={{ width: '100%', border: '1px solid var(--border-color)', padding: 8, borderRadius: 'var(--radius-sm)' }} value={locStateForm} onChange={(e) => setLocStateForm(e.target.value)} />
+          <div className="form-group">
+            <label className="form-label">State Name</label>
+            <input
+              type="text"
+              className="input"
+              value={locStateForm}
+              onChange={(e) => setLocStateForm(e.target.value)}
+              placeholder="e.g. Maharashtra"
+            />
           </div>
-          <button type="submit" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', backgroundColor: 'var(--color-primary)', border: 'none', color: '#fff', padding: 10, borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontWeight: '700', marginTop: 12 }}>
-            <Plus size={14} />
-            <span>Add State</span>
+          
+          <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: 8 }}>
+            <Plus size={14} /> Add State
           </button>
         </div>
       </form>

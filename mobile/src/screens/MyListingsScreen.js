@@ -3,6 +3,7 @@ import { StyleSheet, View, Text, SafeAreaView, FlatList, TouchableOpacity, Image
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppContext } from '../context/AppContext';
 import { animalApi } from '../api/animalApi';
+import { resolveMediaUrl } from '../api/api';
 
 const TABS = ['All', 'Active', 'Pending', 'Sold', 'Rejected'];
 
@@ -263,9 +264,7 @@ export default function MyListingsScreen({ navigation }) {
           </View>
         }
         renderItem={({ item }) => {
-          const mainImage = item.photos && item.photos.length > 0
-            ? (item.photos[0].startsWith('http') ? item.photos[0] : `http://10.0.2.2:5000${item.photos[0]}`)
-            : 'https://images.unsplash.com/photo-1546445317-29f4545e6d52?auto=format&fit=crop&w=300&q=80';
+          const mainImage = resolveMediaUrl(item.photos && item.photos.length > 0 ? item.photos[0] : null);
 
           return (
             <View style={styles.listingCard}>
@@ -344,8 +343,8 @@ export default function MyListingsScreen({ navigation }) {
             <Text style={styles.bottomSheetTitle}>Manage Listing</Text>
             {activeMenuListing && (
               <View style={styles.bottomSheetMetaRow}>
-                <Image
-                  source={{ uri: activeMenuListing.photos && activeMenuListing.photos.length > 0 ? activeMenuListing.photos[0] : 'https://images.unsplash.com/photo-1546445317-29f4545e6d52?auto=format&fit=crop&w=300&q=80' }}
+                 <Image
+                  source={{ uri: resolveMediaUrl(activeMenuListing.photos && activeMenuListing.photos.length > 0 ? activeMenuListing.photos[0] : null) }}
                   style={styles.bottomSheetThumb}
                 />
                 <View>

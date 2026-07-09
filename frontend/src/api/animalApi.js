@@ -16,15 +16,17 @@ export const animalApi = {
     }
     throw new Error(res?.message || 'Failed to fetch animal details');
   },
+  // Admin-only dedicated approve endpoint — POST to /animals/:id/approve
   approve: async (id) => {
-    const res = await axios.patch(`/animals/${id}`, { status: 'approved' });
+    const res = await axios.patch(`/animals/${id}/approve`);
     if (res && res.status === 'success') {
       return res.data;
     }
     throw new Error(res?.message || 'Failed to approve listing');
   },
+  // Admin-only dedicated reject endpoint — sends mandatory reason in body
   reject: async (id, reason) => {
-    const res = await axios.patch(`/animals/${id}`, { status: 'rejected', rejectionReason: reason });
+    const res = await axios.patch(`/animals/${id}/reject`, { reason });
     if (res && res.status === 'success') {
       return res.data;
     }

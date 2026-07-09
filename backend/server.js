@@ -36,7 +36,11 @@ const app = express();
 
 // Global Middlewares
 // 1. Security HTTP headers
-app.use(helmet());
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' }
+  })
+);
 
 // 2. Development logging
 if (process.env.NODE_ENV === 'development' || !process.env.NODE_ENV) {

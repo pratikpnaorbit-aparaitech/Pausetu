@@ -59,6 +59,15 @@ const errorHandler = (err, req, res, next) => {
       error = new AppError('Your token has expired! Please log in again.', 401);
     }
 
+    // Handle Multer Errors
+    if (err.name === 'MulterError') {
+      let message = err.message;
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        message = 'File size is too large. Max limit is 100MB.';
+      }
+      error = new AppError(message, 400);
+    }
+
     // Send the error response
     if (error.isOperational) {
       res.status(error.statusCode).json({

@@ -2,7 +2,7 @@ import React, { useContext, useEffect, useState } from 'react';
 import { StyleSheet, View, Text, SafeAreaView, ScrollView, Image, TouchableOpacity, Dimensions, FlatList, Share, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppContext } from '../context/AppContext';
-import { api } from '../api/api';
+import { api, resolveMediaUrl } from '../api/api';
 
 const { width } = Dimensions.get('window');
 
@@ -169,7 +169,7 @@ export default function SellScreen({ navigation }) {
       status: 'Active',
       views: a.views || 0,
       postedDate: 'Posted ' + new Date(a.createdAt).toLocaleDateString(),
-      image: a.photos && a.photos.length > 0 ? a.photos[0] : 'https://images.unsplash.com/photo-1546445317-29f4545e6d52?auto=format&fit=crop&w=300&q=80'
+      image: a.photos && a.photos.length > 0 ? resolveMediaUrl(a.photos[0]) : 'https://images.unsplash.com/photo-1546445317-29f4545e6d52?auto=format&fit=crop&w=300&q=80'
     }));
 
   const pendingListings = listings

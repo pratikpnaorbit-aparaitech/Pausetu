@@ -3,7 +3,7 @@ import { StyleSheet, View, Text, ScrollView, Image, TouchableOpacity, Dimensions
 import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import SectionHeader from '../components/SectionHeader';
 import ListingCard from '../components/ListingCard';
-import { api } from '../api/api';
+import { api, resolveMediaUrl } from '../api/api';
 
 const { width } = Dimensions.get('window');
 const GALLERY_HEIGHT = 280;
@@ -156,12 +156,12 @@ export default function AnimalDetailsScreen({ route, navigation }) {
           >
             {/* Images */}
             {(animal.photos && animal.photos.length > 0 ? animal.photos : MOCK_IMAGES).map((imgUri, index) => (
-              <Image key={index} source={{ uri: imgUri }} style={styles.galleryImage} resizeMode="cover" />
+              <Image key={index} source={{ uri: resolveMediaUrl(imgUri) }} style={styles.galleryImage} resizeMode="cover" />
             ))}
 
             {/* Video Thumbnail Slide */}
             <View style={styles.videoSlide}>
-              <Image source={{ uri: animal.photos && animal.photos.length > 0 ? animal.photos[0] : MOCK_IMAGES[0] }} style={styles.galleryImage} blurRadius={3} resizeMode="cover" />
+              <Image source={{ uri: animal.photos && animal.photos.length > 0 ? resolveMediaUrl(animal.photos[0]) : MOCK_IMAGES[0] }} style={styles.galleryImage} blurRadius={3} resizeMode="cover" />
               <View style={styles.videoOverlay}>
                 <TouchableOpacity style={styles.playButtonCircle} onPress={() => setIsVideoPlaying(true)}>
                   <Ionicons name="play" size={28} color="#FFFFFF" style={styles.playIconOffset} />

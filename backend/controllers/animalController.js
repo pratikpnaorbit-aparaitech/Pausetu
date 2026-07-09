@@ -1,6 +1,7 @@
 const Animal = require('../models/Animal');
 const asyncHandler = require('../utils/asyncHandler');
 const { AppError } = require('../middleware/errorHandler');
+const { verifyToken } = require('../utils/jwt');
 
 /**
  * Get all animal listings - GET /api/animals
@@ -11,17 +12,53 @@ exports.getAllAnimals = asyncHandler(async (req, res, next) => {
   const limit = parseInt(req.query.limit, 10) || 10;
   const skip = (page - 1) * limit;
 
+  // Optionally decode token to check if user is admin or the owner
+  if (req.headers.authorization && req.headers.authorization.toLowerCase().startsWith('bearer')) {
+    try {
+      const token = req.headers.authorization.split(' ')[1];
+      req.user = verifyToken(token);
+    } catch (e) {
+      // Ignore invalid tokens for public feed
+    }
+  }
+
   // Build filters
   const filter = { isDeleted: false };
 
-  // Public feeds show approved listings only. Sellers can see their own pending/rejected draft listings.
+  // Validate status filtering permissions:
+  // Non-approved statuses (pending, rejected, draft, etc.) can only be accessed by:
+  // 1. Admin users (globally or per seller)
+  // 2. The seller themselves (only for their own listings)
+  const isReqAdmin = req.user && req.user.role === 'admin';
+  const isReqOwner = req.user && req.query.sellerId && req.user.id === req.query.sellerId;
+  const isAuthorizedForPrivateStatus = isReqAdmin || isReqOwner;
+
   if (req.query.sellerId) {
     filter.sellerId = req.query.sellerId;
+    
     if (req.query.status) {
-      filter.status = req.query.status;
+      if (req.query.status === 'approved' || isAuthorizedForPrivateStatus) {
+        filter.status = req.query.status;
+      } else {
+        filter.status = 'approved';
+      }
+    } else {
+      if (!isAuthorizedForPrivateStatus) {
+        filter.status = 'approved';
+      }
     }
   } else {
-    filter.status = 'approved'; // Default to showing only approved listings to the public
+    if (req.query.status) {
+      if (req.query.status === 'approved' || isReqAdmin) {
+        filter.status = req.query.status;
+      } else {
+        filter.status = 'approved';
+      }
+    } else {
+      if (!isReqAdmin) {
+        filter.status = 'approved';
+      }
+    }
   }
 
   // Category and Breed filters
@@ -131,6 +168,7 @@ exports.createAnimal = asyncHandler(async (req, res, next) => {
   } = req.body;
 
   // 1. Enforce validation checks
+
   if (!categoryId || !breedId || !title || !price || !state || !district || !taluka || !village) {
     return next(new AppError('Please fill out all required fields (Category, Breed, Title, Price, Location).', 400));
   }
@@ -252,5 +290,73 @@ exports.deleteAnimal = asyncHandler(async (req, res, next) => {
   res.status(200).json({
     status: 'success',
     message: 'Animal listing deleted successfully'
+  });
+});
+
+/**
+ * Approve animal listing - PATCH /api/animals/:id/approve
+ * Admin-only: sets status to approved and records who approved it
+ */
+exports.approveListing = asyncHandler(async (req, res, next) => {
+  const animal = await Animal.findOne({ _id: req.params.id, isDeleted: false });
+
+  if (!animal) {
+    return next(new AppError('Animal listing not found', 404));
+  }
+
+  if (animal.status === 'approved') {
+    return next(new AppError('This listing is already approved', 400));
+  }
+
+  animal.status = 'approved';
+  animal.approvedBy = req.user.id;
+  animal.approvedAt = new Date();
+  animal.rejectionReason = undefined;
+  await animal.save();
+
+  const populated = await Animal.findById(animal._id)
+    .populate('sellerId', 'name email mobile')
+    .populate('categoryId', 'name slug')
+    .populate('breedId', 'name');
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Animal listing approved and is now live on the marketplace',
+    data: { animal: populated }
+  });
+});
+
+/**
+ * Reject animal listing - PATCH /api/animals/:id/reject
+ * Admin-only: sets status to rejected and stores the mandatory rejection reason
+ */
+exports.rejectListing = asyncHandler(async (req, res, next) => {
+  const { reason } = req.body;
+
+  if (!reason || reason.trim() === '') {
+    return next(new AppError('A rejection reason is mandatory', 400));
+  }
+
+  const animal = await Animal.findOne({ _id: req.params.id, isDeleted: false });
+
+  if (!animal) {
+    return next(new AppError('Animal listing not found', 404));
+  }
+
+  animal.status = 'rejected';
+  animal.rejectionReason = reason.trim();
+  animal.approvedBy = undefined;
+  animal.approvedAt = undefined;
+  await animal.save();
+
+  const populated = await Animal.findById(animal._id)
+    .populate('sellerId', 'name email mobile')
+    .populate('categoryId', 'name slug')
+    .populate('breedId', 'name');
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Animal listing has been rejected. The seller will be notified.',
+    data: { animal: populated }
   });
 });

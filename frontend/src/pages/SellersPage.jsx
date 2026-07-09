@@ -108,113 +108,111 @@ export default function SellersPage() {
   };
 
   return (
-    <div style={{ animation: 'fadeIn 0.25s' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+    <div style={{ animation: 'fadeIn 0.22s both' }}>
+      <div className="page-header">
         <div>
-          <h2 style={{ fontSize: 24, fontWeight: '800', color: 'var(--text-heading)', margin: 0 }}>Sellers Directory</h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 4 }}>Manage and block active animal sellers registered in PashuSetu.</p>
+          <h2 className="page-title">Sellers Directory</h2>
+          <p className="page-subtitle">Manage and moderate active livestock sellers on PashuSetu.</p>
         </div>
       </div>
 
       {/* Search & Filter Strip */}
-      <div style={{ backgroundColor: '#fff', borderRadius: 'var(--radius-md)', padding: 16, border: '1px solid var(--border-color)', marginBottom: 24, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-        <div style={{ position: 'relative', flex: 1, minWidth: 240 }}>
-          <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+      <div className="filter-bar">
+        <div style={{ position: 'relative', flex: '1 1 240px' }}>
+          <Search size={14} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
           <input
+            className="input input-search"
+            style={{ paddingLeft: 34 }}
             type="text"
-            placeholder="Search by Name, Email, Phone, Location..."
+            placeholder="Name, email, phone, location…"
             value={searchQuery}
             onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-            style={{ width: '100%', height: 38, paddingLeft: 40, border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', outline: 'none', fontSize: 13 }}
           />
         </div>
-
         <select
+          className="input"
+          style={{ maxWidth: 160 }}
           value={selectedStatus}
           onChange={(e) => { setSelectedStatus(e.target.value); setCurrentPage(1); }}
-          style={{ height: 38, padding: '0 12px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', backgroundColor: '#fff', outline: 'none' }}
         >
           <option value="">All Statuses</option>
           <option value="Active">Active</option>
           <option value="Blocked">Blocked</option>
         </select>
-
         <input
+          className="input"
+          style={{ maxWidth: 160 }}
           type="text"
-          placeholder="Filter by District"
+          placeholder="Filter by district"
           value={selectedDistrict}
           onChange={(e) => { setSelectedDistrict(e.target.value); setCurrentPage(1); }}
-          style={{ height: 38, padding: '0 12px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', outline: 'none' }}
         />
       </div>
 
       {/* Grid List */}
       {paginatedSellers.length === 0 ? (
-        <div style={{ padding: 48, textAlign: 'center', backgroundColor: '#fff', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-          <User size={48} color="var(--text-muted)" style={{ marginBottom: 12 }} />
-          <h3 style={{ margin: 0, fontWeight: '700' }}>No Sellers Found</h3>
-          <p style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 4 }}>Try adjusting your search filters.</p>
+        <div className="empty-state">
+          <div className="empty-state-icon">
+            <User size={24} color="var(--text-muted)" />
+          </div>
+          <h3 style={{ margin: '0 0 6px', fontWeight: '700', fontSize: 16, color: 'var(--text-heading)' }}>No Sellers Found</h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: 0 }}>Try adjusting your search or filters.</p>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16, marginBottom: 24 }}>
-          {paginatedSellers.map((seller) => (
-            <div key={seller.id} style={{ backgroundColor: '#fff', borderRadius: 'var(--radius-md)', padding: 18, border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)', position: 'relative' }}>
-              <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 14 }}>
-                <Image src={seller.photo} style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover' }} />
-                <div>
-                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: '800', color: 'var(--text-heading)' }}>{seller.name}</h3>
-                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{seller.email}</span>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14, marginBottom: 24 }}>
+          {paginatedSellers.map((seller, idx) => (
+            <div key={seller.id} className="card" style={{ padding: '18px 20px', animation: `slideUp 0.18s ${Math.min(idx,5)*0.04}s both` }}>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 14 }}>
+                <Image src={seller.photo} style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--border-color)', flexShrink: 0 }} />
+                <div style={{ minWidth: 0 }}>
+                  <h3 style={{ margin: '0 0 2px', fontSize: 14, fontWeight: '800', color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{seller.name}</h3>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{seller.email}</span>
                 </div>
+                <span
+                  className={`badge ${seller.status === 'Blocked' ? 'badge-rejected' : 'badge-approved'}`}
+                  style={{ marginLeft: 'auto', flexShrink: 0 }}
+                >
+                  {seller.status}
+                </span>
               </div>
               
-              <div style={{ fontSize: 13, borderTop: '1px solid var(--border-color)', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 18 }}>
-                <div><span style={{ color: 'var(--text-muted)' }}>Phone:</span> <strong>{seller.phone}</strong></div>
-                <div><span style={{ color: 'var(--text-muted)' }}>Location:</span> <strong>{seller.village}, {seller.district}</strong></div>
-                <div><span style={{ color: 'var(--text-muted)' }}>Approved Listings:</span> <strong>{seller.approvedListings || 0}</strong></div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ color: 'var(--text-muted)' }}>Status:</span>
-                  <span style={{
-                    padding: '2px 8px',
-                    borderRadius: 10,
-                    fontSize: 10,
-                    fontWeight: '700',
-                    backgroundColor: seller.status === 'Blocked' ? 'var(--color-danger-light)' : 'var(--color-primary-light)',
-                    color: seller.status === 'Blocked' ? 'var(--color-danger)' : 'var(--color-primary)'
-                  }}>
-                    {seller.status}
-                  </span>
-                </div>
+              <div style={{ fontSize: 12, borderTop: '1px solid var(--border-color)', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14, color: 'var(--text-muted)' }}>
+                <div><strong style={{ color: 'var(--text-main)' }}>Phone:</strong> {seller.phone}</div>
+                <div><strong style={{ color: 'var(--text-main)' }}>Location:</strong> {[seller.village, seller.district].filter(Boolean).join(', ') || 'N/A'}</div>
+                <div><strong style={{ color: 'var(--text-main)' }}>Listings:</strong> {seller.approvedListings || 0} approved</div>
               </div>
 
               <div style={{ display: 'flex', gap: 8 }}>
                 <button
+                  className="btn btn-secondary btn-sm"
+                  style={{ flex: 1 }}
                   onClick={() => setSelectedSeller(seller)}
-                  style={{ flex: 1, padding: '8px 12px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', backgroundColor: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 12, fontWeight: '700' }}
                 >
-                  <Eye size={14} />
-                  <span>Profile</span>
+                  <Eye size={13} /> Profile
                 </button>
                 <button
+                  className="btn btn-secondary btn-sm"
                   onClick={() => startEditSeller(seller)}
-                  style={{ padding: '8px 12px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', backgroundColor: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: '700' }}
                 >
-                  <Edit2 size={14} />
-                  <span>Edit</span>
+                  <Edit2 size={13} /> Edit
                 </button>
                 <button
+                  className={`btn btn-sm ${seller.status === 'Blocked' ? 'btn-secondary' : 'btn-danger-soft'}`}
                   onClick={() => {
-                    const blockMsg = seller.status === 'Blocked' ? `Unblock seller "${seller.name}"?` : `Block seller "${seller.name}"? (They will be denied login access)`;
+                    const blockMsg = seller.status === 'Blocked'
+                      ? `Unblock seller "${seller.name}"?`
+                      : `Block seller "${seller.name}"? They will be denied login access.`;
                     triggerConfirm(seller.status === 'Blocked' ? 'Unblock' : 'Block', seller, blockMsg, () => handleToggleBlockSeller(seller));
                   }}
-                  style={{ padding: '8px 12px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', backgroundColor: '#fff', color: seller.status === 'Blocked' ? 'var(--color-primary)' : 'var(--color-danger)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: '700' }}
                 >
-                  {seller.status === 'Blocked' ? <Unlock size={14} /> : <Ban size={14} />}
+                  {seller.status === 'Blocked' ? <Unlock size={13} /> : <Ban size={13} />}
                 </button>
                 <button
+                  className="btn btn-danger-soft btn-sm btn-icon"
                   onClick={() => triggerConfirm('Delete Seller', seller, `Soft delete seller profile "${seller.name}"?`, () => handleSoftDeleteSeller(seller))}
-                  style={{ padding: 8, background: 'var(--color-danger-light)', border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer', color: 'var(--color-danger)' }}
+                  aria-label={`Delete ${seller.name}`}
                 >
-                  <Trash2 size={14} />
+                  <Trash2 size={13} />
                 </button>
               </div>
             </div>

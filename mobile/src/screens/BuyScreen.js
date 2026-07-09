@@ -2,7 +2,7 @@ import React, { useContext, useState, useCallback, useEffect } from 'react';
 import { StyleSheet, View, Text, SafeAreaView, TouchableOpacity, TextInput, FlatList, Image, ActivityIndicator } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppContext } from '../context/AppContext';
-import { api } from '../api/api';
+import { api, resolveMediaUrl } from '../api/api';
 
 // Import Reusable Components
 import SectionHeader from '../components/SectionHeader';
@@ -241,7 +241,7 @@ const ListHeader = React.memo(({ selectedCategory, setSelectedCategory, onViewDe
                 {/* Image Block */}
                 <View style={styles.imagePlaceholder}>
                   {item.photos && item.photos.length > 0 ? (
-                    <Image source={{ uri: item.photos[0] }} style={{ width: '100%', height: '100%', borderRadius: 12 }} />
+                    <Image source={{ uri: resolveMediaUrl(item.photos[0]) }} style={{ width: '100%', height: '100%', borderRadius: 12 }} />
                   ) : (
                     <MaterialCommunityIcons name="image-outline" size={38} color="#94A3B8" />
                   )}

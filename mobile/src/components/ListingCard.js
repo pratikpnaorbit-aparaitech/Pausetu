@@ -1,13 +1,24 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { resolveMediaUrl } from '../api/api';
 
 export default function ListingCard({ item, onViewDetailsPress, style }) {
+  const imageUrl = resolveMediaUrl(item.photos && item.photos.length > 0 ? item.photos[0] : null);
+
   return (
     <View style={[styles.card, style]}>
       {/* Image Block */}
       <View style={styles.imagePlaceholder}>
-        <MaterialCommunityIcons name="image-outline" size={38} color="#94A3B8" />
+        {item.photos && item.photos.length > 0 ? (
+          <Image 
+            source={{ uri: imageUrl }} 
+            style={styles.cardImage} 
+            onError={(e) => console.log('[Image Load Error] ListingCard:', e.nativeEvent.error, 'URL:', imageUrl)}
+          />
+        ) : (
+          <MaterialCommunityIcons name="image-outline" size={38} color="#94A3B8" />
+        )}
         
         {/* Badges Overlay Container (Top Left) */}
         <View style={styles.badgeOverlayContainer}>
@@ -215,4 +226,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#16A34A',
   },
+  cardImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover'
+  }
 });

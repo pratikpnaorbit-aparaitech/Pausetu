@@ -1,6 +1,22 @@
 import React, { useContext, useState } from 'react';
 import { AdminContext } from '../context/AdminContext';
-import { Check, Trash2 } from 'lucide-react';
+import { Check, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+
+// Status badge using design system class
+function StatusBadge({ status }) {
+  const map = {
+    approved: 'badge-approved',
+    pending:  'badge-pending',
+    rejected: 'badge-rejected',
+    sold:     'badge-sold',
+    draft:    'badge-blocked',
+  };
+  return (
+    <span className={`badge ${map[status] || 'badge-blocked'}`}>
+      {status}
+    </span>
+  );
+}
 
 export default function AnimalsPage() {
   const {
@@ -11,104 +27,191 @@ export default function AnimalsPage() {
     handleMarkSoldListing,
     triggerConfirm,
     handleSoftDeleteListing,
-    showToast
+    showToast,
   } = useContext(AdminContext);
 
   const [selectedAnimals, setSelectedAnimals] = useState([]);
+  const [currentPage, setCurrentPage]         = useState(1);
+  const itemsPerPage = 10;
 
-  const activeAnimals = animals.filter(a => !a.isDeleted);
+  const activeAnimals   = animals.filter((a) => !a.isDeleted);
+  const totalPages      = Math.ceil(activeAnimals.length / itemsPerPage) || 1;
+  const paginatedAnimals = activeAnimals.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
-  const handleSelectAllAnimals = (e) => {
-    if (e.target.checked) {
-      setSelectedAnimals(activeAnimals.map(a => a.id));
-    } else {
-      setSelectedAnimals([]);
-    }
+  const handleSelectAll = (e) => {
+    setSelectedAnimals(e.target.checked ? paginatedAnimals.map((a) => a.id) : []);
   };
 
-  const handleSelectAnimal = (id) => {
-    setSelectedAnimals((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
-    );
+  const handleSelectOne = (id) => {
+    setSelectedAnimals((prev) => prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]);
   };
 
   const handleBulkApprove = () => {
     setAnimals((prev) => prev.map((a) => selectedAnimals.includes(a.id) ? { ...a, status: 'approved' } : a));
-    showToast(`Bulk approved ${selectedAnimals.length} listings!`);
+    showToast(`${selectedAnimals.length} listings approved.`);
     setSelectedAnimals([]);
   };
 
+  const allSelected = paginatedAnimals.length > 0 && paginatedAnimals.every((a) => selectedAnimals.includes(a.id));
+
   return (
-    <div style={{ animation: 'fadeIn 0.25s' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <h2 style={{ fontSize: 24, fontWeight: '800', color: 'var(--text-heading)', margin: 0 }}>Animal Listings</h2>
-        
+    <div style={{ animation: 'fadeIn 0.22s both' }}>
+      {/* Header */}
+      <div className="page-header">
+        <div>
+          <h2 className="page-title">Animal Listings</h2>
+          <p className="page-subtitle">{activeAnimals.length} total active listings</p>
+        </div>
         {selectedAnimals.length > 0 && (
-          <div style={{ display: 'flex', gap: 12 }}>
-            <span style={{ fontSize: 13, alignSelf: 'center', fontWeight: '600' }}>{selectedAnimals.length} selected</span>
-            <button onClick={handleBulkApprove} style={{ padding: '8px 16px', backgroundColor: 'var(--color-primary)', border: 'none', color: '#fff', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontWeight: '700' }}>
-              Bulk Approve
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, animation: 'fadeIn 0.15s both' }}>
+            <span style={{ fontSize: 13, fontWeight: '600', color: 'var(--text-muted)' }}>
+              {selectedAnimals.length} selected
+            </span>
+            <button className="btn btn-primary btn-sm" onClick={handleBulkApprove}>
+              <Check size={13} /> Bulk Approve
             </button>
           </div>
         )}
       </div>
 
-      <div style={{ backgroundColor: '#fff', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
-        <table className="resizable-table">
-          <thead>
-            <tr style={{ backgroundColor: 'var(--bg-main)', borderBottom: '1px solid var(--border-color)', textAlign: 'left' }}>
-              <th style={{ padding: '12px 16px', width: 40 }}><input type="checkbox" onChange={handleSelectAllAnimals} /></th>
-              <th className="resizable-th" style={{ padding: 12, width: columnWidths.title }}>
-                Title
-                <div className="column-resizer" onMouseDown={(e) => handleMouseDownResize(e, 'title')} />
-              </th>
-              <th className="resizable-th" style={{ padding: 12, width: columnWidths.category }}>
-                Category
-                <div className="column-resizer" onMouseDown={(e) => handleMouseDownResize(e, 'category')} />
-              </th>
-              <th className="resizable-th" style={{ padding: 12, width: columnWidths.breed }}>
-                Breed
-                <div className="column-resizer" onMouseDown={(e) => handleMouseDownResize(e, 'breed')} />
-              </th>
-              <th className="resizable-th" style={{ padding: 12, width: columnWidths.price }}>
-                Price
-                <div className="column-resizer" onMouseDown={(e) => handleMouseDownResize(e, 'price')} />
-              </th>
-              <th className="resizable-th" style={{ padding: 12, width: columnWidths.status }}>
-                Status
-                <div className="column-resizer" onMouseDown={(e) => handleMouseDownResize(e, 'status')} />
-              </th>
-              <th style={{ padding: 12, width: 120 }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {activeAnimals.map((a) => (
-              <tr key={a.id} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background-color 0.2s' }}>
-                <td style={{ padding: '12px 16px' }}><input type="checkbox" checked={selectedAnimals.includes(a.id)} onChange={() => handleSelectAnimal(a.id)} /></td>
-                <td style={{ padding: 12, fontWeight: '700', color: 'var(--text-heading)' }}>{a.title}</td>
-                <td style={{ padding: 12 }}>Cow</td>
-                <td style={{ padding: 12 }}>Gir</td>
-                <td style={{ padding: 12, fontWeight: '700' }}>₹{a.price.toLocaleString()}</td>
-                <td style={{ padding: 12 }}>
-                  <span style={{
-                    padding: '4px 8px',
-                    borderRadius: 12,
-                    fontSize: 11,
-                    fontWeight: '700',
-                    backgroundColor: a.status === 'approved' ? 'var(--color-primary-light)' : a.status === 'pending' ? 'var(--color-warning-light)' : 'var(--color-danger-light)',
-                    color: a.status === 'approved' ? 'var(--color-primary)' : a.status === 'pending' ? 'var(--color-warning)' : 'var(--color-danger)'
-                  }}>
-                    {a.status}
-                  </span>
-                </td>
-                <td style={{ padding: 12, display: 'flex', gap: 8 }}>
-                  <button onClick={() => handleMarkSoldListing(a)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-info)' }} title="Mark Sold"><Check size={18} /></button>
-                  <button onClick={() => triggerConfirm('Soft Delete', a, `Soft delete listing "${a.title}"? (It will be hidden from buyers but remains recoverable)`, () => handleSoftDeleteListing(a))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-danger)' }} title="Soft Delete"><Trash2 size={18} /></button>
-                </td>
+      {/* Table */}
+      <div className="table-container">
+        {activeAnimals.length === 0 ? (
+          <div className="empty-state" style={{ border: 'none' }}>
+            <div className="empty-state-icon">
+              <Trash2 size={24} color="var(--text-muted)" />
+            </div>
+            <h3 style={{ margin: '0 0 6px', fontWeight: '700', fontSize: 16, color: 'var(--text-heading)' }}>
+              No listings yet
+            </h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: 0 }}>
+              Animal listings submitted by sellers will appear here.
+            </p>
+          </div>
+        ) : (
+          <table className="resizable-table">
+            <thead>
+              <tr>
+                <th style={{ padding: '11px 14px', width: 44 }}>
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={handleSelectAll}
+                    style={{ cursor: 'pointer', accentColor: 'var(--color-primary)' }}
+                    aria-label="Select all"
+                  />
+                </th>
+                <th className="resizable-th" style={{ width: columnWidths.title }}>
+                  Title
+                  <div className="column-resizer" onMouseDown={(e) => handleMouseDownResize(e, 'title')} />
+                </th>
+                <th className="resizable-th" style={{ width: columnWidths.category }}>
+                  Category
+                  <div className="column-resizer" onMouseDown={(e) => handleMouseDownResize(e, 'category')} />
+                </th>
+                <th className="resizable-th" style={{ width: columnWidths.breed }}>
+                  Breed
+                  <div className="column-resizer" onMouseDown={(e) => handleMouseDownResize(e, 'breed')} />
+                </th>
+                <th className="resizable-th" style={{ width: columnWidths.price }}>
+                  Price
+                  <div className="column-resizer" onMouseDown={(e) => handleMouseDownResize(e, 'price')} />
+                </th>
+                <th className="resizable-th" style={{ width: columnWidths.status }}>
+                  Status
+                  <div className="column-resizer" onMouseDown={(e) => handleMouseDownResize(e, 'status')} />
+                </th>
+                <th style={{ width: 100 }}>Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {paginatedAnimals.map((a) => (
+                <tr key={a.id}>
+                  <td style={{ padding: '12px 14px' }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedAnimals.includes(a.id)}
+                      onChange={() => handleSelectOne(a.id)}
+                      style={{ cursor: 'pointer', accentColor: 'var(--color-primary)' }}
+                      aria-label={`Select ${a.title}`}
+                    />
+                  </td>
+                  <td>
+                    <span style={{ fontWeight: '600', color: 'var(--text-heading)', fontSize: 13 }}>
+                      {a.title || '—'}
+                    </span>
+                  </td>
+                  <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{a.categoryName || 'N/A'}</td>
+                  <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{a.breedName || 'N/A'}</td>
+                  <td>
+                    <span style={{ fontWeight: '700', fontSize: 13, color: 'var(--text-heading)', fontVariantNumeric: 'tabular-nums' }}>
+                      ₹{(a.price || 0).toLocaleString('en-IN')}
+                    </span>
+                  </td>
+                  <td><StatusBadge status={a.status} /></td>
+                  <td>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button
+                        onClick={() => handleMarkSoldListing(a)}
+                        className="btn-ghost btn-icon"
+                        title="Mark as Sold"
+                        aria-label={`Mark ${a.title} as sold`}
+                      >
+                        <Check size={16} color="var(--color-info)" />
+                      </button>
+                      <button
+                        onClick={() => triggerConfirm(
+                          'Soft Delete', a,
+                          `Hide "${a.title}" from buyers? The record remains recoverable.`,
+                          () => handleSoftDeleteListing(a)
+                        )}
+                        className="btn-ghost btn-icon"
+                        title="Soft Delete"
+                        aria-label={`Delete ${a.title}`}
+                      >
+                        <Trash2 size={16} color="var(--color-danger)" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            padding: '12px 16px', borderTop: '1px solid var(--border-color)',
+            backgroundColor: 'var(--bg-main)',
+          }}>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              Page <strong>{currentPage}</strong> of <strong>{totalPages}</strong>
+            </span>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                className="btn btn-secondary btn-sm"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => p - 1)}
+                aria-label="Previous page"
+              >
+                <ChevronLeft size={14} />
+              </button>
+              <button
+                className="btn btn-secondary btn-sm"
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage((p) => p + 1)}
+                aria-label="Next page"
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,23 +1,31 @@
-import React, { useContext } from 'react';
+import React, { useContext, useState, useCallback } from 'react';
 import { AdminContext } from '../context/AdminContext';
 import {
-  LayoutDashboard,
-  Clock,
-  Layers,
-  Users,
-  UserCheck,
-  FolderTree,
-  Tag,
-  MapPin,
-  Shield,
-  BarChart3,
-  Settings,
-  AlertCircle,
-  HelpCircle,
-  LogOut,
-  Search,
-  User
+  LayoutDashboard, Clock, Layers, Users, UserCheck,
+  FolderTree, Tag, MapPin, Shield, BarChart3, Settings,
+  AlertCircle, HelpCircle, LogOut, Search, User, X, Menu
 } from 'lucide-react';
+
+const NAV_ITEMS = [
+  { name: 'Dashboard',        icon: LayoutDashboard, section: 'main' },
+  { name: 'Pending Approvals',icon: Clock,           section: 'main', hasBadge: true },
+  { name: 'Animals',          icon: Layers,          section: 'main' },
+  { name: 'Sellers',          icon: Users,           section: 'main' },
+  { name: 'Buyers',           icon: UserCheck,       section: 'main' },
+  { name: 'Categories',       icon: FolderTree,      section: 'catalog' },
+  { name: 'Breeds',           icon: Tag,             section: 'catalog' },
+  { name: 'Locations',        icon: MapPin,          section: 'catalog' },
+  { name: 'Audit Logs',       icon: Shield,          section: 'system' },
+  { name: 'Reports',          icon: BarChart3,       section: 'system' },
+  { name: 'Settings',         icon: Settings,        section: 'system' },
+  { name: 'Error Pages Demo', icon: AlertCircle,     section: 'system' },
+];
+
+const SECTIONS = [
+  { key: 'main',    label: 'Overview' },
+  { key: 'catalog', label: 'Master Data' },
+  { key: 'system',  label: 'System' },
+];
 
 export default function SidebarLayout({ children }) {
   const {
@@ -32,152 +40,248 @@ export default function SidebarLayout({ children }) {
     serverStatus
   } = useContext(AdminContext);
 
-  const sidebarItems = [
-    { name: 'Dashboard', icon: LayoutDashboard },
-    { name: 'Pending Approvals', icon: Clock, badge: animals.filter((a) => a.status === 'pending').length },
-    { name: 'Animals', icon: Layers },
-    { name: 'Sellers', icon: Users },
-    { name: 'Buyers', icon: UserCheck },
-    { name: 'Categories', icon: FolderTree },
-    { name: 'Breeds', icon: Tag },
-    { name: 'Locations', icon: MapPin },
-    { name: 'Audit Logs', icon: Shield },
-    { name: 'Reports', icon: BarChart3 },
-    { name: 'Settings', icon: Settings },
-    { name: 'Error Pages Demo', icon: AlertCircle }
-  ];
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  const pendingCount = animals.filter((a) => a.status === 'pending' && !a.isDeleted).length;
+
+  const handleNav = useCallback((name) => {
+    setCurrentView(name);
+    setGlobalSearchQuery('');
+    setMobileOpen(false); // Close sidebar on nav (mobile support)
+  }, [setCurrentView, setGlobalSearchQuery]);
 
   return (
-    <div style={{ display: 'flex', width: '100%', minHeight: '100vh', backgroundColor: 'var(--bg-main)' }}>
-      {/* Sidebar Panel */}
-      <aside style={{ width: 260, backgroundColor: 'var(--bg-sidebar)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-        <div style={{ padding: '24px 20px', borderBottom: '1px solid #1e293b', display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ backgroundColor: 'var(--bg-sidebar-active)', padding: 6, borderRadius: 'var(--radius-sm)' }}>
-            <Layers size={24} color="#fff" />
+    <div className="sidebar-layout">
+
+      {/* ── Mobile Sidebar Overlay Backdrop ───────────────────────────── */}
+      {mobileOpen && (
+        <div
+          onClick={() => setMobileOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 190,
+            backgroundColor: 'rgba(15, 23, 42, 0.4)',
+            backdropFilter: 'blur(4px)',
+            animation: 'fadeIn 0.2s ease both',
+          }}
+        />
+      )}
+
+      {/* ── Sidebar Panel ─────────────────────────────────────────────── */}
+      <aside className={`sidebar-aside ${mobileOpen ? 'mobile-open' : ''}`}>
+        {/* Brand Header */}
+        <div style={{
+          padding: '24px 20px',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div className="sidebar-logo-box">
+              <Layers size={18} color="#fff" />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span className="sidebar-brand-text" style={{ fontSize: 14.5, fontWeight: '800', color: '#f8fafc', letterSpacing: '-0.02em', display: 'block', lineHeight: 1.2 }}>
+                PASHUSETU
+              </span>
+              <span className="sidebar-brand-subtitle" style={{ fontSize: 10, color: '#475569', fontWeight: '700', letterSpacing: '0.05em', textTransform: 'uppercase', marginTop: 2 }}>
+                Admin Console
+              </span>
+            </div>
           </div>
-          <div>
-            <span style={{ fontSize: 18, fontWeight: '800', color: '#fff', tracking: '0.5px' }}>PASHUSETU</span>
-            <span style={{ display: 'block', fontSize: 11, color: 'var(--text-light)', fontWeight: '600' }}>Admin Console</span>
-          </div>
+          
+          {/* Mobile close button */}
+          <button
+            onClick={() => setMobileOpen(false)}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: '#64748b', display: 'none', padding: 4
+            }}
+            className="sidebar-menu-btn"
+            aria-label="Close menu"
+          >
+            <X size={18} />
+          </button>
         </div>
 
-        <nav style={{ flex: 1, padding: 16, display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {sidebarItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = currentView === item.name;
+        {/* Navigation Sections */}
+        <nav style={{ flex: 1, padding: '16px 10px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {SECTIONS.map((section) => {
+            const items = NAV_ITEMS.filter((i) => i.section === section.key);
             return (
-              <button
-                key={item.name}
-                onClick={() => {
-                  setCurrentView(item.name);
-                  setGlobalSearchQuery('');
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '10px 14px',
-                  borderRadius: 'var(--radius-sm)',
-                  border: 'none',
-                  backgroundColor: isActive ? 'var(--bg-sidebar-active)' : 'transparent',
-                  color: isActive ? '#fff' : '#94a3b8',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  fontSize: 14,
-                  fontWeight: '600',
-                  transition: 'background-color 0.2s, color 0.2s'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <Icon size={18} />
-                  <span>{item.name}</span>
-                </div>
-                {item.badge > 0 && (
-                  <span style={{ backgroundColor: 'var(--color-danger)', color: '#fff', fontSize: 10, padding: '2px 6px', borderRadius: 10 }}>
-                    {item.badge}
-                  </span>
-                )}
-              </button>
+              <div key={section.key} style={{ marginBottom: 8 }}>
+                <p className="sidebar-section-title">{section.label}</p>
+                {items.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = currentView === item.name;
+                  const badge = item.hasBadge ? pendingCount : 0;
+
+                  return (
+                    <button
+                      key={item.name}
+                      onClick={() => handleNav(item.name)}
+                      className={`sidebar-nav-item${isActive ? ' active' : ''}`}
+                      aria-current={isActive ? 'page' : undefined}
+                      title={item.name}
+                    >
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <Icon size={17} style={{ flexShrink: 0 }} />
+                        <span className="sidebar-nav-label" style={{ fontSize: 13, lineHeight: 1 }}>{item.name}</span>
+                      </span>
+                      {badge > 0 && (
+                        <span className="sidebar-badge">{badge > 99 ? '99+' : badge}</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
             );
           })}
         </nav>
 
-        <div style={{ padding: 16, borderTop: '1px solid #1e293b' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-            <Image src={adminDetails.photo} style={{ width: 36, height: 36, borderRadius: '50%' }} />
-            <div>
-              <span style={{ display: 'block', fontSize: 13, color: '#fff', fontWeight: '700' }}>{adminDetails.name}</span>
-              <span style={{ display: 'block', fontSize: 11, color: 'var(--text-light)' }}>{adminDetails.role}</span>
+        {/* User Profile Card & Sign out */}
+        <div style={{ padding: '16px 12px', borderTop: '1px solid rgba(255, 255, 255, 0.05)' }}>
+          {/* User Profile */}
+          <div className="sidebar-profile-card">
+            <div className="avatar-container">
+              <AdminAvatar src={adminDetails.photo} />
+              <div className="avatar-status-dot" title="Online" />
+            </div>
+            <div className="sidebar-profile-details" style={{ minWidth: 0 }}>
+              <span style={{
+                display: 'block', fontSize: 13, color: '#f8fafc',
+                fontWeight: '700', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+              }}>
+                {adminDetails.name}
+              </span>
+              <span style={{ display: 'block', fontSize: 11, color: '#64748b', fontWeight: '500', marginTop: 1 }}>
+                {adminDetails.role}
+              </span>
             </div>
           </div>
+
+          {/* Sign out */}
           <button
-            onClick={() => triggerConfirm('Logout', null, 'Are you sure you want to end your active administration session?', () => setIsAdminLoggedIn(false))}
-            style={{
-              width: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              padding: '10px 14px',
-              border: 'none',
-              borderRadius: 'var(--radius-sm)',
-              backgroundColor: 'rgba(239, 68, 68, 0.1)',
-              color: 'var(--color-danger)',
-              cursor: 'pointer',
-              fontSize: 14,
-              fontWeight: '700'
-            }}
+            onClick={() => triggerConfirm('Logout', null, 'End your active administration session?', () => setIsAdminLoggedIn(false))}
+            className="sidebar-signout-btn"
+            aria-label="Sign out session"
           >
-            <LogOut size={16} />
-            <span>Session Sign Out</span>
+            <LogOut size={14} style={{ flexShrink: 0 }} />
+            <span className="sidebar-nav-label" style={{ fontSize: 13 }}>Sign Out</span>
           </button>
         </div>
       </aside>
 
-      {/* Main Contents Panel Wrap */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100vh', overflowY: 'auto' }}>
-        <header style={{ height: 72, backgroundColor: '#fff', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justify: 'space-between', paddingHorizontal: 24, position: 'sticky', top: 0, zIndex: 90 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, width: '40%' }}>
+      {/* ── Main Content Area ────────────────────────────────────────── */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: '100vh', minWidth: 0 }}>
+
+        {/* Top Header */}
+        <header style={{
+          height: 60,
+          backgroundColor: '#fff',
+          borderBottom: '1px solid var(--border-color)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0 24px',
+          position: 'sticky',
+          top: 0,
+          zIndex: 90,
+          boxShadow: '0 1px 0 var(--border-color)',
+          gap: 16,
+        }}>
+          {/* Hamburger toggle + Search bar wrap */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: '1 1 auto', maxWidth: 460 }}>
+            {/* Hamburger button on mobile */}
+            <button
+              onClick={() => setMobileOpen(true)}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: 'var(--text-main)', padding: 6, display: 'none',
+                alignItems: 'center', justifyContent: 'center',
+                borderRadius: 'var(--radius-sm)', transition: 'background-color 0.2s',
+              }}
+              className="sidebar-menu-btn"
+              aria-label="Open navigation menu"
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-main)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+            >
+              <Menu size={18} />
+            </button>
+
+            {/* Search */}
             <div style={{ position: 'relative', width: '100%' }}>
-              <Search size={18} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <Search
+                size={14}
+                style={{
+                  position: 'absolute', left: 12, top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: searchFocused ? 'var(--color-primary)' : 'var(--text-light)',
+                  transition: 'color 0.2s',
+                  pointerEvents: 'none',
+                }}
+              />
               <input
                 type="text"
-                style={{
-                  width: '100%',
-                  height: 40,
-                  backgroundColor: 'var(--bg-main)',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: 'var(--radius-sm)',
-                  paddingLeft: 40,
-                  paddingRight: 16,
-                  fontSize: 14,
-                  outline: 'none'
-                }}
-                placeholder="Global search listings, sellers, buyers..."
+                className="input input-search"
+                style={{ paddingLeft: 34, paddingRight: globalSearchQuery ? 34 : 12, height: 36 }}
+                placeholder="Search listings, sellers, buyers…"
                 value={globalSearchQuery}
                 onChange={(e) => setGlobalSearchQuery(e.target.value)}
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => setSearchFocused(false)}
+                aria-label="Global search"
               />
+              {globalSearchQuery && (
+                <button
+                  onClick={() => setGlobalSearchQuery('')}
+                  className="btn-ghost btn-icon"
+                  style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', padding: 4 }}
+                  aria-label="Clear search"
+                >
+                  <X size={12} color="var(--text-muted)" />
+                </button>
+              )}
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          {/* Right rail controls */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
             <button
               onClick={() => setCurrentView('Help Center')}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+              className="btn-ghost btn-icon"
               title="Help Center"
+              aria-label="Help Center"
+              style={{ padding: 6 }}
             >
-              <HelpCircle size={22} />
+              <HelpCircle size={18} color="var(--text-muted)" />
             </button>
-            <div style={{ width: 1, height: 24, backgroundColor: 'var(--border-color)' }} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: '600' }}>
-                {serverStatus === 'Connected' ? 'Server Connected' : 'Server Offline'}
+
+            <div style={{ width: 1, height: 20, backgroundColor: 'var(--border-color)' }} />
+
+            {/* Server status dot */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{
+                width: 7, height: 7, borderRadius: '50%',
+                backgroundColor: serverStatus === 'Connected' ? 'var(--color-primary)' : 'var(--color-danger)',
+                boxShadow: serverStatus === 'Connected'
+                  ? '0 0 0 2px rgba(22,163,74,0.2)'
+                  : '0 0 0 2px rgba(239,68,68,0.2)',
+                transition: 'background-color 0.3s, box-shadow 0.3s',
+              }} />
+              <span className="sidebar-nav-label" style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: '600', whiteSpace: 'nowrap' }}>
+                {serverStatus === 'Connected' ? 'Connected' : 'Offline'}
               </span>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: serverStatus === 'Connected' ? 'var(--color-primary)' : 'var(--color-danger)' }} />
             </div>
           </div>
         </header>
 
-        <main style={{ flex: 1, padding: 24 }}>
+        {/* Page Content View */}
+        <main style={{ flex: 1, padding: '24px 24px 36px', maxWidth: '100%', overflowX: 'hidden' }}>
           {children}
         </main>
       </div>
@@ -185,14 +289,18 @@ export default function SidebarLayout({ children }) {
   );
 }
 
-function Image({ src, style }) {
+function AdminAvatar({ src }) {
   const [error, setError] = React.useState(false);
+  const style = {
+    width: 32, height: 32, borderRadius: '50%', objectFit: 'cover',
+    flexShrink: 0, border: '1.5px solid rgba(255,255,255,0.08)',
+  };
   if (error || !src) {
     return (
-      <div style={{ ...style, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e2e8f0' }}>
-        <User size={18} color="#64748b" />
+      <div style={{ ...style, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#1e293b' }}>
+        <User size={14} color="#64748b" />
       </div>
     );
   }
-  return <img src={src} style={style} onError={() => setError(true)} alt="" />;
+  return <img src={src} style={style} onError={() => setError(true)} alt="" aria-hidden="true" />;
 }

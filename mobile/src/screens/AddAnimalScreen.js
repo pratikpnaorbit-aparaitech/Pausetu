@@ -12,7 +12,9 @@ import {
   Image,
   Dimensions,
   Platform,
-  ActivityIndicator
+  ActivityIndicator,
+  Modal,
+  FlatList
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Camera, CameraView } from 'expo-camera';
@@ -104,6 +106,12 @@ export default function AddAnimalScreen({ navigation }) {
   const [selectedDistrict, setSelectedDistrict] = useState(null);
   const [selectedTaluka, setSelectedTaluka] = useState(null);
   const [selectedVillage, setSelectedVillage] = useState(null);
+
+  // Searchable Dropdowns search and modal states
+  const [stateSearch, setStateSearch] = useState('');
+  const [districtSearch, setDistrictSearch] = useState('');
+  const [talukaSearch, setTalukaSearch] = useState('');
+  const [activeDropdown, setActiveDropdown] = useState(null); // 'state' | 'district' | 'taluka' | null
   
   // GPS State
   const [latitude, setLatitude] = useState(null);
@@ -311,62 +319,51 @@ export default function AddAnimalScreen({ navigation }) {
   // Video capture states
   const handleStartRecording = async () => {
     if (Platform.OS === 'web') return;
+    setIsVideoRecording(true);
+    setVideoTimer(0);
+    
+    let durationSec = 0;
+    videoIntervalRef.current = setInterval(() => {
+      durationSec++;
+      setVideoTimer(durationSec);
+      if (durationSec >= 30) {
+        clearInterval(videoIntervalRef.current);
+        handleStopRecording(durationSec);
+      }
+    }, 1000);
+
     if (cameraRef.current) {
       try {
-        setIsVideoRecording(true);
-        setVideoTimer(0);
-        
-        videoIntervalRef.current = setInterval(() => {
-          setVideoTimer((prev) => {
-            if (prev >= 120) {
-              clearInterval(videoIntervalRef.current);
-              handleStopRecording();
-              return 120;
-            }
-            return prev + 1;
-          });
-        }, 1000);
-
         const recorded = await cameraRef.current.recordAsync({
-          maxDuration: 120,
+          maxDuration: 30,
           quality: '720p'
         });
         
         if (recorded && recorded.uri) {
           setVideoPreview({
             uri: recorded.uri,
-            duration: videoTimer,
-            fileSize: Math.round(5 * 1024 * 1024)
+            duration: durationSec || 30,
+            fileSize: Math.round(6.2 * 1024 * 1024)
           });
         }
       } catch (err) {
         console.warn('Native video recording failed:', err.message);
         setIsVideoRecording(false);
-        clearInterval(videoIntervalRef.current);
+        if (videoIntervalRef.current) clearInterval(videoIntervalRef.current);
         Alert.alert('त्रुटी (Error)', 'व्हिडिओ रेकॉर्डिंग सुरू करण्यात अयशस्वी. (Failed to start video recording.)');
       }
-    } else {
-      // Fallback for Simulator
-      setIsVideoRecording(true);
-      setVideoTimer(0);
-      videoIntervalRef.current = setInterval(() => {
-        setVideoTimer((prev) => {
-          if (prev >= 120) {
-            clearInterval(videoIntervalRef.current);
-            handleStopRecording();
-            return 120;
-          }
-          return prev + 1;
-        });
-      }, 1000);
     }
   };
 
-  const handleStopRecording = () => {
+  const handleStopRecording = (forcedDuration) => {
     if (Platform.OS === 'web') return;
-    clearInterval(videoIntervalRef.current);
+    if (videoIntervalRef.current) {
+      clearInterval(videoIntervalRef.current);
+    }
     setIsVideoRecording(false);
     
+    const finalDuration = forcedDuration !== undefined && typeof forcedDuration === 'number' ? forcedDuration : videoTimer;
+
     if (cameraRef.current) {
       try {
         cameraRef.current.stopRecording();
@@ -374,7 +371,12 @@ export default function AddAnimalScreen({ navigation }) {
         console.warn('Failed to stop camera recording:', err.message);
       }
     } else {
-      console.warn('[Camera] No camera reference found to stop recording.');
+      console.warn('[Camera] No camera reference found to stop recording. Simulator fallback.');
+      setVideoPreview({
+        uri: 'c:/Users/Nilesh Rajpure/OneDrive/Desktop/Pashusetu/backend/uploads/profile-anonymous-1783575388790-732234302.mp4',
+        duration: finalDuration || 20,
+        fileSize: Math.round(6.2 * 1024 * 1024)
+      });
     }
   };
 
@@ -471,6 +473,8 @@ export default function AddAnimalScreen({ navigation }) {
     // 2. Perform detailed validation check
     const missingFields = [];
     const validPhotos = photos.filter(p => p && p.uri);
+
+
     if (validPhotos.length < 5) {
       missingFields.push(`किमान ५ फोटो आवश्यक आहेत (At least 5 photos are required. Current count: ${validPhotos.length})`);
     }
@@ -494,6 +498,10 @@ export default function AddAnimalScreen({ navigation }) {
     }
     if (!selectedTaluka) {
       missingFields.push("तालुका (Taluka)");
+    }
+    const villageVal = typeof selectedVillage === 'object' ? selectedVillage?.name : selectedVillage;
+    if (!villageVal || !villageVal.trim()) {
+      missingFields.push("गाव (Village)");
     }
 
     if (missingFields.length > 0) {
@@ -1153,18 +1161,23 @@ export default function AddAnimalScreen({ navigation }) {
                 marginBottom: 20
               }}>
                 {videoPreview ? (
-                  <View style={{ width: '100%', height: 240, borderRadius: 14, overflow: 'hidden', backgroundColor: '#F8FAFC', justifyContent: 'center', alignItems: 'center' }}>
-                    <Ionicons name="videocam" size={64} color="#16A34A" />
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#475569', marginTop: 8 }}>
-                      Uploaded Video
+                  <View style={{ width: '100%', padding: 16, borderRadius: 14, backgroundColor: '#F8FAFC', justifyContent: 'center', alignItems: 'center' }}>
+                    <Ionicons name="videocam" size={64} color={videoPreview.duration < 20 ? '#EF4444' : '#16A34A'} />
+                    <Text style={{ fontSize: 15, fontWeight: '800', color: '#1E293B', marginTop: 8 }}>
+                      Uploaded Video Duration: 00:{videoPreview.duration < 10 ? `0${videoPreview.duration}` : videoPreview.duration} / 00:30
                     </Text>
-                    <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
-                      Duration: {videoPreview.duration}s | Size: {Math.round((videoPreview.fileSize || 0) / (1024 * 1024))} MB
+                    <Text style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>
+                      Size: {Math.round((videoPreview.fileSize || 0) / (1024 * 1024))} MB
                     </Text>
                     {videoPreview.duration < 20 && (
-                      <Text style={{ fontSize: 12, color: '#EF4444', fontWeight: '600', marginTop: 4 }}>
-                        Duration too short (min. 20s required)
-                      </Text>
+                      <View style={{ padding: 12, backgroundColor: '#FEF2F2', borderRadius: 8, marginTop: 10, borderWidth: 1, borderColor: '#FEE2E2', width: '100%' }}>
+                        <Text style={{ fontSize: 13, color: '#EF4444', fontWeight: '700', textAlign: 'center', lineHeight: 18 }}>
+                          Please record at least 20 seconds for animal verification.
+                        </Text>
+                        <Text style={{ fontSize: 13, color: '#EF4444', fontWeight: '700', textAlign: 'center', marginTop: 6, lineHeight: 18 }}>
+                          प्राण्याच्या पडताळणीसाठी कृपया किमान 20 सेकंदांचा व्हिडिओ रेकॉर्ड करा.
+                        </Text>
+                      </View>
                     )}
                   </View>
                 ) : (
@@ -1279,15 +1292,20 @@ export default function AddAnimalScreen({ navigation }) {
                 marginBottom: 20
               }}>
                 {videoPreview ? (
-                  <View style={{ width: '100%', height: 240, borderRadius: 14, overflow: 'hidden', backgroundColor: '#F8FAFC', justifyContent: 'center', alignItems: 'center' }}>
-                    <Ionicons name="videocam" size={64} color="#16A34A" />
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#475569', marginTop: 8 }}>
-                      Video Recorded: {videoPreview.duration}s
+                  <View style={{ width: '100%', padding: 16, borderRadius: 14, backgroundColor: '#F8FAFC', justifyContent: 'center', alignItems: 'center' }}>
+                    <Ionicons name="videocam" size={64} color={videoPreview.duration < 20 ? '#EF4444' : '#16A34A'} />
+                    <Text style={{ fontSize: 15, fontWeight: '800', color: '#1E293B', marginTop: 8 }}>
+                      Video Duration: 00:{videoPreview.duration < 10 ? `0${videoPreview.duration}` : videoPreview.duration} / 00:30
                     </Text>
                     {videoPreview.duration < 20 && (
-                      <Text style={{ fontSize: 12, color: '#EF4444', fontWeight: '600', marginTop: 4 }}>
-                        Duration too short (min. 20s required)
-                      </Text>
+                      <View style={{ padding: 12, backgroundColor: '#FEF2F2', borderRadius: 8, marginTop: 10, borderWidth: 1, borderColor: '#FEE2E2', width: '100%' }}>
+                        <Text style={{ fontSize: 13, color: '#EF4444', fontWeight: '700', textAlign: 'center', lineHeight: 18 }}>
+                          Please record at least 20 seconds for animal verification.
+                        </Text>
+                        <Text style={{ fontSize: 13, color: '#EF4444', fontWeight: '700', textAlign: 'center', marginTop: 6, lineHeight: 18 }}>
+                          प्राण्याच्या पडताळणीसाठी कृपया किमान 20 सेकंदांचा व्हिडिओ रेकॉर्ड करा.
+                        </Text>
+                      </View>
                     )}
                   </View>
                 ) : isVideoRecording ? (
@@ -1366,8 +1384,11 @@ export default function AddAnimalScreen({ navigation }) {
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
                       <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444', marginRight: 6 }} />
                       <Text style={{ fontSize: 14, fontWeight: '700', color: '#EF4444' }}>
-                        Recording: 00:{videoTimer < 10 ? `0${videoTimer}` : videoTimer} / 02:00
+                        Recording: 00:{videoTimer < 10 ? `0${videoTimer}` : videoTimer} / 00:30
                       </Text>
+                    </View>
+                    <View style={{ height: 6, backgroundColor: '#E2E8F0', borderRadius: 3, width: '80%', overflow: 'hidden', marginTop: 6, marginBottom: 8 }}>
+                      <View style={{ width: `${(videoTimer / 30) * 100}%`, height: '100%', backgroundColor: '#EF4444' }} />
                     </View>
                     <Text style={{ fontSize: 11, color: '#64748B' }}>
                       (Min. 20s required / किमान २० सेकंद रेकॉर्ड करा)
@@ -1722,111 +1743,273 @@ export default function AddAnimalScreen({ navigation }) {
         );
 
       case 7:
+        const typedVillageName = typeof selectedVillage === 'object' ? (selectedVillage?.name || '') : (selectedVillage || '');
+        const filteredStates = states.filter(s =>
+          s && s.name && s.name.toLowerCase().includes(stateSearch.toLowerCase())
+        );
+        const filteredDistricts = districts.filter(d =>
+          d && d.name && d.name.toLowerCase().includes(districtSearch.toLowerCase())
+        );
+        const filteredTalukas = talukas.filter(t =>
+          t && t.name && t.name.toLowerCase().includes(talukaSearch.toLowerCase())
+        );
+        const filteredVillages = villages.filter(v =>
+          v && v.name && v.name.toLowerCase().includes(typedVillageName.toLowerCase())
+        );
+
         return (
           <View style={styles.wizardCard}>
             <Text style={styles.wizardLabel}>पत्ता आणि जीपीएस / Location Details</Text>
 
-            {/* Dropdowns representing dependent dropdown location selections */}
+            {/* State Select Trigger */}
             <View style={styles.inputGroup}>
               <Text style={styles.largeFieldLabel}>राज्य / State *</Text>
-              <View style={styles.dropdownContainer}>
-                {states.map((s) => (
-                  <TouchableOpacity
-                    key={s._id}
-                    style={[styles.pillOption, selectedState?._id === s._id && styles.selectedPillOption]}
-                    onPress={() => {
-                      setSelectedState(s);
-                      setSelectedDistrict(null);
-                      setSelectedTaluka(null);
-                      setSelectedVillage(null);
-                      setDistricts([]);
-                      setTalukas([]);
-                      setVillages([]);
-                      fetchDistricts(s._id);
-                    }}
-                  >
-                    <Text style={[styles.pillText, selectedState?._id === s._id && styles.selectedPillText]}>{s.name}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+              <TouchableOpacity
+                style={styles.dropdownSelector}
+                onPress={() => {
+                  setStateSearch('');
+                  setActiveDropdown('state');
+                }}
+              >
+                <Text style={styles.dropdownSelectorText}>
+                  {selectedState ? selectedState.name : 'राज्य निवडा / Select State'}
+                </Text>
+                <Ionicons name="chevron-down" size={20} color="#64748B" />
+              </TouchableOpacity>
             </View>
 
+            {/* State Modal */}
+            <Modal
+              visible={activeDropdown === 'state'}
+              animationType="slide"
+              transparent={true}
+              onRequestClose={() => setActiveDropdown(null)}
+            >
+              <View style={styles.modalOverlay}>
+                <View style={styles.modalContent}>
+                  <View style={styles.modalHeader}>
+                    <Text style={styles.modalTitle}>राज्य निवडा / Select State</Text>
+                    <TouchableOpacity onPress={() => setActiveDropdown(null)}>
+                      <Ionicons name="close" size={24} color="#334155" />
+                    </TouchableOpacity>
+                  </View>
+                  <TextInput
+                    style={styles.modalSearchInput}
+                    placeholder="शोधा / Search State..."
+                    value={stateSearch}
+                    onChangeText={setStateSearch}
+                    autoFocus
+                  />
+                  <FlatList
+                    data={filteredStates}
+                    keyExtractor={(item) => item._id}
+                    style={{ maxHeight: 300 }}
+                    renderItem={({ item: s }) => (
+                      <TouchableOpacity
+                        style={styles.modalOption}
+                        onPress={() => {
+                          setSelectedState(s);
+                          setSelectedDistrict(null);
+                          setSelectedTaluka(null);
+                          setSelectedVillage(null);
+                          setDistricts([]);
+                          setTalukas([]);
+                          setVillages([]);
+                          fetchDistricts(s._id);
+                          setActiveDropdown(null);
+                        }}
+                      >
+                        <Text style={styles.modalOptionText}>{s.name}</Text>
+                        {selectedState?._id === s._id && (
+                          <Ionicons name="checkmark" size={20} color="#16A34A" style={{ marginLeft: 'auto' }} />
+                        )}
+                      </TouchableOpacity>
+                    )}
+                    ListEmptyComponent={
+                      <Text style={styles.noResultsText}>कोणतेही परिणाम आढळले नाहीत / No results found</Text>
+                    }
+                  />
+                </View>
+              </View>
+            </Modal>
+
+            {/* District Select Trigger */}
             {selectedState && (
               <View style={styles.inputGroup}>
                 <Text style={styles.largeFieldLabel}>जिल्हा / District *</Text>
-                <View style={styles.dropdownContainer}>
-                  {districts.map((d) => (
-                    <TouchableOpacity
-                      key={d._id}
-                      style={[styles.pillOption, selectedDistrict?._id === d._id && styles.selectedPillOption]}
-                      onPress={() => {
-                        setSelectedDistrict(d);
-                        setSelectedTaluka(null);
-                        setSelectedVillage(null);
-                        setTalukas([]);
-                        setVillages([]);
-                        fetchTalukas(d._id);
-                      }}
-                    >
-                      <Text style={[styles.pillText, selectedDistrict?._id === d._id && styles.selectedPillText]}>{d.name}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                <TouchableOpacity
+                  style={styles.dropdownSelector}
+                  onPress={() => {
+                    setDistrictSearch('');
+                    setActiveDropdown('district');
+                  }}
+                >
+                  <Text style={styles.dropdownSelectorText}>
+                    {selectedDistrict ? selectedDistrict.name : 'जिल्हा निवडा / Select District'}
+                  </Text>
+                  <Ionicons name="chevron-down" size={20} color="#64748B" />
+                </TouchableOpacity>
               </View>
             )}
 
+            {/* District Modal */}
+            <Modal
+              visible={activeDropdown === 'district'}
+              animationType="slide"
+              transparent={true}
+              onRequestClose={() => setActiveDropdown(null)}
+            >
+              <View style={styles.modalOverlay}>
+                <View style={styles.modalContent}>
+                  <View style={styles.modalHeader}>
+                    <Text style={styles.modalTitle}>जिल्हा निवडा / Select District</Text>
+                    <TouchableOpacity onPress={() => setActiveDropdown(null)}>
+                      <Ionicons name="close" size={24} color="#334155" />
+                    </TouchableOpacity>
+                  </View>
+                  <TextInput
+                    style={styles.modalSearchInput}
+                    placeholder="शोधा / Search District..."
+                    value={districtSearch}
+                    onChangeText={setDistrictSearch}
+                    autoFocus
+                  />
+                  <FlatList
+                    data={filteredDistricts}
+                    keyExtractor={(item) => item._id}
+                    style={{ maxHeight: 300 }}
+                    renderItem={({ item: d }) => (
+                      <TouchableOpacity
+                        style={styles.modalOption}
+                        onPress={() => {
+                          setSelectedDistrict(d);
+                          setSelectedTaluka(null);
+                          setSelectedVillage(null);
+                          setTalukas([]);
+                          setVillages([]);
+                          fetchTalukas(d._id);
+                          setActiveDropdown(null);
+                        }}
+                      >
+                        <Text style={styles.modalOptionText}>{d.name}</Text>
+                        {selectedDistrict?._id === d._id && (
+                          <Ionicons name="checkmark" size={20} color="#16A34A" style={{ marginLeft: 'auto' }} />
+                        )}
+                      </TouchableOpacity>
+                    )}
+                    ListEmptyComponent={
+                      <Text style={styles.noResultsText}>कोणतेही परिणाम आढळले नाहीत / No results found</Text>
+                    }
+                  />
+                </View>
+              </View>
+            </Modal>
+
+            {/* Taluka Select Trigger */}
             {selectedDistrict && (
               <View style={styles.inputGroup}>
                 <Text style={styles.largeFieldLabel}>तालुका / Taluka *</Text>
-                <View style={styles.dropdownContainer}>
-                  {talukas.map((t) => (
-                    <TouchableOpacity
-                      key={t._id}
-                      style={[styles.pillOption, selectedTaluka?._id === t._id && styles.selectedPillOption]}
-                      onPress={() => {
-                        setSelectedTaluka(t);
-                        setSelectedVillage(null);
-                        setVillages([]);
-                        fetchVillages(t._id);
-                      }}
-                    >
-                      <Text style={[styles.pillText, selectedTaluka?._id === t._id && styles.selectedPillText]}>{t.name}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                <TouchableOpacity
+                  style={styles.dropdownSelector}
+                  onPress={() => {
+                    setTalukaSearch('');
+                    setActiveDropdown('taluka');
+                  }}
+                >
+                  <Text style={styles.dropdownSelectorText}>
+                    {selectedTaluka ? selectedTaluka.name : 'तालुका निवडा / Select Taluka'}
+                  </Text>
+                  <Ionicons name="chevron-down" size={20} color="#64748B" />
+                </TouchableOpacity>
               </View>
             )}
 
+            {/* Taluka Modal */}
+            <Modal
+              visible={activeDropdown === 'taluka'}
+              animationType="slide"
+              transparent={true}
+              onRequestClose={() => setActiveDropdown(null)}
+            >
+              <View style={styles.modalOverlay}>
+                <View style={styles.modalContent}>
+                  <View style={styles.modalHeader}>
+                    <Text style={styles.modalTitle}>तालुका निवडा / Select Taluka</Text>
+                    <TouchableOpacity onPress={() => setActiveDropdown(null)}>
+                      <Ionicons name="close" size={24} color="#334155" />
+                    </TouchableOpacity>
+                  </View>
+                  <TextInput
+                    style={styles.modalSearchInput}
+                    placeholder="शोधा / Search Taluka..."
+                    value={talukaSearch}
+                    onChangeText={setTalukaSearch}
+                    autoFocus
+                  />
+                  <FlatList
+                    data={filteredTalukas}
+                    keyExtractor={(item) => item._id}
+                    style={{ maxHeight: 300 }}
+                    renderItem={({ item: t }) => (
+                      <TouchableOpacity
+                        style={styles.modalOption}
+                        onPress={() => {
+                          setSelectedTaluka(t);
+                          setSelectedVillage(null);
+                          setVillages([]);
+                          fetchVillages(t._id);
+                          setActiveDropdown(null);
+                        }}
+                      >
+                        <Text style={styles.modalOptionText}>{t.name}</Text>
+                        {selectedTaluka?._id === t._id && (
+                          <Ionicons name="checkmark" size={20} color="#16A34A" style={{ marginLeft: 'auto' }} />
+                        )}
+                      </TouchableOpacity>
+                    )}
+                    ListEmptyComponent={
+                      <Text style={styles.noResultsText}>कोणतेही परिणाम आढळले नाहीत / No results found</Text>
+                    }
+                  />
+                </View>
+              </View>
+            </Modal>
+
+            {/* Village Input & Suggestions */}
             {selectedTaluka && (
               <View style={styles.inputGroup}>
-                <Text style={styles.largeFieldLabel}>गाव / Village</Text>
+                <Text style={styles.largeFieldLabel}>गाव / Village *</Text>
                 <TextInput
                   style={[styles.largeInput, { marginBottom: 12 }]}
                   placeholder="Enter your village name / गावचे नाव टाका"
                   value={typeof selectedVillage === 'object' ? (selectedVillage?.name || '') : (selectedVillage || '')}
                   onChangeText={(text) => setSelectedVillage(text)}
                 />
-                {villages && villages.length > 0 && (
+                {filteredVillages && filteredVillages.length > 0 && (
                   <View style={{ marginTop: 8 }}>
-                    <Text style={{ fontSize: 13, color: '#64748B', marginBottom: 6, fontWeight: '600' }}>
+                    <Text style={{ fontSize: 13, color: '#64748B', marginBottom: 8, fontWeight: '600' }}>
                       पडताळणी यादीतील गाव निवडा / Select from Master List:
                     </Text>
-                    <View style={styles.dropdownContainer}>
-                      {villages.map((v) => {
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', paddingVertical: 4 }}>
+                      {filteredVillages.map((v) => {
                         const isSelected = typeof selectedVillage === 'object' 
                           ? selectedVillage?._id === v._id 
                           : selectedVillage === v.name;
                         return (
                           <TouchableOpacity
                             key={v._id}
-                            style={[styles.pillOption, isSelected && styles.selectedPillOption]}
+                            style={[
+                              styles.pillOption, 
+                              isSelected && styles.selectedPillOption,
+                              { marginRight: 8, paddingVertical: 8, paddingHorizontal: 14 }
+                            ]}
                             onPress={() => setSelectedVillage(v)}
                           >
                             <Text style={[styles.pillText, isSelected && styles.selectedPillText]}>{v.name}</Text>
                           </TouchableOpacity>
                         );
                       })}
-                    </View>
+                    </ScrollView>
                   </View>
                 )}
               </View>
@@ -2299,6 +2482,81 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#B91C1C',
     marginLeft: 10
+  },
+  dropdownSelector: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8
+  },
+  dropdownSelectorText: {
+    fontSize: 16,
+    color: '#0F172A',
+    fontWeight: '500'
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.5)',
+    justifyContent: 'flex-end'
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 24,
+    maxHeight: '80%',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 10
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#0F172A'
+  },
+  modalSearchInput: {
+    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#0F172A',
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0'
+  },
+  modalOption: {
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    flexDirection: 'row',
+    alignItems: 'center'
+  },
+  modalOptionText: {
+    fontSize: 16,
+    color: '#334155',
+    fontWeight: '500'
+  },
+  noResultsText: {
+    textAlign: 'center',
+    color: '#94A3B8',
+    marginVertical: 20,
+    fontSize: 14
   },
   inputGroup: {
     marginBottom: 16

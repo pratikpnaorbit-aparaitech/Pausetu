@@ -3,7 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
-const API_BASE_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5000/api' : 'http://localhost:5000/api';
+export const API_BASE_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5000/api' : 'http://localhost:5000/api';
 
 const instance = axios.create({
   baseURL: API_BASE_URL,
@@ -179,6 +179,24 @@ export const api = {
   deleteNotification: async (id) => {
     return instance.delete(`/notifications/${id}`);
   }
+};
+
+export const resolveMediaUrl = (photo) => {
+  if (!photo) return 'https://images.unsplash.com/photo-1546445317-29f4545e6d52?auto=format&fit=crop&w=300&q=80';
+  
+  let targetUrl = '';
+  if (typeof photo === 'string') {
+    targetUrl = photo;
+  } else if (typeof photo === 'object') {
+    targetUrl = photo.fileUrl || photo.url || '';
+  }
+  
+  if (!targetUrl) return 'https://images.unsplash.com/photo-1546445317-29f4545e6d52?auto=format&fit=crop&w=300&q=80';
+  if (targetUrl.startsWith('http')) return targetUrl;
+  
+  const pathPart = targetUrl.startsWith('/') ? targetUrl : `/${targetUrl}`;
+  const serverHost = API_BASE_URL.replace('/api', '');
+  return `${serverHost}${pathPart}`;
 };
 
 export default instance;
