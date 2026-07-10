@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { StyleSheet, View, Text, ScrollView, Image, TouchableOpacity, Dimensions, Modal, Share, FlatList } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, Image, TouchableOpacity, Dimensions, Modal, Share, FlatList, SafeAreaView, ActivityIndicator, Linking, Alert, Platform } from 'react-native';
 import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
+import { Video, ResizeMode } from 'expo-av';
 import SectionHeader from '../components/SectionHeader';
 import ListingCard from '../components/ListingCard';
 import { api, resolveMediaUrl } from '../api/api';
@@ -53,56 +54,129 @@ const SIMILAR_ANIMALS = [
 ];
 
 export default function AnimalDetailsScreen({ route, navigation }) {
-  // Safe extraction of params (fallback to mock default)
-  const animal = route.params?.animal || {
-    id: 'f1',
-    name: 'HF Cross Cow',
-    breed: 'Holstein Friesian',
-    age: '3.5 Years',
-    price: '₹55,000',
-    location: 'Baramati, Pune',
-    isVerified: true,
-    isFeatured: true,
-  };
+  // Extract the pre-mapped item from route params (used as immediate preview)
+  const passedAnimal = route.params?.animal || null;
 
+  // Derive the animal's MongoDB _id from whichever field the caller provided.
+  // BuyScreen maps _id → id, but similar-animal cards pass the raw object.
+  const animalId = passedAnimal?._id || passedAnimal?.id || null;
+
+  const [animal, setAnimal] = useState(passedAnimal);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [activeSlide, setActiveSlide] = useState(0);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [similarAnimals, setSimilarAnimals] = useState([]);
 
+  // Fetch the complete animal document from the API on mount.
+  // The pre-mapped object from BuyScreen is missing critical fields
+  // (_id, categoryId, description, gender, weight, color, health, sellerId object, etc.).
   useEffect(() => {
+    let cancelled = false;
+
+    const fetchAnimalDetails = async () => {
+      if (!animalId) {
+        setLoading(false);
+        setError('No animal ID provided.');
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError(null);
+        const res = await api.getAnimalById(animalId);
+
+        if (cancelled) return;
+
+        if (res.status === 'success' && res.data?.animal) {
+          const a = res.data.animal;
+          setAnimal({
+            ...a,
+            _id: a._id,
+            id: a._id,
+            name: a.title || passedAnimal?.name || 'Unknown',
+            breed: a.breedId?.name || passedAnimal?.breed || 'Unknown Breed',
+            age: a.age || passedAnimal?.age || 'N/A',
+            price: `₹${(a.price || 0).toLocaleString()}`,
+            sellerName: a.sellerId?.name || passedAnimal?.sellerName || 'Seller',
+            location: [a.village, a.district].filter(Boolean).join(', ') || passedAnimal?.location || '',
+            isVerified: a.status === 'approved',
+            isFeatured: (a.views || 0) > 200,
+            photos: a.photos || [],
+            // Backend field is 'video' (singular string), not 'videos'
+            video: a.video || null,
+            description: a.description || '',
+            gender: a.gender || null,
+            weight: a.weight || null,
+            color: a.color || null,
+            health: a.health || {},
+            categoryId: a.categoryId || null,
+            breedId: a.breedId || null,
+            sellerId: a.sellerId || null,
+            latitude: a.latitude || null,
+            longitude: a.longitude || null,
+            state: a.state || null,
+            district: a.district || null,
+            taluka: a.taluka || null,
+            village: a.village || null,
+          });
+        } else {
+          setError('Animal listing not found.');
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.warn('[AnimalDetails] Failed to load animal:', err.message);
+          // If the API failed but we have the pre-mapped preview, show it
+          if (passedAnimal) {
+            setAnimal(passedAnimal);
+          } else {
+            setError(err.message || 'Failed to load animal details.');
+          }
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    fetchAnimalDetails();
+    return () => { cancelled = true; };
+  }, [animalId]);
+
+  // Fetch similar animals once we have the full animal data with categoryId
+  useEffect(() => {
+    if (!animal?.categoryId) return;
+
     const fetchSimilar = async () => {
       try {
-        if (animal.categoryId) {
-          const catId = animal.categoryId._id || animal.categoryId;
-          const res = await api.getAnimals({ categoryId: catId, status: 'approved' });
-          if (res.status === 'success') {
-            const list = res.data.animals
-              .filter(a => a._id !== animal._id)
-              .slice(0, 5)
-              .map(a => ({
-                ...a,
-                id: a._id,
-                name: a.title,
-                breed: a.breedId?.name || 'Unknown Breed',
-                age: a.age,
-                price: `₹${a.price.toLocaleString()}`,
-                sellerName: a.sellerId?.name || 'Seller',
-                location: `${a.village}, ${a.district}`,
-                isVerified: a.status === 'approved',
-                isFeatured: a.views > 200,
-                postedTime: 'Active',
-                photos: a.photos
-              }));
-            setSimilarAnimals(list);
-          }
+        const catId = animal.categoryId._id || animal.categoryId;
+        const res = await api.getAnimals({ categoryId: catId, status: 'approved' });
+        if (res.status === 'success') {
+          const list = res.data.animals
+            .filter(a => a._id !== (animal._id || animal.id))
+            .slice(0, 5)
+            .map(a => ({
+              ...a,
+              id: a._id,
+              name: a.title,
+              breed: a.breedId?.name || 'Unknown Breed',
+              age: a.age,
+              price: `₹${(a.price || 0).toLocaleString()}`,
+              sellerName: a.sellerId?.name || 'Seller',
+              location: `${a.village || ''}, ${a.district || ''}`,
+              isVerified: a.status === 'approved',
+              isFeatured: (a.views || 0) > 200,
+              postedTime: 'Active',
+              photos: a.photos || [],
+            }));
+          setSimilarAnimals(list);
         }
       } catch (err) {
         console.warn('Failed to load similar animals:', err.message);
       }
     };
     fetchSimilar();
-  }, [animal]);
+  }, [animal?.categoryId]);
 
   const scrollRef = useRef(null);
 
@@ -123,10 +197,125 @@ export default function AnimalDetailsScreen({ route, navigation }) {
     }
   };
 
-  const handleOpenMaps = () => {
-    // UI Only notification simulation or deep link if needed
-    alert('Opening maps location for ' + animal.location);
+  // ── Action Handlers ──────────────────────────────────────────────────────
+
+  const handleCall = async () => {
+    const phone = animal.sellerId?.mobile || animal.sellerId?.phoneNumber;
+    if (!phone) {
+      Alert.alert('Phone Not Available', 'The seller has not provided a phone number for this listing.');
+      return;
+    }
+    const url = `tel:${phone}`;
+    const supported = await Linking.canOpenURL(url);
+    if (supported) {
+      Linking.openURL(url);
+    } else {
+      Alert.alert('Cannot Open Dialer', 'Unable to open phone dialer on this device.');
+    }
   };
+
+  const handleWhatsApp = async () => {
+    const phone = animal.sellerId?.mobile || animal.sellerId?.phoneNumber;
+    if (!phone) {
+      Alert.alert('Phone Not Available', 'The seller has not provided a phone number for this listing.');
+      return;
+    }
+    // Normalize phone: strip leading zeros, spaces, dashes; prepend country code 91 for India
+    const cleaned = phone.replace(/[^0-9]/g, '');
+    const withCountry = cleaned.startsWith('91') ? cleaned : `91${cleaned}`;
+    const url = `https://wa.me/${withCountry}?text=${encodeURIComponent(`Hi, I am interested in your animal listing: ${animal.name} (${animal.breed}) priced at ${animal.price} on PashuSetu.`)}`;
+    const supported = await Linking.canOpenURL(url);
+    if (supported) {
+      Linking.openURL(url);
+    } else {
+      Alert.alert('WhatsApp Not Found', 'WhatsApp is not installed on this device.');
+    }
+  };
+
+  const handleChat = () => {
+    const sellerId = animal.sellerId?._id || animal.sellerId;
+    if (!sellerId) {
+      Alert.alert('Seller Unavailable', 'Cannot start chat — seller information is missing.');
+      return;
+    }
+    // Navigate to Chat screen if available, otherwise show graceful fallback
+    const state = navigation.getState();
+    const routeNames = state?.routeNames || [];
+    if (routeNames.includes('Chat')) {
+      navigation.navigate('Chat', {
+        sellerId,
+        animalId: animal._id || animal.id,
+        animalTitle: animal.name,
+      });
+    } else {
+      // Chat screen not yet wired — offer Call or WhatsApp instead
+      Alert.alert(
+        'Chat Coming Soon',
+        'In-app chat is being set up. Would you like to contact the seller via call or WhatsApp?',
+        [
+          { text: 'Call', onPress: handleCall },
+          { text: 'WhatsApp', onPress: handleWhatsApp },
+          { text: 'Cancel', style: 'cancel' },
+        ]
+      );
+    }
+  };
+
+  const handleOpenMaps = async () => {
+    let url = '';
+    if (animal.latitude && animal.longitude) {
+      // Prefer precise coordinates
+      url = `https://www.google.com/maps/search/?api=1&query=${animal.latitude},${animal.longitude}`;
+    } else if (animal.location) {
+      // Fall back to address string
+      const encoded = encodeURIComponent(
+        [animal.village, animal.taluka, animal.district, animal.state].filter(Boolean).join(', ') || animal.location
+      );
+      url = `https://www.google.com/maps/search/?api=1&query=${encoded}`;
+    } else {
+      Alert.alert('Location Unavailable', 'No location data is available for this listing.');
+      return;
+    }
+    const supported = await Linking.canOpenURL(url);
+    if (supported) {
+      Linking.openURL(url);
+    } else {
+      Alert.alert('Cannot Open Maps', 'Unable to open Google Maps on this device.');
+    }
+  };
+
+  // Loading state
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#16A34A" />
+        <Text style={{ marginTop: 12, color: '#64748B', fontSize: 14, fontWeight: '600' }}>
+          Loading animal details...
+        </Text>
+      </View>
+    );
+  }
+
+  // Error state
+  if (error || !animal) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 32 }]}>
+        <MaterialCommunityIcons name="alert-circle-outline" size={56} color="#94A3B8" />
+        <Text style={{ marginTop: 16, color: '#0F172A', fontSize: 16, fontWeight: '700', textAlign: 'center' }}>
+          {error || 'Animal not found'}
+        </Text>
+        <Text style={{ marginTop: 8, color: '#64748B', fontSize: 13, textAlign: 'center' }}>
+          The listing may have been removed or is temporarily unavailable.
+        </Text>
+        <TouchableOpacity
+          style={{ marginTop: 20, paddingHorizontal: 24, paddingVertical: 10, backgroundColor: '#16A34A', borderRadius: 12 }}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -159,21 +348,31 @@ export default function AnimalDetailsScreen({ route, navigation }) {
               <Image key={index} source={{ uri: resolveMediaUrl(imgUri) }} style={styles.galleryImage} resizeMode="cover" />
             ))}
 
-            {/* Video Thumbnail Slide */}
-            <View style={styles.videoSlide}>
-              <Image source={{ uri: animal.photos && animal.photos.length > 0 ? resolveMediaUrl(animal.photos[0]) : MOCK_IMAGES[0] }} style={styles.galleryImage} blurRadius={3} resizeMode="cover" />
-              <View style={styles.videoOverlay}>
-                <TouchableOpacity style={styles.playButtonCircle} onPress={() => setIsVideoPlaying(true)}>
-                  <Ionicons name="play" size={28} color="#FFFFFF" style={styles.playIconOffset} />
-                </TouchableOpacity>
-                <Text style={styles.videoSlideLabel}>Tap to Watch Video</Text>
+            {/* Video Thumbnail Slide — only render when the animal has an actual video */}
+            {!!animal.video && (
+              <View style={styles.videoSlide}>
+                <Image
+                  source={{ uri: animal.photos && animal.photos.length > 0 ? resolveMediaUrl(animal.photos[0]) : MOCK_IMAGES[0] }}
+                  style={styles.galleryImage}
+                  blurRadius={3}
+                  resizeMode="cover"
+                />
+                <View style={styles.videoOverlay}>
+                  <TouchableOpacity style={styles.playButtonCircle} onPress={() => setIsVideoPlaying(true)}>
+                    <Ionicons name="play" size={28} color="#FFFFFF" style={styles.playIconOffset} />
+                  </TouchableOpacity>
+                  <Text style={styles.videoSlideLabel}>Tap to Watch Video</Text>
+                </View>
               </View>
-            </View>
+            )}
           </ScrollView>
 
-          {/* Pagination Indicators */}
+          {/* Pagination Indicators — +1 for video slide only when video exists */}
           <View style={styles.paginationContainer}>
-            {[...Array((animal.photos && animal.photos.length > 0 ? animal.photos.length : MOCK_IMAGES.length) + 1)].map((_, index) => (
+            {[...Array(
+              (animal.photos && animal.photos.length > 0 ? animal.photos.length : MOCK_IMAGES.length) +
+              (animal.video ? 1 : 0)
+            )].map((_, index) => (
               <View
                 key={index}
                 style={[
@@ -259,40 +458,65 @@ export default function AnimalDetailsScreen({ route, navigation }) {
           <View style={styles.sellerCard}>
             <View style={styles.sellerMainInfo}>
               <View style={styles.avatarContainer}>
-                <Image
-                  source={{ uri: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80' }}
-                  style={styles.sellerAvatar}
-                />
-                <MaterialCommunityIcons name="check-decagram" size={16} color="#3B82F6" style={styles.sellerVerifyBadge} />
+                {animal.sellerId?.profilePhoto ? (
+                  <Image
+                    source={{ uri: resolveMediaUrl(animal.sellerId.profilePhoto) }}
+                    style={styles.sellerAvatar}
+                  />
+                ) : (
+                  <View style={[styles.sellerAvatar, { backgroundColor: '#E2E8F0', justifyContent: 'center', alignItems: 'center' }]}>
+                    <Ionicons name="person" size={24} color="#94A3B8" />
+                  </View>
+                )}
+                {animal.isVerified && (
+                  <MaterialCommunityIcons name="check-decagram" size={16} color="#3B82F6" style={styles.sellerVerifyBadge} />
+                )}
               </View>
 
               <View style={styles.sellerMeta}>
-                <Text style={styles.sellerName}>Ramesh Patil</Text>
-                <Text style={styles.sellerSubtext}>Joined Dec 2024</Text>
+                <Text style={styles.sellerName}>{animal.sellerId?.name || animal.sellerName || 'Seller'}</Text>
+                <Text style={styles.sellerSubtext}>{animal.sellerId?.email || ''}</Text>
                 <View style={styles.ratingStarsRow}>
                   <Ionicons name="star" size={12} color="#F59E0B" />
-                  <Text style={styles.ratingLabel}>4.8 (18 ratings)</Text>
+                  <Text style={styles.ratingLabel}>Verified Seller</Text>
                 </View>
               </View>
             </View>
 
             {/* Quick Action Contact Buttons */}
-            <View style={styles.sellerActionsRow}>
-              <TouchableOpacity style={[styles.sellerActionBtn, styles.callBtn]}>
-                <Ionicons name="call" size={16} color="#FFFFFF" />
-                <Text style={styles.sellerActionTextWhite}>Call</Text>
-              </TouchableOpacity>
+            {(() => {
+              const hasPhone = !!(animal.sellerId?.mobile || animal.sellerId?.phoneNumber);
+              return (
+                <View style={styles.sellerActionsRow}>
+                  <TouchableOpacity
+                    style={[styles.sellerActionBtn, styles.callBtn, !hasPhone && styles.disabledBtn]}
+                    onPress={handleCall}
+                    activeOpacity={hasPhone ? 0.7 : 1}
+                  >
+                    <Ionicons name="call" size={16} color="#FFFFFF" />
+                    <Text style={styles.sellerActionTextWhite}>Call</Text>
+                  </TouchableOpacity>
 
-              <TouchableOpacity style={[styles.sellerActionBtn, styles.whatsappBtn]}>
-                <Ionicons name="logo-whatsapp" size={16} color="#FFFFFF" />
-                <Text style={styles.sellerActionTextWhite}>WhatsApp</Text>
-              </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.sellerActionBtn, styles.whatsappBtn, !hasPhone && styles.disabledBtn]}
+                    onPress={handleWhatsApp}
+                    activeOpacity={hasPhone ? 0.7 : 1}
+                  >
+                    <Ionicons name="logo-whatsapp" size={16} color="#FFFFFF" />
+                    <Text style={styles.sellerActionTextWhite}>WhatsApp</Text>
+                  </TouchableOpacity>
 
-              <TouchableOpacity style={[styles.sellerActionBtn, styles.chatBtn]}>
-                <Ionicons name="chatbubble-ellipses" size={16} color="#16A34A" />
-                <Text style={styles.sellerActionTextGreen}>Chat</Text>
-              </TouchableOpacity>
-            </View>
+                  <TouchableOpacity
+                    style={[styles.sellerActionBtn, styles.chatBtn]}
+                    onPress={handleChat}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="chatbubble-ellipses" size={16} color="#16A34A" />
+                    <Text style={styles.sellerActionTextGreen}>Chat</Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            })()}
           </View>
 
           {/* Location details */}
@@ -302,7 +526,9 @@ export default function AnimalDetailsScreen({ route, navigation }) {
               <Ionicons name="location" size={20} color="#16A34A" />
               <View style={styles.locationMeta}>
                 <Text style={styles.locationPrimary}>{animal.location}</Text>
-                <Text style={styles.locationSecondary}>Taluka: Baramati, District: Pune, State: Maharashtra</Text>
+                <Text style={styles.locationSecondary}>
+                  {[animal.taluka && `Taluka: ${animal.taluka}`, animal.district && `District: ${animal.district}`, animal.state && `State: ${animal.state}`].filter(Boolean).join(', ') || 'Location details unavailable'}
+                </Text>
               </View>
             </View>
 
@@ -338,14 +564,18 @@ export default function AnimalDetailsScreen({ route, navigation }) {
 
       {/* Sticky Bottom Actions Bar */}
       <View style={styles.stickyBottomBar}>
-        <TouchableOpacity style={styles.stickyPrimaryBtn}>
+        <TouchableOpacity style={styles.stickyCallBtn} onPress={handleCall} activeOpacity={0.8}>
+          <Ionicons name="call" size={18} color="#FFFFFF" style={styles.primaryBtnIcon} />
+          <Text style={styles.stickyPrimaryBtnText}>Call Seller</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.stickyPrimaryBtn} onPress={handleChat} activeOpacity={0.8}>
           <Ionicons name="chatbubble-ellipses" size={18} color="#FFFFFF" style={styles.primaryBtnIcon} />
-          <Text style={styles.stickyPrimaryBtnText}>Contact Seller</Text>
+          <Text style={styles.stickyPrimaryBtnText}>Chat</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Full-Screen Video Player Modal Simulation */}
-      <Modal visible={isVideoPlaying} transparent={true} animationType="slide">
+      {/* Full-Screen Video Player Modal — uses expo-av for real uploaded video playback */}
+      <Modal visible={isVideoPlaying} transparent={false} animationType="slide" statusBarTranslucent>
         <View style={styles.videoPlayerContainer}>
           <SafeAreaView style={styles.videoSafeArea}>
             <TouchableOpacity style={styles.closeVideoBtn} onPress={() => setIsVideoPlaying(false)}>
@@ -353,16 +583,29 @@ export default function AnimalDetailsScreen({ route, navigation }) {
             </TouchableOpacity>
           </SafeAreaView>
 
-          {/* Simulated Fullscreen Video Content */}
-          <View style={styles.simulatedVideoBox}>
-            <MaterialCommunityIcons name="video-vintage" size={80} color="rgba(255,255,255,0.4)" />
-            <Text style={styles.videoPlayerText}>Simulated Video Playback Stream</Text>
-            <View style={styles.videoControlsRow}>
-              <Ionicons name="play-back-sharp" size={24} color="#FFFFFF" />
-              <Ionicons name="pause" size={32} color="#FFFFFF" style={styles.controlMargin} />
-              <Ionicons name="play-forward-sharp" size={24} color="#FFFFFF" />
+          {animal.video ? (
+            <Video
+              source={{ uri: resolveMediaUrl(animal.video) }}
+              style={styles.fullscreenVideo}
+              resizeMode={ResizeMode.CONTAIN}
+              shouldPlay
+              useNativeControls
+              isLooping={false}
+              onError={(err) => {
+                console.warn('[VideoPlayer] Playback error:', err);
+                Alert.alert(
+                  'Playback Error',
+                  'Unable to play the video. The file may still be processing or the URL is unavailable.',
+                  [{ text: 'Close', onPress: () => setIsVideoPlaying(false) }]
+                );
+              }}
+            />
+          ) : (
+            <View style={styles.noVideoBox}>
+              <MaterialCommunityIcons name="video-off-outline" size={64} color="rgba(255,255,255,0.5)" />
+              <Text style={styles.noVideoText}>No video available for this listing.</Text>
             </View>
-          </View>
+          )}
         </View>
       </Modal>
     </View>
@@ -752,7 +995,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 10,
     paddingBottom: 28, // Padded for iOS home bar safety
+  },
+  stickyCallBtn: {
+    flex: 1,
+    height: 46,
+    backgroundColor: '#0F172A',
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
   },
   stickyPrimaryBtn: {
     flex: 1,
@@ -781,6 +1039,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#000000',
     justifyContent: 'center',
   },
+  fullscreenVideo: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
   videoSafeArea: {
     position: 'absolute',
     top: 24,
@@ -795,24 +1058,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  simulatedVideoBox: {
+  noVideoBox: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    flex: 1,
+    paddingHorizontal: 32,
   },
-  videoPlayerText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
+  noVideoText: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 15,
+    fontWeight: '600',
     marginTop: 16,
     textAlign: 'center',
   },
-  videoControlsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 32,
-  },
-  controlMargin: {
-    marginHorizontal: 24,
+  disabledBtn: {
+    opacity: 0.45,
   },
 });
+

@@ -1,14 +1,17 @@
 import React, { useContext } from 'react';
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity, SafeAreaView } from 'react-native';
+import { StyleSheet, View, SafeAreaView, ScrollView, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppContext } from '../context/AppContext';
+import { useTranslation } from 'react-i18next';
+import AppText from '../components/AppText';
 
 export default function HomeScreen() {
   const { userProfile, userToken } = useContext(AppContext);
+  const { t } = useTranslation();
   const isGuest = userToken === 'guest';
-  const name = isGuest ? 'Guest User' : userProfile?.name || 'User';
-  const role = isGuest ? 'Guest Mode' : userProfile?.role || 'Farmer';
+  const name = isGuest ? t('profile.guestUser') : userProfile?.name || 'User';
+  const role = isGuest ? t('profile.guestMode') : userProfile?.role || t('profile.farmer');
 
   return (
     <SafeAreaView style={styles.container}>
@@ -17,63 +20,64 @@ export default function HomeScreen() {
         <LinearGradient colors={['#11998e', '#38ef7d']} style={styles.headerCard}>
           <View style={styles.profileRow}>
             <View style={styles.avatarCircle}>
-              <Text style={styles.avatarText}>{name.charAt(0).toUpperCase()}</Text>
+              <AppText style={styles.avatarText}>{name.charAt(0).toUpperCase()}</AppText>
             </View>
             <View style={styles.profileDetails}>
-              <Text style={styles.welcomeText}>Welcome back,</Text>
-              <Text style={styles.nameText}>{name}</Text>
-              <Text style={styles.roleBadge}>{role}</Text>
+              <AppText style={styles.welcomeText}>{t('home.welcomeBack')}</AppText>
+              <AppText style={styles.nameText}>{name}</AppText>
+              <AppText style={styles.roleBadge}>{role}</AppText>
             </View>
           </View>
         </LinearGradient>
 
         {/* Dashboard Title */}
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
+        <AppText style={styles.sectionTitle}>{t('home.quickActions')}</AppText>
 
         {/* Action Grid */}
         <View style={styles.grid}>
           <TouchableOpacity style={styles.gridCard}>
             <MaterialCommunityIcons name="cow" size={32} color="#00E676" style={styles.gridIcon} />
-            <Text style={styles.gridLabel}>Cattle Market</Text>
-            <Text style={styles.gridDesc}>Buy & sell cows, buffaloes</Text>
+            <AppText style={styles.gridLabel}>{t('home.cattleMarket')}</AppText>
+            <AppText style={styles.gridDesc}>{t('home.cattleMarketDesc')}</AppText>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.gridCard}>
             <MaterialCommunityIcons name="stethoscope" size={32} color="#00E676" style={styles.gridIcon} />
-            <Text style={styles.gridLabel}>Consult Vet</Text>
-            <Text style={styles.gridDesc}>Online medical queries</Text>
+            <AppText style={styles.gridLabel}>{t('home.consultVet')}</AppText>
+            <AppText style={styles.gridDesc}>{t('home.consultVetDesc')}</AppText>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.gridCard}>
             <MaterialCommunityIcons name="sprout" size={32} color="#00E676" style={styles.gridIcon} />
-            <Text style={styles.gridLabel}>Animal Feed</Text>
-            <Text style={styles.gridDesc}>Fodder & minerals shop</Text>
+            <AppText style={styles.gridLabel}>{t('home.animalFeed')}</AppText>
+            <AppText style={styles.gridDesc}>{t('home.animalFeedDesc')}</AppText>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.gridCard}>
             <MaterialCommunityIcons name="weather-partly-cloudy" size={32} color="#00E676" style={styles.gridIcon} />
-            <Text style={styles.gridLabel}>Agri Weather</Text>
-            <Text style={styles.gridDesc}>Dynamic local updates</Text>
+            <AppText style={styles.gridLabel}>{t('home.agriWeather')}</AppText>
+            <AppText style={styles.gridDesc}>{t('home.agriWeatherDesc')}</AppText>
           </TouchableOpacity>
         </View>
 
         {/* Recent Activities Section */}
-        <Text style={styles.sectionTitle}>Recent Updates</Text>
+        <AppText style={styles.sectionTitle}>{t('home.recentUpdates')}</AppText>
         <View style={styles.updateCard}>
-          <Text style={styles.updateBadge}>Alert</Text>
-          <Text style={styles.updateTitle}>Fodder prices are projected to rise next week.</Text>
-          <Text style={styles.updateTime}>2 hours ago</Text>
+          <AppText style={styles.updateBadge}>Alert</AppText>
+          <AppText style={styles.updateTitle}>Fodder prices are projected to rise next week.</AppText>
+          <AppText style={styles.updateTime}>2 hours ago</AppText>
         </View>
 
         <View style={styles.updateCard}>
-          <Text style={[styles.updateBadge, styles.doctorBadge]}>Doctor</Text>
-          <Text style={styles.updateTitle}>Dr. Sharma is now online for medical consults.</Text>
-          <Text style={styles.updateTime}>5 hours ago</Text>
+          <AppText style={[styles.updateBadge, styles.doctorBadge]}>Doctor</AppText>
+          <AppText style={styles.updateTitle}>Dr. Sharma is now online for medical consults.</AppText>
+          <AppText style={styles.updateTime}>5 hours ago</AppText>
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: {

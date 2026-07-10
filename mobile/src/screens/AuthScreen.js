@@ -1,10 +1,13 @@
 import React, { useState, useContext } from 'react';
-import { StyleSheet, View, Text, TextInput, TouchableOpacity, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { StyleSheet, View, TextInput, TouchableOpacity, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { AppContext } from '../context/AppContext';
 import { api } from '../api/api';
+import { useTranslation } from 'react-i18next';
+import AppText from '../components/AppText';
 
 export default function AuthScreen({ navigation }) {
   const { login, loginAsGuest } = useContext(AppContext);
+  const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -39,19 +42,19 @@ export default function AuthScreen({ navigation }) {
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           <View style={styles.header}>
             <View style={styles.logoCircle}>
-              <Text style={styles.logoText}>PS</Text>
+              <AppText style={styles.logoText}>PS</AppText>
             </View>
-            <Text style={styles.title}>PashuSetu Auth Portal</Text>
-            <Text style={styles.subtitle}>Log in to access cattle marketplace, doctors, and resources</Text>
+            <AppText style={styles.title}>{t('auth.title')}</AppText>
+            <AppText style={styles.subtitle}>{t('auth.subtitle')}</AppText>
           </View>
 
           {/* Email Authentication */}
           <View style={styles.phoneSection}>
-            <Text style={styles.sectionLabel}>Continue with Email Address</Text>
+            <AppText style={styles.sectionLabel}>{t('auth.continueWithEmail')}</AppText>
             <View style={styles.phoneInputContainer}>
               <TextInput
                 style={styles.input}
-                placeholder="Enter Email Address"
+                placeholder={t('auth.emailPlaceholder')}
                 placeholderTextColor="#90A4AE"
                 keyboardType="email-address"
                 autoCapitalize="none"
@@ -64,14 +67,14 @@ export default function AuthScreen({ navigation }) {
               {loading ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <Text style={styles.sendButtonText}>Continue</Text>
+                <AppText style={styles.sendButtonText}>{t('auth.continue')}</AppText>
               )}
             </TouchableOpacity>
           </View>
 
           {/* Guest Entry */}
           <TouchableOpacity style={styles.guestButton} onPress={loginAsGuest}>
-            <Text style={styles.guestButtonText}>Continue as Guest</Text>
+            <AppText style={styles.guestButtonText}>{t('auth.continueAsGuest')}</AppText>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>

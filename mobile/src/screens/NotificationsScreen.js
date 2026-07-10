@@ -1,8 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { StyleSheet, View, Text, SafeAreaView, FlatList, TouchableOpacity, Alert, Modal, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, SafeAreaView, FlatList, TouchableOpacity, Alert, Modal, ActivityIndicator } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import NotificationCard from '../components/NotificationCard';
 import { api } from '../api/api';
+import { useTranslation } from 'react-i18next';
+import AppText from '../components/AppText';
 
 const mapBackendNotification = (n) => {
   let category = 'System';
@@ -63,6 +65,7 @@ export default function NotificationsScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isMenuVisible, setIsMenuVisible] = useState(false);
+  const { t } = useTranslation();
 
   const fetchNotifications = async () => {
     try {
@@ -159,13 +162,13 @@ export default function NotificationsScreen({ navigation }) {
           <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={22} color="#0F172A" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Notifications</Text>
+          <AppText style={styles.headerTitle}>{t('notifications.title')}</AppText>
         </View>
 
         <View style={styles.headerRight}>
           {notifications.length > 0 && (
             <TouchableOpacity style={styles.headerMarkReadBtn} onPress={handleMarkAllAsRead}>
-              <Text style={styles.headerMarkReadText}>Mark all as read</Text>
+              <AppText style={styles.headerMarkReadText}>{t('notifications.markAllRead')}</AppText>
             </TouchableOpacity>
           )}
 
@@ -194,12 +197,12 @@ export default function NotificationsScreen({ navigation }) {
                 ]}
                 onPress={() => setSelectedTab(item)}
               >
-                <Text style={[
+                <AppText style={[
                   styles.tabText,
                   isActive ? styles.tabTextActive : styles.tabTextInactive
                 ]}>
                   {item}
-                </Text>
+                </AppText>
               </TouchableOpacity>
             );
           }}
@@ -219,17 +222,17 @@ export default function NotificationsScreen({ navigation }) {
             <View style={styles.emptyIconCircle}>
               <MaterialCommunityIcons name="bell-off-outline" size={48} color="#94A3B8" />
             </View>
-            <Text style={styles.emptyTitle}>No notifications yet</Text>
-            <Text style={styles.emptySubtitle}>
-              You are completely up to date. We will notify you here when listings update or buyer messages arrive!
-            </Text>
+            <AppText style={styles.emptyTitle}>{t('notifications.noNotifications')}</AppText>
+            <AppText style={styles.emptySubtitle}>
+              {t('notifications.noNotificationsSub')}
+            </AppText>
             <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
               {isRefreshing ? (
                 <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
                 <>
                   <Ionicons name="refresh-outline" size={16} color="#FFFFFF" style={styles.refreshIcon} />
-                  <Text style={styles.refreshButtonText}>Refresh</Text>
+                  <AppText style={styles.refreshButtonText}>{t('common.retry')}</AppText>
                 </>
               )}
             </TouchableOpacity>
@@ -259,14 +262,14 @@ export default function NotificationsScreen({ navigation }) {
           <View style={styles.menuDropdownContainer}>
             <TouchableOpacity style={styles.dropdownItem} onPress={handleMarkAllAsRead}>
               <Ionicons name="checkmark-done-outline" size={18} color="#0F172A" style={styles.dropdownIcon} />
-              <Text style={styles.dropdownText}>Mark all read</Text>
+              <AppText style={styles.dropdownText}>{t('notifications.markAllRead')}</AppText>
             </TouchableOpacity>
 
             <View style={styles.dropdownDivider} />
 
             <TouchableOpacity style={[styles.dropdownItem, styles.deleteItem]} onPress={handleDeleteAll}>
               <Ionicons name="trash-outline" size={18} color="#EF4444" style={styles.dropdownIcon} />
-              <Text style={[styles.dropdownText, { color: '#EF4444' }]}>Clear all logs</Text>
+              <AppText style={[styles.dropdownText, { color: '#EF4444' }]}>{t('notifications.clearAll')}</AppText>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>

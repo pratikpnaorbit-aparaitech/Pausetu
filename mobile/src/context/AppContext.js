@@ -2,6 +2,7 @@ import React, { createContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { secureStorage, registerLogoutHandler } from '../api/api';
 import { profileApi } from '../api/profileApi';
+import i18n from '../i18n/i18n';
 
 export const AppContext = createContext();
 
@@ -12,12 +13,60 @@ export const AppProvider = ({ children }) => {
   const [userToken, setUserToken] = useState(null);
   const [isGuest, setIsGuest] = useState(false);
   const [isProfileComplete, setIsProfileComplete] = useState(false);
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [hasLocationPermission, setHasLocationPermission] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
+  // Global appearance preferences
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [fontSize, setFontSize] = useState('Medium'); // 'Small' | 'Medium' | 'Large'
+
+  const hasMeaningfulProfileData = (user) => {
+    if (!user) return false;
+
+    return Boolean(
+      user.fullName ||
+      user.name ||
+      user.email ||
+      user.mobile ||
+      user.role ||
+      user.village ||
+      user.taluka ||
+      user.district ||
+      user.state ||
+      user.profilePhoto ||
+      user.photo
+    );
+  };
+
+  const normalizeProfileData = (user, fallbackLanguage = language) => {
+    if (!user || !hasMeaningfulProfileData(user)) return null;
+
+    return {
+      id: user._id || user.id || null,
+      name: user.fullName || user.name || '',
+      email: user.email || '',
+      role: user.role === 'seller'
+        ? 'Farmer'
+        : user.role === 'buyer'
+          ? 'Merchant / Cattle Buyer'
+          : user.role === 'doctor'
+            ? 'Veterinary Doctor'
+            : '',
+      mobile: user.mobile || '',
+      village: user.village || '',
+      taluka: user.taluka || '',
+      district: user.district || '',
+      state: user.state || '',
+      photo: user.profilePhoto || user.photo || '',
+      language: user.preferredLanguage || fallbackLanguage
+    };
+  };
 
   // Restore states from storage on boot and sync profile from backend
   useEffect(() => {
     const bootstrapAsync = async () => {
+      setIsProfileLoading(true);
+
       try {
         const onboarded = await AsyncStorage.getItem('isOnboarded');
         const lang = await AsyncStorage.getItem('language') || 'en';
@@ -25,50 +74,42 @@ export const AppProvider = ({ children }) => {
         const locationGranted = await AsyncStorage.getItem('hasLocationPermission');
         const cachedProfile = await AsyncStorage.getItem('userProfile');
         const isGuestStr = await AsyncStorage.getItem('isGuest');
+        const storedDarkMode = await AsyncStorage.getItem('isDarkMode');
+        const storedFontSize = await AsyncStorage.getItem('fontSize');
 
         if (onboarded === 'true') setIsOnboarded(true);
         setLanguage(lang);
+        // Sync i18n to the persisted language on every boot
+        i18n.changeLanguage(lang);
         if (locationGranted === 'true') setHasLocationPermission(true);
+        if (storedDarkMode === 'true') setIsDarkMode(true);
+        if (storedFontSize) setFontSize(storedFontSize);
 
         if (isGuestStr === 'true') {
           setIsGuest(true);
           setIsProfileComplete(true);
+          setUserProfile(null);
           setUserToken('guest');
         } else if (token && token !== 'null' && token !== 'undefined') {
-          // Sync with backend if token exists to validate it
           try {
             const resObj = await profileApi.getProfile();
-            if (resObj.status === 'success' && resObj.data.user) {
+            if (resObj?.status === 'success' && resObj.data?.user) {
               const user = resObj.data.user;
-              const completeData = {
-                id: user._id || user.id,
-                name: user.fullName || '',
-                email: user.email || '',
-                role: user.role === 'seller' ? 'Farmer' : (user.role === 'buyer' ? 'Merchant / Cattle Buyer' : 'Veterinary Doctor'),
-                mobile: user.mobile || '',
-                village: user.village || '',
-                taluka: user.taluka || '',
-                district: user.district || '',
-                state: user.state || '',
-                photo: user.photo || '',
-                language: user.preferredLanguage || lang
-              };
+              const completeData = normalizeProfileData(user, lang);
               await AsyncStorage.setItem('userProfile', JSON.stringify(completeData));
               setUserProfile(completeData);
-              if (user.isProfileCompleted) {
-                await AsyncStorage.setItem('isProfileComplete', 'true');
-                setIsProfileComplete(true);
-              } else {
-                await AsyncStorage.setItem('isProfileComplete', 'false');
-                setIsProfileComplete(false);
-              }
+              const isComplete = Boolean(user.fullName || user.isProfileCompleted);
+              await AsyncStorage.setItem('isProfileComplete', isComplete ? 'true' : 'false');
+              setIsProfileComplete(isComplete);
               setUserToken(token);
             } else {
-              await logout();
+              await AsyncStorage.removeItem('userProfile');
+              setUserProfile(null);
+              setIsProfileComplete(false);
+              setUserToken(token);
             }
           } catch (syncErr) {
             console.warn('[Sync Warning] Backend profile synchronization failed:', syncErr.message);
-            // Check if it's an auth error vs network issue
             const isNetworkError = syncErr.message && (
               syncErr.message.includes('Network') ||
               syncErr.message.includes('network') ||
@@ -76,20 +117,27 @@ export const AppProvider = ({ children }) => {
               syncErr.message.includes('connect')
             );
             if (isNetworkError) {
-              // Fallback to cache if offline
               const profileComplete = await AsyncStorage.getItem('isProfileComplete');
               if (profileComplete === 'true') setIsProfileComplete(true);
-              if (cachedProfile) setUserProfile(JSON.parse(cachedProfile));
+              if (cachedProfile) {
+                setUserProfile(JSON.parse(cachedProfile));
+              } else {
+                setUserProfile(null);
+              }
               setUserToken(token);
             } else {
-              // 401/Invalid token, logout
               await logout();
             }
           }
+        } else {
+          setUserProfile(null);
+          setIsProfileComplete(false);
+          setUserToken(null);
         }
       } catch (e) {
         console.error('Failed to load navigation state from AsyncStorage', e);
       } finally {
+        setIsProfileLoading(false);
         setTimeout(() => {
           setIsLoading(false);
         }, 1500);
@@ -110,51 +158,45 @@ export const AppProvider = ({ children }) => {
       await AsyncStorage.setItem('language', selectedLang);
       setIsOnboarded(true);
       setLanguage(selectedLang);
+      // Immediately update i18n so all useTranslation() hooks re-render
+      await i18n.changeLanguage(selectedLang);
     } catch (e) {
       console.error(e);
     }
   };
 
   const login = async (accessToken, refreshToken, user) => {
+    setIsProfileLoading(true);
+    setUserProfile(null);
+
     try {
       await secureStorage.setItem('userToken', accessToken);
       if (refreshToken) {
         await secureStorage.setItem('refreshToken', refreshToken);
       }
-      
+
       let currentUser = user;
-      if (!currentUser) {
-        const resObj = await profileApi.getProfile();
-        if (resObj.status === 'success' && resObj.data.user) {
-          currentUser = resObj.data.user;
+      let profileData = normalizeProfileData(currentUser);
+      if (!profileData) {
+        try {
+          const resObj = await profileApi.getProfile();
+          if (resObj?.status === 'success' && resObj.data?.user) {
+            currentUser = resObj.data.user;
+            profileData = normalizeProfileData(currentUser);
+          }
+        } catch (profileError) {
+          console.warn('[Context Warning] Profile load failed, user must complete details:', profileError.message);
         }
       }
 
-      if (currentUser) {
-        const completeData = {
-          id: currentUser._id || currentUser.id,
-          name: currentUser.fullName || currentUser.name || '',
-          email: currentUser.email || '',
-          role: currentUser.role === 'seller' ? 'Farmer' : (currentUser.role === 'buyer' ? 'Merchant / Cattle Buyer' : 'Veterinary Doctor'),
-          mobile: currentUser.mobile || '',
-          village: currentUser.village || '',
-          taluka: currentUser.taluka || '',
-          district: currentUser.district || '',
-          state: currentUser.state || '',
-          photo: currentUser.photo || '',
-          language: currentUser.preferredLanguage || 'en'
-        };
-        await AsyncStorage.setItem('userProfile', JSON.stringify(completeData));
-        setUserProfile(completeData);
-
-        if (currentUser.isProfileCompleted) {
-          await AsyncStorage.setItem('isProfileComplete', 'true');
-          setIsProfileComplete(true);
-        } else {
-          await AsyncStorage.setItem('isProfileComplete', 'false');
-          setIsProfileComplete(false);
-        }
+      if (profileData) {
+        await AsyncStorage.setItem('userProfile', JSON.stringify(profileData));
+        setUserProfile(profileData);
+        const isComplete = Boolean(currentUser?.fullName || currentUser?.isProfileCompleted);
+        await AsyncStorage.setItem('isProfileComplete', isComplete ? 'true' : 'false');
+        setIsProfileComplete(isComplete);
       } else {
+        await AsyncStorage.removeItem('userProfile');
         await AsyncStorage.setItem('isProfileComplete', 'false');
         setIsProfileComplete(false);
       }
@@ -163,9 +205,12 @@ export const AppProvider = ({ children }) => {
       setUserToken(accessToken);
     } catch (e) {
       console.warn('[Context Warning] Profile load failed, user must complete details:', e.message);
+      await AsyncStorage.removeItem('userProfile');
       await AsyncStorage.setItem('isProfileComplete', 'false');
       setIsProfileComplete(false);
       setUserToken(accessToken);
+    } finally {
+      setIsProfileLoading(false);
     }
   };
 
@@ -183,28 +228,29 @@ export const AppProvider = ({ children }) => {
   };
 
   const refreshProfileData = async () => {
+    setIsProfileLoading(true);
+
     try {
       const resObj = await profileApi.getProfile();
-      if (resObj.status === 'success' && resObj.data.user) {
+      if (resObj?.status === 'success' && resObj.data?.user) {
         const user = resObj.data.user;
-        const completeData = {
-          id: user._id || user.id,
-          name: user.fullName || '',
-          email: user.email || '',
-          role: user.role === 'seller' ? 'Farmer' : (user.role === 'buyer' ? 'Merchant / Cattle Buyer' : 'Veterinary Doctor'),
-          mobile: user.mobile || '',
-          village: user.village || '',
-          taluka: user.taluka || '',
-          district: user.district || '',
-          state: user.state || '',
-          photo: user.photo || '',
-          language: user.preferredLanguage || 'en'
-        };
+        const completeData = normalizeProfileData(user);
         await AsyncStorage.setItem('userProfile', JSON.stringify(completeData));
         setUserProfile(completeData);
+
+        const isComplete = Boolean(user.fullName || user.isProfileCompleted);
+        await AsyncStorage.setItem('isProfileComplete', isComplete ? 'true' : 'false');
+        setIsProfileComplete(isComplete);
+      } else {
+        setUserProfile(null);
+        setIsProfileComplete(false);
       }
     } catch (e) {
       console.error('[Context Error] Profile refresh failed:', e);
+      setUserProfile(null);
+      setIsProfileComplete(false);
+    } finally {
+      setIsProfileLoading(false);
     }
   };
 
@@ -213,21 +259,20 @@ export const AppProvider = ({ children }) => {
       const payload = {
         fullName: profileData.name,
         role: profileData.role === 'Farmer' ? 'seller' : (profileData.role === 'Veterinary Doctor' ? 'doctor' : 'buyer'),
-        mobile: profileData.mobile || '9988776655',
-        state: profileData.state || 'Maharashtra',
-        district: profileData.district || 'Pune',
-        taluka: profileData.taluka || 'Purandar',
-        village: profileData.village || 'Saswad',
-        preferredLanguage: profileData.language || language
+        mobile: profileData.mobile,
+        state: profileData.state,
+        district: profileData.district,
+        taluka: profileData.taluka,
+        village: profileData.village,
+        preferredLanguage: profileData.language
       };
-      
+
       await profileApi.updateProfile(payload);
       await refreshProfileData();
       await AsyncStorage.setItem('isProfileComplete', 'true');
       setIsProfileComplete(true);
     } catch (e) {
       console.error('[Context Error] Profile complete failed:', e);
-      // Fallback local complete
       await AsyncStorage.setItem('userProfile', JSON.stringify(profileData));
       await AsyncStorage.setItem('isProfileComplete', 'true');
       setUserProfile(profileData);
@@ -244,6 +289,27 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  // Toggle dark mode and persist
+  const toggleDarkMode = async () => {
+    try {
+      const next = !isDarkMode;
+      setIsDarkMode(next);
+      await AsyncStorage.setItem('isDarkMode', next ? 'true' : 'false');
+    } catch (e) {
+      console.error('[AppContext] toggleDarkMode failed:', e);
+    }
+  };
+
+  // Set font size and persist
+  const setAppFontSize = async (size) => {
+    try {
+      setFontSize(size);
+      await AsyncStorage.setItem('fontSize', size);
+    } catch (e) {
+      console.error('[AppContext] setAppFontSize failed:', e);
+    }
+  };
+
   const logout = async () => {
     try {
       await secureStorage.removeItem('userToken');
@@ -254,6 +320,7 @@ export const AppProvider = ({ children }) => {
       await AsyncStorage.removeItem('isGuest');
       setUserToken(null);
       setIsProfileComplete(false);
+      setIsProfileLoading(false);
       setUserProfile(null);
       setHasLocationPermission(false);
       setIsGuest(false);
@@ -276,6 +343,7 @@ export const AppProvider = ({ children }) => {
       setUserToken(null);
       setIsGuest(false);
       setIsProfileComplete(false);
+      setIsProfileLoading(false);
       setUserProfile(null);
       setHasLocationPermission(false);
     } catch (e) {
@@ -294,6 +362,9 @@ export const AppProvider = ({ children }) => {
         isProfileComplete,
         hasLocationPermission,
         userProfile,
+        isProfileLoading,
+        isDarkMode,
+        fontSize,
         completeOnboarding,
         login,
         loginAsGuest,
@@ -301,7 +372,9 @@ export const AppProvider = ({ children }) => {
         grantLocation,
         logout,
         exitGuestSession,
-        refreshProfileData
+        refreshProfileData,
+        toggleDarkMode,
+        setAppFontSize,
       }}
     >
       {children}

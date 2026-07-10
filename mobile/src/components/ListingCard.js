@@ -1,9 +1,12 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { resolveMediaUrl } from '../api/api';
+import { useTranslation } from 'react-i18next';
+import AppText from './AppText';
 
 export default function ListingCard({ item, onViewDetailsPress, style }) {
+  const { t } = useTranslation();
   const imageUrl = resolveMediaUrl(item.photos && item.photos.length > 0 ? item.photos[0] : null);
 
   return (
@@ -24,13 +27,13 @@ export default function ListingCard({ item, onViewDetailsPress, style }) {
         <View style={styles.badgeOverlayContainer}>
           {item.isFeatured && (
             <View style={styles.featuredBadge}>
-              <Text style={styles.featuredBadgeText}>Featured</Text>
+              <AppText style={styles.featuredBadgeText}>{t('common.featured')}</AppText>
             </View>
           )}
           {item.isVerified && (
             <View style={styles.verifiedBadge}>
               <MaterialCommunityIcons name="check-decagram" size={11} color="#FFFFFF" style={styles.badgeIcon} />
-              <Text style={styles.verifiedBadgeText}>Verified</Text>
+              <AppText style={styles.verifiedBadgeText}>{t('common.verified')}</AppText>
             </View>
           )}
         </View>
@@ -39,20 +42,20 @@ export default function ListingCard({ item, onViewDetailsPress, style }) {
       {/* Details Block */}
       <View style={styles.cardDetails}>
         <View style={styles.titleRow}>
-          <Text style={styles.animalName} numberOfLines={1}>
+          <AppText style={styles.animalName} numberOfLines={1}>
             {item.name}
-          </Text>
+          </AppText>
           {item.isVerified && (
             <MaterialCommunityIcons name="check-decagram" size={15} color="#3B82F6" style={styles.verifiedIcon} />
           )}
         </View>
 
-        <Text style={styles.breedText} numberOfLines={1}>
+        <AppText style={styles.breedText} numberOfLines={1}>
           {item.breed} • {item.age}
-        </Text>
+        </AppText>
         
         <View style={styles.priceRow}>
-          <Text style={styles.priceText}>{item.price}</Text>
+          <AppText style={styles.priceText}>{item.price}</AppText>
         </View>
 
         {/* Divider */}
@@ -62,24 +65,24 @@ export default function ListingCard({ item, onViewDetailsPress, style }) {
         <View style={styles.sellerRow}>
           <View style={styles.sellerLeft}>
             <Ionicons name="person-circle-outline" size={16} color="#64748B" />
-            <Text style={styles.sellerName} numberOfLines={1}>
+            <AppText style={styles.sellerName} numberOfLines={1}>
               {item.sellerName}
-            </Text>
+            </AppText>
           </View>
-          <Text style={styles.postedTime}>{item.postedTime}</Text>
+          <AppText style={styles.postedTime}>{item.postedTime}</AppText>
         </View>
 
         {/* Location Row */}
         <View style={styles.locationRow}>
           <Ionicons name="location" size={13} color="#64748B" style={styles.locationPinIcon} />
-          <Text style={styles.locationText} numberOfLines={1}>
+          <AppText style={styles.locationText} numberOfLines={1}>
             {item.location}
-          </Text>
+          </AppText>
         </View>
 
-        {/* Action Button - Polished Solid Green Light Theme */}
+        {/* Action Button */}
         <TouchableOpacity style={styles.detailsButton} onPress={onViewDetailsPress}>
-          <Text style={styles.detailsButtonText}>View Details</Text>
+          <AppText style={styles.detailsButtonText}>{t('common.viewDetails')}</AppText>
         </TouchableOpacity>
       </View>
     </View>

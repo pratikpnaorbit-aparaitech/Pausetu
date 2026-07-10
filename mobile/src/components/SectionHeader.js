@@ -1,13 +1,14 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import AppText from './AppText';
 
 export default function SectionHeader({ title, actionText = 'View All', onActionPress }) {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{title}</Text>
+      <AppText style={styles.title}>{title}</AppText>
       {onActionPress && (
         <TouchableOpacity onPress={onActionPress}>
-          <Text style={styles.actionText}>{actionText}</Text>
+          <AppText style={styles.actionText}>{actionText}</AppText>
         </TouchableOpacity>
       )}
     </View>
@@ -34,3 +35,4 @@ const styles = StyleSheet.create({
     color: '#16A34A', // Primary Green
   },
 });
+

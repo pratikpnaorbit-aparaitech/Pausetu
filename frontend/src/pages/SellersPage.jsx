@@ -1,6 +1,6 @@
 import React, { useContext, useState } from 'react';
 import { AdminContext } from '../context/AdminContext';
-import { Ban, Unlock, Trash2, User, Eye, Edit2, Search, Filter, AlertCircle, RefreshCw, X, Check, Save } from 'lucide-react';
+import { Ban, Unlock, Trash2, User, Eye, Edit2, Search, Filter, AlertCircle, RefreshCw, X, Check, Save, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function SellersPage() {
   const {
@@ -35,10 +35,11 @@ export default function SellersPage() {
   if (isLoading) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeIn 0.2s' }}>
-        <div style={{ height: 40, width: 280, backgroundColor: '#e2e8f0', borderRadius: 4 }} />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+        <div className="skeleton" style={{ height: 32, width: 280, marginBottom: 4 }} />
+        <div className="skeleton" style={{ height: 14, width: 380 }} />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16, marginTop: 8 }}>
           {[1, 2, 3].map((i) => (
-            <div key={i} style={{ height: 240, backgroundColor: '#fff', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }} />
+            <div key={i} className="skeleton-card" style={{ height: 240 }} />
           ))}
         </div>
       </div>
@@ -48,15 +49,25 @@ export default function SellersPage() {
   // 2. Error Fallback Retry block
   if (apiError) {
     return (
-      <div style={{ padding: 40, textAlign: 'center', backgroundColor: '#fff', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, maxWidth: 500, margin: '40px auto' }}>
-        <AlertCircle size={48} color="var(--color-danger)" />
-        <h3 style={{ margin: 0, fontWeight: '700', fontSize: 18, color: 'var(--text-heading)' }}>Connection Error</h3>
-        <p style={{ color: 'var(--text-muted)', fontSize: 14, margin: 0 }}>Failed to fetch seller directory from backend.</p>
+      <div
+        className="card"
+        style={{ padding: '48px 32px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, maxWidth: 500, margin: '40px auto' }}
+        role="alert"
+        aria-live="assertive"
+      >
+        <div style={{ width: 64, height: 64, borderRadius: '50%', backgroundColor: 'var(--color-danger-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <AlertCircle size={28} color="var(--color-danger)" />
+        </div>
+        <div>
+          <h3 style={{ margin: '0 0 6px', fontWeight: '800', fontSize: 18, color: 'var(--text-heading)' }}>Connection Error</h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: 13.5, margin: 0 }}>Failed to fetch seller directory from backend.</p>
+        </div>
         <button
+          className="btn btn-primary"
           onClick={loadDashboardData}
-          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', backgroundColor: 'var(--bg-sidebar)', color: '#fff', border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontWeight: '700' }}
+          style={{ marginTop: 8 }}
         >
-          <RefreshCw size={16} />
+          <RefreshCw size={14} />
           <span>Retry Connection</span>
         </button>
       </div>
@@ -222,11 +233,27 @@ export default function SellersPage() {
 
       {/* Pagination Strip */}
       {totalPages > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', padding: 12, borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-          <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Page {currentPage} of {totalPages}</span>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button disabled={currentPage === 1} onClick={() => setCurrentPage(currentPage - 1)} style={{ padding: '6px 12px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', backgroundColor: '#fff', cursor: 'pointer' }}>Prev</button>
-            <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(currentPage + 1)} style={{ padding: '6px 12px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', backgroundColor: '#fff', cursor: 'pointer' }}>Next</button>
+        <div className="card-flat" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)' }}>
+          <span style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>
+            Page <strong>{currentPage}</strong> of <strong>{totalPages}</strong>
+          </span>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              className="btn btn-secondary btn-sm"
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(currentPage - 1)}
+              aria-label="Previous page"
+            >
+              <ChevronLeft size={14} />
+            </button>
+            <button
+              className="btn btn-secondary btn-sm"
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage(currentPage + 1)}
+              aria-label="Next page"
+            >
+              <ChevronRight size={14} />
+            </button>
           </div>
         </div>
       )}

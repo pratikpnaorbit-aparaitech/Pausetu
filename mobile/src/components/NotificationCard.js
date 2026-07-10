@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
-import { StyleSheet, View, Text, Animated, PanResponder, TouchableOpacity, Dimensions } from 'react-native';
+import { StyleSheet, View, Animated, PanResponder, TouchableOpacity, Dimensions } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import AppText from './AppText';
 
 const { width } = Dimensions.get('window');
 const SWIPE_THRESHOLD = -80; // Swipe threshold to show delete button
@@ -67,7 +68,7 @@ export default function NotificationCard({ item, onMarkAsRead, onDelete }) {
       <View style={styles.deleteBackground}>
         <TouchableOpacity style={styles.deleteButton} onPress={() => onDelete(item.id)}>
           <Ionicons name="trash-outline" size={22} color="#FFFFFF" />
-          <Text style={styles.deleteText}>Delete</Text>
+          <AppText style={styles.deleteText}>Delete</AppText>
         </TouchableOpacity>
       </View>
 
@@ -93,23 +94,23 @@ export default function NotificationCard({ item, onMarkAsRead, onDelete }) {
             {/* Notification Text content */}
             <View style={styles.textWrapper}>
               <View style={styles.titleRow}>
-                <Text style={[styles.cardTitle, !item.isRead && styles.unreadTitleText]} numberOfLines={1}>
+                <AppText style={[styles.cardTitle, !item.isRead && styles.unreadTitleText]} numberOfLines={1}>
                   {item.title}
-                </Text>
+                </AppText>
                 {!item.isRead && <View style={styles.unreadGreenDot} />}
               </View>
 
-              <Text style={styles.cardDesc} numberOfLines={2}>
+              <AppText style={styles.cardDesc} numberOfLines={2}>
                 {item.description}
-              </Text>
+              </AppText>
 
               <View style={styles.metaRow}>
-                <Text style={styles.cardTime}>{item.time}</Text>
+                <AppText style={styles.cardTime}>{item.time}</AppText>
                 {item.badgeText && (
                   <View style={[styles.statusBadge, { backgroundColor: item.badgeColor }]}>
-                    <Text style={[styles.statusBadgeText, { color: item.badgeTextColor }]}>
+                    <AppText style={[styles.statusBadgeText, { color: item.badgeTextColor }]}>
                       {item.badgeText}
-                    </Text>
+                    </AppText>
                   </View>
                 )}
               </View>

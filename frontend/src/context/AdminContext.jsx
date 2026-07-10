@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios, { API_BASE_URL } from '../api/axios';
 import { dashboardApi } from '../api/dashboardApi';
 import { sellerApi } from '../api/sellerApi';
@@ -6,7 +6,13 @@ import { buyerApi } from '../api/buyerApi';
 import { animalApi } from '../api/animalApi';
 import { categoryApi } from '../api/categoryApi';
 
-export const AdminContext = createContext();
+// AdminContext (plain context object) lives in its own file so this file
+// only exports the AdminProvider component, satisfying Vite Fast Refresh.
+import { AdminContext } from './AdminContextObject';
+
+// Re-export so all consumers can continue using:
+//   import { AdminContext } from '../context/AdminContext';
+export { AdminContext };
 
 // Resolve a media URL: if it starts with /uploads, prepend the API server base (without /api suffix)
 const resolveMediaUrl = (url) => {
@@ -79,29 +85,66 @@ export const AdminProvider = ({ children }) => {
   const [isActionLoading, setIsActionLoading] = useState(false);
 
   /**
-   * Step 1: Ensure admin is authenticated.
-   * Resolves the token into localStorage before any data fetch runs.
-   * Returns true if auth succeeded, false otherwise.
+   * Step 1: Ensure admin is authenticated with a non-expired token.
+   *
+   * Fast path: if a token exists in localStorage AND it has not expired
+   * (with a 60-second safety margin), return immediately.
+   *
+   * Slow path: if no token exists, or the existing token is expired/expiring,
+   * clear localStorage and exchange the admin bypass OTP for a fresh JWT.
+   *
+   * THROWS on any failure — callers must not continue without a valid token,
+   * because the backend silently restricts pending/rejected listings to
+   * approved-only when no Authorization header is present.
    */
   const ensureAdminAuth = useCallback(async () => {
     const existingToken = localStorage.getItem('pashusetu_admin_token');
+
     if (existingToken) {
-      return true;
+      // Decode the JWT exp claim locally — no network call required.
+      // JWT structure: header.payload.signature — all base64url encoded.
+      try {
+        const payloadBase64 = existingToken.split('.')[1];
+        // base64url → base64 padding
+        const padded = payloadBase64.replace(/-/g, '+').replace(/_/g, '/')
+          + '=='.slice(0, (4 - payloadBase64.length % 4) % 4);
+        const payload = JSON.parse(atob(padded));
+        const nowSeconds = Math.floor(Date.now() / 1000);
+        const safetyMarginSeconds = 60; // Re-auth 60s before actual expiry
+
+        if (payload.exp && payload.exp > nowSeconds + safetyMarginSeconds) {
+          // Token is valid and not expiring soon — fast path.
+          return;
+        }
+        // Token is expired or expiring within 60s — fall through to slow path.
+        localStorage.removeItem('pashusetu_admin_token');
+      } catch {
+        // Could not decode — treat as invalid and fall through.
+        localStorage.removeItem('pashusetu_admin_token');
+      }
     }
 
+    // Slow path: exchange the admin bypass OTP to acquire a fresh token.
+    let authRes;
     try {
-      const authRes = await axios.post('/auth/verify-otp', {
+      authRes = await axios.post('/auth/verify-otp', {
         email: 'admin@pashusetu.com',
         otp: '123456'
       });
-      if (authRes && authRes.status === 'success' && authRes.data?.accessToken) {
-        localStorage.setItem('pashusetu_admin_token', authRes.data.accessToken);
-        return true;
-      }
-    } catch (authErr) {
-      // Auth failure is non-fatal — continue without token (public data only)
+    } catch (networkErr) {
+      throw new Error(
+        `Admin authentication failed: ${networkErr.message || 'Could not reach auth server.'}`
+      );
     }
-    return false;
+
+    const token = authRes?.data?.accessToken;
+    if (!token) {
+      throw new Error(
+        'Admin authentication failed: server responded but returned no access token.'
+      );
+    }
+
+    localStorage.setItem('pashusetu_admin_token', token);
   }, []);
 
   /**
@@ -153,12 +196,24 @@ export const AdminProvider = ({ children }) => {
 
   /**
    * Step 2: Fetch all dashboard data.
-   * Only called after ensureAdminAuth() resolves.
+   * Calls ensureAdminAuth() as the first operation on EVERY invocation —
+   * including manual Refresh button clicks — so the axios request interceptor
+   * always finds a valid token in localStorage before any protected API call.
+   *
+   * Without this guard, a cleared-localStorage session (fresh browser, Atlas
+   * migration wipe) causes the backend to treat GET /api/animals as a public
+   * request and silently filter out all pending/rejected listings.
    */
   const loadDashboardData = useCallback(async () => {
     setIsLoading(true);
     setApiError(null);
     try {
+      // 0. CRITICAL GUARD: Guarantee a valid admin JWT is in localStorage
+      //    before any protected API call. The axios interceptor reads from
+      //    localStorage synchronously on every request, so the token must
+      //    already be stored at this point.
+      await ensureAdminAuth();
+
       // 1. Fetch Server Status Health
       const health = await dashboardApi.getHealth();
       setServerStatus(health.status);
@@ -171,8 +226,12 @@ export const AdminProvider = ({ children }) => {
       const cats = await categoryApi.getAll();
       setCategories(cats);
 
-      // 4. Fetch ALL Animals (admin sees all statuses — no status filter = admin gets all)
-      const list = await animalApi.getAll({ limit: 100 });
+      // 4. Fetch ALL Animals with admin JWT attached.
+      //    The backend checks Authorization header: if role === 'admin',
+      //    no status filter is applied and all statuses (pending, rejected,
+      //    approved, sold) are returned. Limit 500 covers all real-world
+      //    Atlas collections without pagination overhead.
+      const list = await animalApi.getAll({ limit: 500 });
       setAnimals(list.map(mapAnimal));
 
       // 5. Fetch Sellers
@@ -213,15 +272,23 @@ export const AdminProvider = ({ children }) => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [ensureAdminAuth]);
 
   /**
-   * Bootstrap on mount: authenticate first, then load data.
+   * Bootstrap on mount: authenticate first, then trigger data load.
+   * Auth errors are surfaced as apiError so the UI shows a retry state
+   * rather than an unhandled promise rejection crashing the app.
    */
   useEffect(() => {
     (async () => {
-      await ensureAdminAuth();
-      setIsAuthReady(true);
+      try {
+        await ensureAdminAuth();
+        setIsAuthReady(true);
+      } catch (authErr) {
+        // Auth failed on cold start — surface error and do NOT load data.
+        setApiError(authErr.message);
+        setIsLoading(false);
+      }
     })();
   }, [ensureAdminAuth]);
 

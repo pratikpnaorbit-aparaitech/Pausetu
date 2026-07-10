@@ -4,6 +4,8 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { AppContext } from '../context/AppContext';
 import { profileApi } from '../api/profileApi';
+import { useTranslation } from 'react-i18next';
+import AppText from '../components/AppText';
 
 const SELLER_STATS = [
   { id: '1', label: 'Active Listings', value: '3', icon: 'list-box-outline', color: '#16A34A' },
@@ -18,12 +20,13 @@ const MENU_ITEMS = [
 ];
 
 export default function ProfileScreen({ navigation }) {
-  const { userProfile, completeProfile, logout, exitGuestSession, isGuest, userToken, refreshProfileData } = useContext(AppContext);
+  const { userProfile, isProfileLoading, completeProfile, logout, exitGuestSession, isGuest, userToken, refreshProfileData } = useContext(AppContext);
+  const { t } = useTranslation();
 
   // Edit profile states
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [editForm, setEditForm] = useState({ name: '', mobile: '', village: '', taluka: '', district: '', state: '', language: 'en' });
-  
+
   // Image uploading states
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -93,17 +96,15 @@ export default function ProfileScreen({ navigation }) {
   };
 
   const handleEditProfile = () => {
-    if (userProfile) {
-      setEditForm({
-        name: userProfile.name || '',
-        mobile: userProfile.mobile || '',
-        village: userProfile.village || '',
-        taluka: userProfile.taluka || '',
-        district: userProfile.district || '',
-        state: userProfile.state || 'Maharashtra',
-        language: userProfile.language || 'en'
-      });
-    }
+    setEditForm({
+      name: userProfile?.name || '',
+      mobile: userProfile?.mobile || '',
+      village: userProfile?.village || '',
+      taluka: userProfile?.taluka || '',
+      district: userProfile?.district || '',
+      state: userProfile?.state || '',
+      language: userProfile?.language || 'en'
+    });
     setIsEditModalVisible(true);
   };
 
@@ -121,7 +122,7 @@ export default function ProfileScreen({ navigation }) {
     try {
       await completeProfile({
         name: editForm.name.trim(),
-        role: userProfile?.role || 'Farmer',
+        role: userProfile?.role || '',
         mobile: editForm.mobile.trim(),
         village: editForm.village.trim(),
         taluka: editForm.taluka.trim(),
@@ -206,9 +207,28 @@ export default function ProfileScreen({ navigation }) {
     }
   };
 
-  const profileImageUrl = userProfile?.photo 
+  const profileImageUrl = userProfile?.photo
     ? (userProfile.photo.startsWith('http') ? userProfile.photo : `http://10.0.2.2:5000${userProfile.photo}`)
-    : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80';
+    : null;
+  const displayName = userProfile?.name?.trim() ? userProfile.name : 'Not provided';
+  const displayRole = userProfile?.role?.trim() ? userProfile.role : 'Not provided';
+  const displayMobile = userProfile?.mobile?.trim() ? userProfile.mobile : 'Not provided';
+  const displayEmail = userProfile?.email?.trim() ? userProfile.email : 'Not provided';
+  const displayLocation = userProfile?.village
+    ? `${userProfile.village}, ${userProfile.taluka || ''}, ${userProfile.district || ''}, ${userProfile.state || ''}`.replace(/, ,/g, ',').replace(/(^,)|(,$)/g, '')
+    : 'Not configured';
+
+  if (isProfileLoading && !userProfile) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingState}>
+          <ActivityIndicator size="large" color="#16A34A" />
+          <AppText style={styles.loadingTitle}>Loading your profile</AppText>
+          <AppText style={styles.loadingText}>We’re fetching your account details from the server.</AppText>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -217,7 +237,7 @@ export default function ProfileScreen({ navigation }) {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={22} color="#0F172A" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>User Profile</Text>
+        <AppText style={styles.headerTitle}>{t('profile.title')}</AppText>
         <TouchableOpacity style={styles.backButton} onPress={triggerSync} disabled={syncing}>
           {syncing ? (
             <ActivityIndicator size="small" color="#16A34A" />
@@ -228,166 +248,180 @@ export default function ProfileScreen({ navigation }) {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        
+
         {/* Profile photo progress indicator */}
         {uploading && (
           <View style={styles.progressContainer}>
             <ActivityIndicator size="small" color="#16A34A" />
-            <Text style={styles.progressText}>Uploading Profile Photo... {uploadProgress}%</Text>
+            <AppText style={styles.progressText}>Uploading Profile Photo... {uploadProgress}%</AppText>
           </View>
         )}
 
-        {/* User Card Header block */}
-        <View style={styles.profileUserCard}>
-          <View style={styles.userMainRow}>
-            <TouchableOpacity style={styles.avatarContainer} onPress={handleSelectPhoto}>
-              <Image
-                source={{ uri: profileImageUrl }}
-                style={styles.avatarImage}
-              />
-              <View style={styles.camOverlayBadge}>
-                <Ionicons name="camera" size={12} color="#fff" />
-              </View>
+        {!userProfile ? (
+          <View style={styles.emptyStateCard}>
+            <View style={styles.emptyStateIcon}>
+              <Ionicons name="person-circle-outline" size={40} color="#16A34A" />
+            </View>
+            <AppText style={styles.emptyStateTitle}>Complete your profile</AppText>
+            <AppText style={styles.emptyStateText}>
+              Your account is ready, but no profile details are available yet. Add your information to continue using PashuSetu with your real profile.
+            </AppText>
+            <TouchableOpacity style={styles.emptyStateButton} onPress={handleEditProfile}>
+              <AppText style={styles.emptyStateButtonText}>Add Profile Details</AppText>
             </TouchableOpacity>
-
-            <View style={styles.userMeta}>
-              <View style={styles.nameRow}>
-                <Text style={styles.userName}>{userProfile?.name || 'PashuSetu Farmer'}</Text>
-              </View>
-              <Text style={styles.userRole}>{userProfile?.role || 'Livestock Seller'}</Text>
-            </View>
           </View>
-
-          <TouchableOpacity style={styles.editProfileBtn} onPress={handleEditProfile}>
-            <Ionicons name="create-outline" size={14} color="#16A34A" />
-            <Text style={styles.editProfileText}>Edit Profile Details</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Statistics Grid */}
-        <Text style={styles.sectionTitle}>Dashboard Stats</Text>
-        <View style={styles.statsGrid}>
-          {SELLER_STATS.map((stat) => (
-            <View key={stat.id} style={styles.statCard}>
-              <View style={[styles.statIconCircle, { backgroundColor: stat.color + '12' }]}>
-                <MaterialCommunityIcons name={stat.icon} size={18} color={stat.color} />
-              </View>
-              <View style={styles.statInfo}>
-                <Text style={styles.statValue}>{stat.value}</Text>
-                <Text style={styles.statLabel}>{stat.label}</Text>
-              </View>
-            </View>
-          ))}
-        </View>
-
-        {/* Profile Information */}
-        <Text style={styles.sectionTitle}>Contact & Location Info</Text>
-        <View style={styles.infoCard}>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Full Name</Text>
-            <Text style={styles.infoValue}>{userProfile?.name || 'Not provided'}</Text>
-          </View>
-          <View style={styles.divider} />
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Mobile Number</Text>
-            <Text style={styles.infoValue}>+91 {userProfile?.mobile || 'Not provided'}</Text>
-          </View>
-          <View style={styles.divider} />
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Email Address</Text>
-            <Text style={styles.infoValue}>{userProfile?.email || 'Guest Session'}</Text>
-          </View>
-          <View style={styles.divider} />
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Location Address</Text>
-            <Text style={styles.infoValue}>
-              {userProfile?.village ? `${userProfile.village}, ${userProfile.taluka}, ${userProfile.district}, ${userProfile.state}` : 'Not configured'}
-            </Text>
-          </View>
-        </View>
-
-        {/* Account Menu Items Section */}
-        <Text style={styles.sectionTitle}>Account & Settings</Text>
-        <View style={styles.menuCard}>
-          {MENU_ITEMS.map((item, index) => (
-            <View key={item.id}>
-              <TouchableOpacity style={styles.menuRow} onPress={() => handleMenuPress(item)}>
-                <View style={styles.menuLeft}>
-                  <View style={styles.menuIconContainer}>
-                    {item.type === 'material' ? (
-                      <MaterialCommunityIcons name={item.icon} size={20} color="#475569" />
-                    ) : (
-                      <Ionicons name={item.icon} size={20} color="#475569" />
-                    )}
+        ) : (
+          <>
+            <View style={styles.profileUserCard}>
+              <View style={styles.userMainRow}>
+                <TouchableOpacity style={styles.avatarContainer} onPress={handleSelectPhoto}>
+                  <Image
+                    source={{ uri: profileImageUrl }}
+                    style={styles.avatarImage}
+                  />
+                  <View style={styles.camOverlayBadge}>
+                    <Ionicons name="camera" size={12} color="#fff" />
                   </View>
-                  <Text style={styles.menuTitle}>{item.title}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
-              </TouchableOpacity>
-              {index < MENU_ITEMS.length - 1 && <View style={styles.divider} />}
-            </View>
-          ))}
-        </View>
+                </TouchableOpacity>
 
-        {/* Account Actions Section */}
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Ionicons name="log-out-outline" size={20} color="#EF4444" style={styles.logoutIcon} />
-          <Text style={styles.logoutButtonText}>Log Out Account</Text>
-        </TouchableOpacity>
+                <View style={styles.userMeta}>
+                  <View style={styles.nameRow}>
+                    <AppText style={styles.userName}>{displayName}</AppText>
+                  </View>
+                  <AppText style={styles.userRole}>{displayRole}</AppText>
+                </View>
+              </View>
+
+              <TouchableOpacity style={styles.editProfileBtn} onPress={handleEditProfile}>
+                <Ionicons name="create-outline" size={14} color="#16A34A" />
+                <AppText style={styles.editProfileText}>{t('profile.editProfile')}</AppText>
+              </TouchableOpacity>
+            </View>
+
+            {/* Statistics Grid */}
+            <Text style={styles.sectionTitle}>Dashboard Stats</Text>
+            <View style={styles.statsGrid}>
+              {SELLER_STATS.map((stat) => (
+                <View key={stat.id} style={styles.statCard}>
+                  <View style={[styles.statIconCircle, { backgroundColor: stat.color + '12' }]}>
+                    <MaterialCommunityIcons name={stat.icon} size={18} color={stat.color} />
+                  </View>
+                  <View style={styles.statInfo}>
+                    <AppText style={styles.statValue}>{stat.value}</AppText>
+                    <AppText style={styles.statLabel}>{stat.label}</AppText>
+                  </View>
+                </View>
+              ))}
+            </View>
+
+            {/* Profile Information */}
+            <Text style={styles.sectionTitle}>Contact & Location Info</Text>
+            <View style={styles.infoCard}>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Full Name</Text>
+                <Text style={styles.infoValue}>{displayName}</Text>
+              </View>
+              <View style={styles.divider} />
+
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Mobile Number</Text>
+                <Text style={styles.infoValue}>+91 {displayMobile}</Text>
+              </View>
+              <View style={styles.divider} />
+
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Email Address</Text>
+                <Text style={styles.infoValue}>{displayEmail}</Text>
+              </View>
+              <View style={styles.divider} />
+
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Location Address</Text>
+                <Text style={styles.infoValue}>{displayLocation}</Text>
+              </View>
+            </View>
+
+            {/* Account Menu Items Section */}
+            <Text style={styles.sectionTitle}>Account & Settings</Text>
+            <View style={styles.menuCard}>
+              {MENU_ITEMS.map((item, index) => (
+                <View key={item.id}>
+                  <TouchableOpacity style={styles.menuRow} onPress={() => handleMenuPress(item)}>
+                    <View style={styles.menuLeft}>
+                      <View style={styles.menuIconContainer}>
+                        {item.type === 'material' ? (
+                          <MaterialCommunityIcons name={item.icon} size={20} color="#475569" />
+                        ) : (
+                          <Ionicons name={item.icon} size={20} color="#475569" />
+                        )}
+                      </View>
+                      <AppText style={styles.menuTitle}>{item.title}</AppText>
+                    </View>
+                    <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+                  </TouchableOpacity>
+                  {index < MENU_ITEMS.length - 1 && <View style={styles.divider} />}
+                </View>
+              ))}
+            </View>
+
+            {/* Account Actions Section */}
+            <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+              <Ionicons name="log-out-outline" size={20} color="#EF4444" style={styles.logoutIcon} />
+              <AppText style={styles.logoutButtonText}>{t('profile.logout')}</AppText>
+            </TouchableOpacity>
+          </>
+        )}
       </ScrollView>
 
       {/* Edit Profile Details Modal Form */}
-      <Modal animationType="slide" transparent={true} visible={isEditModalVisible} onRequestClose={() => setIsEditModalVisible(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Update Profile Details</Text>
-              <TouchableOpacity onPress={() => setIsEditModalVisible(false)}>
-                <Ionicons name="close" size={24} color="#64748B" />
+        <Modal animationType="slide" transparent={true} visible={isEditModalVisible} onRequestClose={() => setIsEditModalVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Update Profile Details</Text>
+                <TouchableOpacity onPress={() => setIsEditModalVisible(false)}>
+                  <Ionicons name="close" size={24} color="#64748B" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView contentContainerStyle={styles.modalFormScroll}>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Full Name</Text>
+                  <TextInput style={styles.input} value={editForm.name} onChangeText={(text) => setEditForm({ ...editForm, name: text })} placeholder="Enter Name" />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Mobile Number</Text>
+                  <TextInput style={styles.input} keyboardType="phone-pad" value={editForm.mobile} onChangeText={(text) => setEditForm({ ...editForm, mobile: text })} placeholder="Enter Phone" maxLength={10} />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Village</Text>
+                  <TextInput style={styles.input} value={editForm.village} onChangeText={(text) => setEditForm({ ...editForm, village: text })} placeholder="Enter Village" />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Taluka</Text>
+                  <TextInput style={styles.input} value={editForm.taluka} onChangeText={(text) => setEditForm({ ...editForm, taluka: text })} placeholder="Enter Taluka" />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>District</Text>
+                  <TextInput style={styles.input} value={editForm.district} onChangeText={(text) => setEditForm({ ...editForm, district: text })} placeholder="Enter District" />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>State</Text>
+                  <TextInput style={styles.input} value={editForm.state} onChangeText={(text) => setEditForm({ ...editForm, state: text })} placeholder="Enter State" />
+                </View>
+              </ScrollView>
+
+              <TouchableOpacity style={styles.saveButton} onPress={handleSaveProfile} disabled={syncing}>
+                {syncing ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveButtonText}>Save Details</Text>}
               </TouchableOpacity>
             </View>
-
-            <ScrollView contentContainerStyle={styles.modalFormScroll}>
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Full Name</Text>
-                <TextInput style={styles.input} value={editForm.name} onChangeText={(text) => setEditForm({ ...editForm, name: text })} placeholder="Enter Name" />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Mobile Number</Text>
-                <TextInput style={styles.input} keyboardType="phone-pad" value={editForm.mobile} onChangeText={(text) => setEditForm({ ...editForm, mobile: text })} placeholder="Enter Phone" maxLength={10} />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Village</Text>
-                <TextInput style={styles.input} value={editForm.village} onChangeText={(text) => setEditForm({ ...editForm, village: text })} placeholder="Enter Village" />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Taluka</Text>
-                <TextInput style={styles.input} value={editForm.taluka} onChangeText={(text) => setEditForm({ ...editForm, taluka: text })} placeholder="Enter Taluka" />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>District</Text>
-                <TextInput style={styles.input} value={editForm.district} onChangeText={(text) => setEditForm({ ...editForm, district: text })} placeholder="Enter District" />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>State</Text>
-                <TextInput style={styles.input} value={editForm.state} onChangeText={(text) => setEditForm({ ...editForm, state: text })} placeholder="Enter State" />
-              </View>
-            </ScrollView>
-
-            <TouchableOpacity style={styles.saveButton} onPress={handleSaveProfile} disabled={syncing}>
-              {syncing ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveButtonText}>Save Details</Text>}
-            </TouchableOpacity>
           </View>
-        </View>
-      </Modal>
+        </Modal>
     </SafeAreaView>
   );
 }

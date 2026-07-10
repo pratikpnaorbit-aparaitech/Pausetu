@@ -1,6 +1,9 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
+import { AppContext } from '../context/AppContext';
+import { useFontScale } from '../hooks/useTypography';
 
 // Import Screens
 import BuyScreen from '../screens/BuyScreen';
@@ -11,6 +14,10 @@ import PostScreen from '../screens/PostScreen';
 const Tab = createBottomTabNavigator();
 
 export default function BottomTabNavigator() {
+  const { t } = useTranslation();
+  const fontScale = useFontScale();
+  const scaledTabLabel = Math.round(11 * fontScale);
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -18,7 +25,7 @@ export default function BottomTabNavigator() {
         headerStyle: {
           backgroundColor: '#FFFFFF',
           borderBottomWidth: 1,
-          borderBottomColor: '#F1F5F9', // Softer border line
+          borderBottomColor: '#F1F5F9',
         },
         headerTintColor: '#0F172A',
         headerTitleStyle: {
@@ -44,7 +51,7 @@ export default function BottomTabNavigator() {
         tabBarActiveTintColor: '#16A34A',
         tabBarInactiveTintColor: '#64748B',
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: scaledTabLabel,
           fontWeight: '600',
           marginTop: 2,
         },
@@ -57,7 +64,7 @@ export default function BottomTabNavigator() {
         name="Buy"
         component={BuyScreen}
         options={{
-          title: 'Buy',
+          title: t('tabs.buy'),
           tabBarIcon: ({ color }) => (
             <MaterialCommunityIcons name="shopping" size={22} color={color} />
           ),
@@ -67,7 +74,7 @@ export default function BottomTabNavigator() {
         name="Sell"
         component={SellScreen}
         options={{
-          title: 'Sell',
+          title: t('tabs.sell'),
           tabBarIcon: ({ color }) => (
             <MaterialCommunityIcons name="cash-plus" size={22} color={color} />
           ),
@@ -77,7 +84,7 @@ export default function BottomTabNavigator() {
         name="Bid"
         component={BidScreen}
         options={{
-          title: 'Bid',
+          title: t('tabs.bid'),
           tabBarIcon: ({ color }) => (
             <MaterialCommunityIcons name="gavel" size={22} color={color} />
           ),
@@ -87,7 +94,7 @@ export default function BottomTabNavigator() {
         name="Post"
         component={PostScreen}
         options={{
-          title: 'Post',
+          title: t('tabs.post'),
           tabBarIcon: ({ color }) => (
             <MaterialCommunityIcons name="plus-circle-outline" size={22} color={color} />
           ),
@@ -96,3 +103,4 @@ export default function BottomTabNavigator() {
     </Tab.Navigator>
   );
 }
+
