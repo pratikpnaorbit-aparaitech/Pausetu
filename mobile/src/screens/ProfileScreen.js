@@ -6,6 +6,7 @@ import { AppContext } from '../context/AppContext';
 import { profileApi } from '../api/profileApi';
 import { useTranslation } from 'react-i18next';
 import AppText from '../components/AppText';
+import VerificationCard from '../components/VerificationCard';
 
 const SELLER_STATS = [
   { id: '1', labelKey: 'profile.activeListings', value: '3', icon: 'list-box-outline', color: '#16A34A' },
@@ -297,6 +298,8 @@ export default function ProfileScreen({ navigation }) {
                 <AppText style={styles.editProfileText}>{t('profile.editProfile')}</AppText>
               </TouchableOpacity>
             </View>
+
+            <VerificationCard navigation={navigation} />
 
             {/* Statistics Grid */}
             <AppText style={styles.sectionTitle}>{t('profile.dashboardStats')}</AppText>

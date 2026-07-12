@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useContext } from 'react';
 import { StyleSheet, View, ScrollView, Image, TouchableOpacity, Dimensions, Modal, Share, FlatList, SafeAreaView, ActivityIndicator, Linking, Alert } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Video, ResizeMode } from 'expo-av';
@@ -7,6 +7,7 @@ import ListingCard from '../components/ListingCard';
 import { api, resolveMediaUrl } from '../api/api';
 import { useTranslation } from 'react-i18next';
 import AppText from '../components/AppText';
+import { AppContext } from '../context/AppContext';
 
 const { width } = Dimensions.get('window');
 const GALLERY_HEIGHT = 280;
@@ -29,6 +30,42 @@ export default function AnimalDetailsScreen({ route, navigation }) {
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [similarAnimals, setSimilarAnimals] = useState([]);
   const { t } = useTranslation();
+
+  const { userProfile, isGuest } = useContext(AppContext);
+
+  const checkVerification = () => {
+    if (isGuest) {
+      Alert.alert(
+        t('common.loginRequired', { defaultValue: 'Login Required' }),
+        t('verification.restrictedToast', { defaultValue: 'Verification Required: Please log in and upload your milk dairy receipt to unlock this feature.' })
+      );
+      return false;
+    }
+    const status = userProfile?.verification?.status || 'unverified';
+    if (status !== 'approved') {
+      Alert.alert(
+        status === 'pending'
+          ? t('verification.pending', { defaultValue: 'Verification Pending' })
+          : t('verification.title', { defaultValue: 'Verification Required' }),
+        status === 'pending'
+          ? t('verification.pendingDesc', { defaultValue: 'Your account is under review. Marketplace features will be unlocked after approval.' })
+          : t('verification.restrictedToast', { defaultValue: 'Verification Required: Please upload your milk dairy receipt to unlock this feature.' }),
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          {
+            text: status === 'pending' ? t('common.close') : t('verification.uploadNewBtn', { defaultValue: 'Upload Receipt' }),
+            onPress: () => {
+              if (status !== 'pending') {
+                navigation.navigate('Verification');
+              }
+            }
+          }
+        ]
+      );
+      return false;
+    }
+    return true;
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -153,6 +190,7 @@ export default function AnimalDetailsScreen({ route, navigation }) {
   };
 
   const handleCall = async () => {
+    if (!checkVerification()) return;
     const phone = animal.sellerId?.mobile || animal.sellerId?.phoneNumber;
     if (!phone) {
       Alert.alert(t('animalDetails.phoneNotAvailable'), t('animalDetails.phoneNotAvailableMsg'));
@@ -168,6 +206,7 @@ export default function AnimalDetailsScreen({ route, navigation }) {
   };
 
   const handleWhatsApp = async () => {
+    if (!checkVerification()) return;
     const phone = animal.sellerId?.mobile || animal.sellerId?.phoneNumber;
     if (!phone) {
       Alert.alert(t('animalDetails.phoneNotAvailable'), t('animalDetails.phoneNotAvailableMsg'));
@@ -185,6 +224,7 @@ export default function AnimalDetailsScreen({ route, navigation }) {
   };
 
   const handleChat = () => {
+    if (!checkVerification()) return;
     const sellerId = animal.sellerId?._id || animal.sellerId;
     if (!sellerId) {
       Alert.alert(t('common.error'), t('animalDetails.notFound'));

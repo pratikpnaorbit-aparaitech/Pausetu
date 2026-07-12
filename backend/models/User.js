@@ -58,6 +58,21 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false
     },
+    verification: {
+      status: {
+        type: String,
+        enum: ['unverified', 'pending', 'approved', 'rejected'],
+        default: 'unverified'
+      },
+      receiptUrl: String,
+      submittedAt: Date,
+      approvedAt: Date,
+      rejectedReason: String,
+      verifiedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Admin'
+      }
+    },
     createdAt: {
       type: Date,
       default: Date.now

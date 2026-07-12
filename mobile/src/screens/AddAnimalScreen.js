@@ -55,9 +55,31 @@ const PHOTO_STEPS = [
 
 export default function AddAnimalScreen({ navigation }) {
   const { t } = useTranslation();
-  const { userToken } = useContext(AppContext);
+  const { userProfile, userToken, isGuest } = useContext(AppContext);
+
+  const verification = userProfile?.verification || { status: 'unverified' };
+  const verificationStatus = verification.status || 'unverified';
+
+  useEffect(() => {
+    if (!isGuest && verificationStatus !== 'approved') {
+      Alert.alert(
+        t('verification.title'),
+        t('verification.restrictedToast'),
+        [{ text: t('common.close'), onPress: () => navigation.goBack() }]
+      );
+    }
+  }, [verificationStatus, isGuest]);
+
   const [currentStep, setCurrentStep] = useState(1);
   const cameraRef = useRef(null);
+
+  if (!isGuest && verificationStatus !== 'approved') {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF', justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#16A34A" />
+      </SafeAreaView>
+    );
+  }
 
   // Categories & Breeds lists
   const [categories, setCategories] = useState([]);

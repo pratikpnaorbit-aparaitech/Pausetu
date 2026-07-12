@@ -1,6 +1,7 @@
-import React, { useContext } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { AdminContext } from '../context/AdminContext';
 import { Save, Shield, Sliders } from 'lucide-react';
+import { verificationApi } from '../api/verificationApi';
 
 // Reusable form field
 function Field({ label, children }) {
@@ -45,6 +46,43 @@ function Switch({ isChecked, toggle, label }) {
 
 export default function SettingsPage() {
   const { generalSettings, setGeneralSettings, passwordForm, setPasswordForm, showToast } = useContext(AdminContext);
+
+  const [verificationSettings, setVerificationSettings] = useState({
+    verificationMode: 'manual',
+    maxUploadSize: 5,
+    allowedFileTypes: ['jpeg', 'jpg', 'png', 'webp', 'pdf']
+  });
+  const [savingSettings, setSavingSettings] = useState(false);
+
+  useEffect(() => {
+    const fetchVerificationSettings = async () => {
+      const data = await verificationApi.getSettings();
+      if (data) {
+        setVerificationSettings({
+          verificationMode: data.verificationMode || 'manual',
+          maxUploadSize: data.maxUploadSize || 5,
+          allowedFileTypes: data.allowedFileTypes || ['jpeg', 'jpg', 'png', 'webp', 'pdf']
+        });
+      }
+    };
+    fetchVerificationSettings();
+  }, []);
+
+  const handleSaveVerificationSettings = async () => {
+    setSavingSettings(true);
+    try {
+      const success = await verificationApi.updateSettings(verificationSettings);
+      if (success) {
+        showToast('Verification settings saved successfully!');
+      } else {
+        alert('Failed to save verification settings.');
+      }
+    } catch (e) {
+      alert(e.message || 'Error saving settings.');
+    } finally {
+      setSavingSettings(false);
+    }
+  };
 
   return (
     <div style={{ animation: 'fadeIn 0.22s both' }}>
@@ -165,6 +203,100 @@ export default function SettingsPage() {
               }}
             >
               <Shield size={13} /> Update Credentials
+            </button>
+          </SettingsSection>
+
+          <SettingsSection icon={Shield} title="Verification Settings">
+            {/* Mode selection radio list */}
+            <Field label="Verification Mode">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', color: 'var(--text-main)' }}>
+                  <input
+                    type="radio"
+                    name="verificationMode"
+                    value="manual"
+                    checked={verificationSettings.verificationMode === 'manual'}
+                    onChange={() => setVerificationSettings({ ...verificationSettings, verificationMode: 'manual' })}
+                  />
+                  <span>Manual Verification (Default)</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', color: 'var(--text-main)' }}>
+                  <input
+                    type="radio"
+                    name="verificationMode"
+                    value="auto"
+                    checked={verificationSettings.verificationMode === 'auto'}
+                    onChange={() => setVerificationSettings({ ...verificationSettings, verificationMode: 'auto' })}
+                  />
+                  <span>Automatic Verification (Approve immediately)</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', color: 'var(--text-main)' }}>
+                  <input
+                    type="radio"
+                    name="verificationMode"
+                    value="ocr_manual"
+                    checked={verificationSettings.verificationMode === 'ocr_manual'}
+                    onChange={() => setVerificationSettings({ ...verificationSettings, verificationMode: 'ocr_manual' })}
+                  />
+                  <span>OCR + Manual Review (Future)</span>
+                </label>
+              </div>
+            </Field>
+
+            {/* Auto Approval Toggle (Syncs with verificationMode === 'auto') */}
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '14px 16px', backgroundColor: 'var(--bg-main)',
+              borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)',
+            }}>
+              <div>
+                <p style={{ margin: '0 0 2px', fontSize: 13, fontWeight: '700', color: 'var(--text-heading)' }}>
+                  Auto-Approve Receipts
+                </p>
+                <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)' }}>
+                  Approve farmer verification immediately on upload
+                </p>
+              </div>
+              <Switch
+                isChecked={verificationSettings.verificationMode === 'auto'}
+                toggle={() => setVerificationSettings({
+                  ...verificationSettings,
+                  verificationMode: verificationSettings.verificationMode === 'auto' ? 'manual' : 'auto'
+                })}
+                label="Toggle auto-approve receipts"
+              />
+            </div>
+
+            <Field label="Maximum Upload Size (MB)">
+              <input
+                className="input"
+                type="number"
+                min={1}
+                value={verificationSettings.maxUploadSize}
+                onChange={(e) => setVerificationSettings({ ...verificationSettings, maxUploadSize: Number(e.target.value) })}
+              />
+            </Field>
+
+            <Field label="Allowed File Types">
+              <input
+                className="input"
+                type="text"
+                value={verificationSettings.allowedFileTypes.join(', ')}
+                onChange={(e) => setVerificationSettings({
+                  ...verificationSettings,
+                  allowedFileTypes: e.target.value.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+                })}
+                placeholder="e.g. jpeg, jpg, png, webp, pdf"
+              />
+            </Field>
+
+            <button
+              className="btn btn-primary btn-sm"
+              style={{ alignSelf: 'flex-end' }}
+              onClick={handleSaveVerificationSettings}
+              disabled={savingSettings}
+            >
+              <Save size={13} /> {savingSettings ? 'Saving...' : 'Save Settings'}
             </button>
           </SettingsSection>
         </div>

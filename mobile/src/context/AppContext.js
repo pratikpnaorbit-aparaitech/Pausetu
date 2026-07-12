@@ -58,7 +58,8 @@ export const AppProvider = ({ children }) => {
       district: user.district || '',
       state: user.state || '',
       photo: user.profilePhoto || user.photo || '',
-      language: user.preferredLanguage || fallbackLanguage
+      language: user.preferredLanguage || fallbackLanguage,
+      verification: user.verification || { status: 'unverified' }
     };
   };
 

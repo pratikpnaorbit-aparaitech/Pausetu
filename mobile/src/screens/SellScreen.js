@@ -59,6 +59,59 @@ export default function SellScreen({ navigation }) {
     );
   }
 
+  const verification = userProfile?.verification || { status: 'unverified' };
+  const verificationStatus = verification.status || 'unverified';
+
+  if (!isGuest && verificationStatus !== 'approved') {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.guestContainer}>
+          <MaterialCommunityIcons
+            name={
+              verificationStatus === 'pending'
+                ? 'clock-outline'
+                : verificationStatus === 'rejected'
+                  ? 'alert-decagram-outline'
+                  : 'shield-alert-outline'
+            }
+            size={64}
+            color={
+              verificationStatus === 'pending'
+                ? '#D97706'
+                : verificationStatus === 'rejected'
+                  ? '#DC2626'
+                  : '#94A3B8'
+            }
+          />
+          <AppText style={styles.guestTitle}>
+            {verificationStatus === 'pending'
+              ? t('verification.pending')
+              : verificationStatus === 'rejected'
+                ? t('verification.rejected')
+                : t('verification.title')}
+          </AppText>
+          <AppText style={styles.guestSubtitle}>
+            {verificationStatus === 'pending'
+              ? t('verification.pendingDesc')
+              : verificationStatus === 'rejected'
+                ? t('verification.rejectedDesc', { reason: verification.rejectedReason || 'No reason specified' })
+                : t('verification.unverifiedDesc')}
+          </AppText>
+          {(verificationStatus === 'unverified' || verificationStatus === 'rejected') && (
+            <TouchableOpacity
+              style={styles.guestLoginButton}
+              onPress={() => navigation.navigate('Verification')}
+            >
+              <AppText style={styles.guestLoginButtonText}>
+                {t('verification.uploadNewBtn')}
+              </AppText>
+            </TouchableOpacity>
+          )}
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>

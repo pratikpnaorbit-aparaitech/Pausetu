@@ -22,16 +22,16 @@ const storage = multer.diskStorage({
   }
 });
 
-// Multer File Filter - Image validation (jpg, jpeg, png, webp)
+// Multer File Filter - Image validation (jpg, jpeg, png, webp, pdf)
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png|webp|mp4|mov|avi|mkv/;
+  const allowedTypes = /jpeg|jpg|png|webp|pdf|mp4|mov|avi|mkv/;
   const mimetype = allowedTypes.test(file.mimetype);
   const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
 
   if (mimetype || extname) {
     return cb(null, true);
   }
-  cb(new AppError('Only images (JPEG, JPG, PNG, WEBP) and videos (MP4, MOV, AVI, MKV) are allowed!', 400), false);
+  cb(new AppError('Only images (JPEG, JPG, PNG, WEBP), PDFs, and videos (MP4, MOV, AVI, MKV) are allowed!', 400), false);
 };
 
 // Configurable upload middleware (Max 5MB file size)

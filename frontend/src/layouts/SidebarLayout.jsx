@@ -9,6 +9,7 @@ import {
 const NAV_ITEMS = [
   { name: 'Dashboard',        icon: LayoutDashboard, section: 'main' },
   { name: 'Pending Approvals',icon: Clock,           section: 'main', hasBadge: true },
+  { name: 'Verification Requests', icon: Shield,     section: 'main' },
   { name: 'Animals',          icon: Layers,          section: 'main' },
   { name: 'Sellers',          icon: Users,           section: 'main' },
   { name: 'Buyers',           icon: UserCheck,       section: 'main' },
