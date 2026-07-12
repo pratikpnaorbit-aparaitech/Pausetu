@@ -63,15 +63,15 @@ export default function HomeScreen() {
         {/* Recent Activities Section */}
         <AppText style={styles.sectionTitle}>{t('home.recentUpdates')}</AppText>
         <View style={styles.updateCard}>
-          <AppText style={styles.updateBadge}>Alert</AppText>
-          <AppText style={styles.updateTitle}>Fodder prices are projected to rise next week.</AppText>
-          <AppText style={styles.updateTime}>2 hours ago</AppText>
+          <AppText style={styles.updateBadge}>{t('home.alertBadge')}</AppText>
+          <AppText style={styles.updateTitle}>{t('home.fodderAlert')}</AppText>
+          <AppText style={styles.updateTime}>{t('home.hoursAgo2')}</AppText>
         </View>
 
         <View style={styles.updateCard}>
-          <AppText style={[styles.updateBadge, styles.doctorBadge]}>Doctor</AppText>
-          <AppText style={styles.updateTitle}>Dr. Sharma is now online for medical consults.</AppText>
-          <AppText style={styles.updateTime}>5 hours ago</AppText>
+          <AppText style={[styles.updateBadge, styles.doctorBadge]}>{t('home.doctorBadge')}</AppText>
+          <AppText style={styles.updateTitle}>{t('home.doctorAlert')}</AppText>
+          <AppText style={styles.updateTime}>{t('home.hoursAgo5')}</AppText>
         </View>
       </ScrollView>
     </SafeAreaView>

@@ -1,16 +1,20 @@
 import React from 'react';
-import { StyleSheet, View, Text, SafeAreaView } from 'react-native';
+import { StyleSheet, View, SafeAreaView } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
+import AppText from '../components/AppText';
 
 export default function PostScreen() {
+  const { t } = useTranslation();
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <View style={styles.iconCircle}>
           <MaterialCommunityIcons name="plus-circle-outline" size={60} color="#16A34A" />
         </View>
-        <Text style={styles.title}>Post Listing</Text>
-        <Text style={styles.subtitle}>Create a new cattle listing or auction for the community.</Text>
+        <AppText style={styles.title}>{t('post.title')}</AppText>
+        <AppText style={styles.subtitle}>{t('post.subtitle')}</AppText>
       </View>
     </SafeAreaView>
   );

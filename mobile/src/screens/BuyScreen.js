@@ -1,20 +1,22 @@
 import React, { useContext, useState, useCallback, useEffect } from 'react';
-import { StyleSheet, View, Text, SafeAreaView, TouchableOpacity, TextInput, FlatList, Image, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, SafeAreaView, TouchableOpacity, TextInput, FlatList, Image, ActivityIndicator } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppContext } from '../context/AppContext';
 import { api, resolveMediaUrl } from '../api/api';
+import { useTranslation } from 'react-i18next';
+import AppText from '../components/AppText';
 
 // Import Reusable Components
 import SectionHeader from '../components/SectionHeader';
 import ListingCard from '../components/ListingCard';
 
 const CATEGORIES = [
-  { id: 'cow', name: 'Cow', image: require('../../assets/icons/cow.png') },
-  { id: 'buffalo', name: 'Buffalo', image: require('../../assets/icons/buffalo.png') },
-  { id: 'goat', name: 'Goat', image: require('../../assets/icons/goat.png') },
-  { id: 'sheep', name: 'Sheep', image: require('../../assets/icons/sheep.png') },
-  { id: 'horse', name: 'Horse', image: require('../../assets/icons/horse.png') },
-  { id: 'other', name: 'Other', image: require('../../assets/icons/other.png') },
+  { id: 'cow', nameKey: 'buy.cow', image: require('../../assets/icons/cow.png') },
+  { id: 'buffalo', nameKey: 'buy.buffalo', image: require('../../assets/icons/buffalo.png') },
+  { id: 'goat', nameKey: 'buy.goat', image: require('../../assets/icons/goat.png') },
+  { id: 'sheep', nameKey: 'buy.sheep', image: require('../../assets/icons/sheep.png') },
+  { id: 'horse', nameKey: 'buy.horse', image: require('../../assets/icons/horse.png') },
+  { id: 'other', nameKey: 'buy.other', image: require('../../assets/icons/other.png') },
 ];
 
 const FEATURED_ANIMALS = [
@@ -160,6 +162,8 @@ const NEARBY_SELLERS = [
 
 // Standalone React.memo components to prevent unmounting/remounting of list headers and footers
 const ListHeader = React.memo(({ selectedCategory, setSelectedCategory, onViewDetails, featuredAnimals }) => {
+  const { t } = useTranslation();
+
   return (
     <View>
       {/* Location Card */}
@@ -167,12 +171,12 @@ const ListHeader = React.memo(({ selectedCategory, setSelectedCategory, onViewDe
         <View style={styles.locationInfo}>
           <Ionicons name="location-outline" size={20} color="#16A34A" style={styles.locationPinIcon} />
           <View style={styles.locationTextContainer}>
-            <Text style={styles.locationCity}>Pune, Maharashtra</Text>
-            <Text style={styles.locationSubtitle}>Showing nearby cattle listings</Text>
+            <AppText style={styles.locationCity}>Pune, Maharashtra</AppText>
+            <AppText style={styles.locationSubtitle}>{t('buy.showingNearby')}</AppText>
           </View>
         </View>
         <TouchableOpacity style={styles.changeButton}>
-          <Text style={styles.changeButtonText}>Change</Text>
+          <AppText style={styles.changeButtonText}>{t('buy.change')}</AppText>
         </TouchableOpacity>
       </View>
 
@@ -182,7 +186,7 @@ const ListHeader = React.memo(({ selectedCategory, setSelectedCategory, onViewDe
           <Ionicons name="search" size={18} color="#64748B" style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search cattle, breed, seller or location..."
+            placeholder={t('buy.searchCattle')}
             placeholderTextColor="#94A3B8"
             editable={true}
           />
@@ -194,7 +198,7 @@ const ListHeader = React.memo(({ selectedCategory, setSelectedCategory, onViewDe
 
       {/* Browse Categories Section */}
       <View style={styles.categoriesSection}>
-        <Text style={styles.categoriesTitle}>Browse Categories</Text>
+        <AppText style={styles.categoriesTitle}>{t('buy.browseCategories')}</AppText>
         <FlatList
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -213,12 +217,12 @@ const ListHeader = React.memo(({ selectedCategory, setSelectedCategory, onViewDe
                 onPress={() => setSelectedCategory(item.id)}
               >
                 <Image source={item.image} style={styles.categoryCardImage} resizeMode="contain" />
-                <Text style={[
+                <AppText style={[
                   styles.categoryCardName,
                   isSelected ? styles.selectedCardName : styles.unselectedCardName
                 ]}>
-                  {item.name}
-                </Text>
+                  {t(item.nameKey)}
+                </AppText>
               </TouchableOpacity>
             );
           }}
@@ -227,7 +231,7 @@ const ListHeader = React.memo(({ selectedCategory, setSelectedCategory, onViewDe
 
       {/* Featured Animals Section */}
       <View style={styles.featuredSection}>
-        <SectionHeader title="Featured Animals" onActionPress={() => {}} />
+        <SectionHeader title={t('buy.featuredAnimals')} onActionPress={() => { }} />
 
         <FlatList
           horizontal
@@ -248,12 +252,12 @@ const ListHeader = React.memo(({ selectedCategory, setSelectedCategory, onViewDe
                   {/* Badges Overlay (Featured & Verified) */}
                   <View style={styles.badgeOverlayContainer}>
                     <View style={styles.featuredBadge}>
-                      <Text style={styles.featuredBadgeText}>Featured</Text>
+                      <AppText style={styles.featuredBadgeText}>{t('common.featured')}</AppText>
                     </View>
                     {item.isVerified && (
                       <View style={styles.verifiedBadge}>
                         <MaterialCommunityIcons name="check-decagram" size={11} color="#FFFFFF" style={styles.badgeIcon} />
-                        <Text style={styles.verifiedBadgeText}>Verified</Text>
+                        <AppText style={styles.verifiedBadgeText}>{t('common.verified')}</AppText>
                       </View>
                     )}
                   </View>
@@ -262,29 +266,29 @@ const ListHeader = React.memo(({ selectedCategory, setSelectedCategory, onViewDe
                 {/* Metadata Content */}
                 <View style={styles.cardDetails}>
                   <View style={styles.titleRow}>
-                    <Text style={styles.animalName} numberOfLines={1}>
+                    <AppText style={styles.animalName} numberOfLines={1}>
                       {item.name}
-                    </Text>
+                    </AppText>
                     {item.isVerified && (
                       <MaterialCommunityIcons name="check-decagram" size={15} color="#3B82F6" style={styles.verifiedIcon} />
                     )}
                   </View>
-                  <Text style={styles.breedText} numberOfLines={1}>
+                  <AppText style={styles.breedText} numberOfLines={1}>
                     {item.breed} • {item.age}
-                  </Text>
-                  <Text style={styles.priceText}>{item.price}</Text>
+                  </AppText>
+                  <AppText style={styles.priceText}>{item.price}</AppText>
 
                   {/* Location details */}
                   <View style={styles.locationRow}>
                     <Ionicons name="location" size={13} color="#64748B" />
-                    <Text style={styles.locationText} numberOfLines={1}>
+                    <AppText style={styles.locationText} numberOfLines={1}>
                       {item.location}
-                    </Text>
+                    </AppText>
                   </View>
 
                   {/* Action Button */}
                   <TouchableOpacity style={styles.detailsButton} onPress={() => onViewDetails(item)}>
-                    <Text style={styles.detailsButtonText}>View Details</Text>
+                    <AppText style={styles.detailsButtonText}>{t('common.viewDetails')}</AppText>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -293,16 +297,18 @@ const ListHeader = React.memo(({ selectedCategory, setSelectedCategory, onViewDe
         />
       </View>
       {/* Latest Listings Header */}
-      <SectionHeader title="Latest Listings" onActionPress={() => {}} />
+      <SectionHeader title={t('buy.latestListings')} onActionPress={() => { }} />
     </View>
   );
 });
 
 const ListFooter = React.memo(({ onViewDetails, recommendedAnimals }) => {
+  const { t } = useTranslation();
+
   return (
     <View style={styles.footerSection}>
       {/* Recommended For You */}
-      <SectionHeader title="Recommended For You" onActionPress={() => {}} />
+      <SectionHeader title={t('buy.recommendedForYou')} onActionPress={() => { }} />
       <FlatList
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -319,7 +325,7 @@ const ListFooter = React.memo(({ onViewDetails, recommendedAnimals }) => {
       />
 
       {/* Nearby Sellers */}
-      <SectionHeader title="Nearby Sellers" onActionPress={() => {}} />
+      <SectionHeader title={t('buy.nearbySellers')} onActionPress={() => { }} />
       <FlatList
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -337,30 +343,30 @@ const ListFooter = React.memo(({ onViewDetails, recommendedAnimals }) => {
             </View>
 
             {/* Name */}
-            <Text style={styles.sellerCardName} numberOfLines={1}>
+            <AppText style={styles.sellerCardName} numberOfLines={1}>
               {item.name}
-            </Text>
+            </AppText>
 
             {/* Location & Distance */}
             <View style={styles.sellerLocationRow}>
               <Ionicons name="location" size={11} color="#64748B" style={styles.sellerLocationPin} />
-              <Text style={styles.sellerLocationText} numberOfLines={1}>
+              <AppText style={styles.sellerLocationText} numberOfLines={1}>
                 {item.location} ({item.distance})
-              </Text>
+              </AppText>
             </View>
 
             {/* Rating */}
             <View style={styles.ratingRow}>
               <Ionicons name="star" size={12} color="#F59E0B" />
-              <Text style={styles.ratingText}>{item.rating}</Text>
+              <AppText style={styles.ratingText}>{item.rating}</AppText>
             </View>
 
             {/* Stock Count */}
-            <Text style={styles.animalsAvailableText}>{item.animalsCount} animals available</Text>
+            <AppText style={styles.animalsAvailableText}>{t('buy.animalsAvailable', { count: item.animalsCount })}</AppText>
 
             {/* Action - Outline details button style */}
             <TouchableOpacity style={styles.contactButton}>
-              <Text style={styles.contactButtonText}>Contact</Text>
+              <AppText style={styles.contactButtonText}>{t('buy.contact')}</AppText>
             </TouchableOpacity>
           </View>
         )}
@@ -373,6 +379,7 @@ export default function BuyScreen({ navigation }) {
   const { userProfile, userToken } = useContext(AppContext);
   const isGuest = userToken === 'guest';
   const name = isGuest ? 'Guest' : userProfile?.name || 'User';
+  const { t } = useTranslation();
 
   const [selectedCategory, setSelectedCategory] = useState('cow');
   const [animalsList, setAnimalsList] = useState([]);
@@ -429,26 +436,28 @@ export default function BuyScreen({ navigation }) {
             <View style={styles.logoAndBrand}>
               {/* App Logo */}
               <View style={styles.logoCircle}>
-                <Text style={styles.logoText}>PS</Text>
+                <AppText style={styles.logoText}>PS</AppText>
               </View>
               {/* Title and Tagline */}
               <View style={styles.brandTextContainer}>
-                <Text style={styles.headerTitle}>PashuSetu</Text>
-                <Text style={styles.headerTagline}>Marketplace & Care</Text>
+                <AppText style={styles.headerTitle}>
+                  {t('app.name')}
+                </AppText>
+                <AppText style={styles.headerTagline}>{t('buy.marketplaceCare')}</AppText>
               </View>
             </View>
 
             {/* Right Controls */}
             <View style={styles.headerActions}>
               <TouchableOpacity style={styles.sellButton} onPress={handleNavigateToSell}>
-                <Text style={styles.sellButtonText}>Sell +</Text>
+                <AppText style={styles.sellButtonText}>{t('buy.sellPlus')}</AppText>
               </TouchableOpacity>
               <TouchableOpacity style={styles.notificationHeaderBtn} onPress={() => navigation.navigate('Notifications')}>
                 <Ionicons name="notifications-outline" size={20} color="#0F172A" />
                 <View style={styles.notificationHeaderBadge} />
               </TouchableOpacity>
               <TouchableOpacity style={styles.avatarCircle} onPress={() => navigation.navigate('Profile')}>
-                <Text style={styles.avatarText}>{name.charAt(0).toUpperCase()}</Text>
+                <AppText style={styles.avatarText}>{name.charAt(0).toUpperCase()}</AppText>
               </TouchableOpacity>
             </View>
           </View>
@@ -456,7 +465,7 @@ export default function BuyScreen({ navigation }) {
           {loading ? (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
               <ActivityIndicator size="large" color="#16A34A" />
-              <Text style={{ marginTop: 12, color: '#64748B', fontWeight: '600' }}>जाहिराती लोड होत आहेत... (Loading listings...)</Text>
+              <AppText style={{ marginTop: 12, color: '#64748B', fontWeight: '600' }}>{t('buy.loadingListings')}</AppText>
             </View>
           ) : (
             <FlatList
@@ -490,7 +499,7 @@ export default function BuyScreen({ navigation }) {
           {/* Floating Action Button (FAB) */}
           <TouchableOpacity style={styles.fab} activeOpacity={0.85} onPress={handleNavigateToSell}>
             <MaterialCommunityIcons name="plus" size={22} color="#FFFFFF" />
-            <Text style={styles.fabLabel}>Sell Animal</Text>
+            <AppText style={styles.fabLabel}>{t('buy.sellAnimal')}</AppText>
           </TouchableOpacity>
         </View>
       </SafeAreaView>

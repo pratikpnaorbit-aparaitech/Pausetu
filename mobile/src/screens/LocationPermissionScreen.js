@@ -1,10 +1,13 @@
 import React, { useContext } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, SafeAreaView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AppContext } from '../context/AppContext';
+import { useTranslation } from 'react-i18next';
+import AppText from '../components/AppText';
 
 export default function LocationPermissionScreen() {
   const { grantLocation } = useContext(AppContext);
+  const { t } = useTranslation();
 
   const handleGrantPermission = () => {
     grantLocation();
@@ -17,34 +20,34 @@ export default function LocationPermissionScreen() {
           <View style={styles.mapIconCircle}>
             <Ionicons name="location-outline" size={50} color="#16A34A" />
           </View>
-          <Text style={styles.title}>Enable Location Services</Text>
-          <Text style={styles.description}>
-            PashuSetu requests location permission to connect you with veterinarians, buyers, and sellers in your nearby radius.
-          </Text>
+          <AppText style={styles.title}>{t('location.enableTitle')}</AppText>
+          <AppText style={styles.description}>
+            {t('location.description')}
+          </AppText>
 
           <View style={styles.benefitsContainer}>
             <View style={styles.benefitRow}>
               <Ionicons name="checkmark-sharp" size={18} color="#16A34A" style={styles.bulletIcon} />
-              <Text style={styles.benefitText}>Locate nearest verified animal doctors</Text>
+              <AppText style={styles.benefitText}>{t('location.benefit1')}</AppText>
             </View>
             <View style={styles.benefitRow}>
               <Ionicons name="checkmark-sharp" size={18} color="#16A34A" style={styles.bulletIcon} />
-              <Text style={styles.benefitText}>Browse cattle listings in your district</Text>
+              <AppText style={styles.benefitText}>{t('location.benefit2')}</AppText>
             </View>
             <View style={styles.benefitRow}>
               <Ionicons name="checkmark-sharp" size={18} color="#16A34A" style={styles.bulletIcon} />
-              <Text style={styles.benefitText}>Calculate accurate transport distances</Text>
+              <AppText style={styles.benefitText}>{t('location.benefit3')}</AppText>
             </View>
           </View>
         </View>
 
         <View style={styles.footer}>
           <TouchableOpacity style={styles.grantButton} onPress={handleGrantPermission}>
-            <Text style={styles.grantButtonText}>Grant Location Access</Text>
+            <AppText style={styles.grantButtonText}>{t('location.grantAccess')}</AppText>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.skipButton} onPress={grantLocation}>
-            <Text style={styles.skipButtonText}>Not Now / Enter Manually</Text>
+            <AppText style={styles.skipButtonText}>{t('location.notNow')}</AppText>
           </TouchableOpacity>
         </View>
       </View>

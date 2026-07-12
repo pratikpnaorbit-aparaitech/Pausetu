@@ -1,12 +1,14 @@
 import React, { useRef } from 'react';
 import { StyleSheet, View, Animated, PanResponder, TouchableOpacity, Dimensions } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import AppText from './AppText';
 
 const { width } = Dimensions.get('window');
 const SWIPE_THRESHOLD = -80; // Swipe threshold to show delete button
 
 export default function NotificationCard({ item, onMarkAsRead, onDelete }) {
+  const { t } = useTranslation();
   const translateX = useRef(new Animated.Value(0)).current;
 
   const panResponder = useRef(
@@ -68,7 +70,7 @@ export default function NotificationCard({ item, onMarkAsRead, onDelete }) {
       <View style={styles.deleteBackground}>
         <TouchableOpacity style={styles.deleteButton} onPress={() => onDelete(item.id)}>
           <Ionicons name="trash-outline" size={22} color="#FFFFFF" />
-          <AppText style={styles.deleteText}>Delete</AppText>
+          <AppText style={styles.deleteText}>{t('notificationCard.delete')}</AppText>
         </TouchableOpacity>
       </View>
 

@@ -2,7 +2,6 @@ import React, { useState, useEffect, useContext, useRef } from 'react';
 import {
   StyleSheet,
   View,
-  Text,
   SafeAreaView,
   ScrollView,
   TextInput,
@@ -22,6 +21,8 @@ import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppContext } from '../context/AppContext';
+import { useTranslation } from 'react-i18next';
+import AppText from '../components/AppText';
 import { animalApi } from '../api/animalApi';
 
 const { width, height } = Dimensions.get('window');
@@ -32,27 +33,28 @@ const DRAFTS_KEY = 'PASHUSETU_OFFLINE_DRAFTS';
 
 // Step descriptions
 const STEPS = [
-  { id: 1, titleEn: 'Select Category', titleMr: 'प्राणी निवडा' },
-  { id: 2, titleEn: 'Take Live Photos', titleMr: 'फोटो काढा (५ अनिवार्य)' },
-  { id: 3, titleEn: 'Record Live Video', titleMr: 'व्हिडिओ काढा (१ अनिवार्य)' },
-  { id: 4, titleEn: 'Animal Details', titleMr: 'जनावराची माहिती' },
-  { id: 5, titleEn: 'Health Details', titleMr: 'आरोग्य तपशील' },
-  { id: 6, titleEn: 'Pricing', titleMr: 'किंमत' },
-  { id: 7, titleEn: 'Location & GPS', titleMr: 'पत्ता आणि जीपीएस' },
-  { id: 8, titleEn: 'Preview', titleMr: 'तपासा' },
-  { id: 9, titleEn: 'Submit', titleMr: 'जाहिरात पाठवा' }
+  { id: 1, titleKey: 'addAnimal.steps.selectCategory' },
+  { id: 2, titleKey: 'addAnimal.steps.takePhotos' },
+  { id: 3, titleKey: 'addAnimal.steps.recordVideo' },
+  { id: 4, titleKey: 'addAnimal.steps.animalDetails' },
+  { id: 5, titleKey: 'addAnimal.steps.healthDetails' },
+  { id: 6, titleKey: 'addAnimal.steps.pricing' },
+  { id: 7, titleKey: 'addAnimal.steps.locationGps' },
+  { id: 8, titleKey: 'addAnimal.steps.preview' },
+  { id: 9, titleKey: 'addAnimal.steps.submit' }
 ];
 
 // Steps 2 Photo configuration
 const PHOTO_STEPS = [
-  { name: 'Front Photo', nameMr: 'समोरून फोटो काढा', instructionEn: 'Take Front Photo of the animal', instructionMr: 'समोरचा भाग स्पष्ट दिसला पाहिजे.' },
-  { name: 'Left Side', nameMr: 'डाव्या बाजूने फोटो काढा', instructionEn: 'Take Left Side Photo of the animal', instructionMr: 'डावी बाजू आणि पाय दिसले पाहिजेत.' },
-  { name: 'Right Side', nameMr: 'उजव्या बाजूने फोटो काढा', instructionEn: 'Take Right Side Photo of the animal', instructionMr: 'उजवी बाजू स्पष्ट दिसली पाहिजे.' },
-  { name: 'Back Side', nameMr: 'मागील बाजूने फोटो काढा', instructionEn: 'Take Back Side Photo of the animal', instructionMr: 'मागील बाजू आणि शेपूट दिसली पाहिजे.' },
-  { name: 'Full Body', nameMr: 'पूर्ण शरीराचा फोटो काढा', instructionEn: 'Take Full Body Photo of the animal', instructionMr: 'पूर्ण जनावर एका फ्रेममध्ये आले पाहिजे.' }
+  { name: 'Front Photo', nameKey: 'addAnimal.photoSteps.front', instructionKey: 'addAnimal.photoSteps.frontInst' },
+  { name: 'Left Side', nameKey: 'addAnimal.photoSteps.left', instructionKey: 'addAnimal.photoSteps.leftInst' },
+  { name: 'Right Side', nameKey: 'addAnimal.photoSteps.right', instructionKey: 'addAnimal.photoSteps.rightInst' },
+  { name: 'Back Side', nameKey: 'addAnimal.photoSteps.back', instructionKey: 'addAnimal.photoSteps.backInst' },
+  { name: 'Full Body', nameKey: 'addAnimal.photoSteps.fullBody', instructionKey: 'addAnimal.photoSteps.fullBodyInst' }
 ];
 
 export default function AddAnimalScreen({ navigation }) {
+  const { t } = useTranslation();
   const { userToken } = useContext(AppContext);
   const [currentStep, setCurrentStep] = useState(1);
   const cameraRef = useRef(null);
@@ -112,7 +114,7 @@ export default function AddAnimalScreen({ navigation }) {
   const [districtSearch, setDistrictSearch] = useState('');
   const [talukaSearch, setTalukaSearch] = useState('');
   const [activeDropdown, setActiveDropdown] = useState(null); // 'state' | 'district' | 'taluka' | null
-  
+
   // GPS State
   const [latitude, setLatitude] = useState(null);
   const [longitude, setLongitude] = useState(null);
@@ -159,6 +161,8 @@ export default function AddAnimalScreen({ navigation }) {
   const fetchCategories = async () => {
     try {
       const body = await animalApi.getCategories();
+
+
       if (body.status === 'success') {
         setCategories(body.data.categories);
       } else {
@@ -247,7 +251,7 @@ export default function AddAnimalScreen({ navigation }) {
     setSelectedCategory(cat);
     setSelectedBreed(null);
     fetchBreeds(cat._id || cat.id);
-    setCurrentStep(2); 
+    setCurrentStep(2);
   };
 
   // Capture Photo Handler
@@ -264,10 +268,10 @@ export default function AddAnimalScreen({ navigation }) {
         }
       } catch (err) {
         console.warn('Physical camera capture failed:', err.message);
-        Alert.alert('त्रुटी (Error)', 'कॅमेरा फोटो काढण्यात अयशस्वी झाला. (Camera capture failed.)');
+        Alert.alert(t('common.error'), t('addAnimal.cameraCaptureFailed'));
       }
     } else {
-      Alert.alert('त्रुटी (Error)', 'कॅमेरा उपलब्ध नाही. (Camera not ready/available.)');
+      Alert.alert(t('common.error'), t('addAnimal.cameraUnavailable'));
     }
   };
 
@@ -276,7 +280,7 @@ export default function AddAnimalScreen({ navigation }) {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('परवानगी नाकारली (Permission Denied)', 'गॅलरी परवानगी आवश्यक आहे. (Gallery permissions are required to select photos.)');
+        Alert.alert(t('common.permissionDenied'), t('profile.galleryPermission'));
         return;
       }
 
@@ -291,7 +295,7 @@ export default function AddAnimalScreen({ navigation }) {
       }
     } catch (err) {
       console.warn('Image picker failed:', err.message);
-      Alert.alert('त्रुटी (Error)', 'फोटो निवडण्यात अयशस्वी. (Failed to pick photo.)');
+      Alert.alert(t('common.error'), t('addAnimal.photoPickFailed'));
     }
   };
 
@@ -321,7 +325,7 @@ export default function AddAnimalScreen({ navigation }) {
     if (Platform.OS === 'web') return;
     setIsVideoRecording(true);
     setVideoTimer(0);
-    
+
     let durationSec = 0;
     videoIntervalRef.current = setInterval(() => {
       durationSec++;
@@ -338,7 +342,7 @@ export default function AddAnimalScreen({ navigation }) {
           maxDuration: 30,
           quality: '720p'
         });
-        
+
         if (recorded && recorded.uri) {
           setVideoPreview({
             uri: recorded.uri,
@@ -350,7 +354,7 @@ export default function AddAnimalScreen({ navigation }) {
         console.warn('Native video recording failed:', err.message);
         setIsVideoRecording(false);
         if (videoIntervalRef.current) clearInterval(videoIntervalRef.current);
-        Alert.alert('त्रुटी (Error)', 'व्हिडिओ रेकॉर्डिंग सुरू करण्यात अयशस्वी. (Failed to start video recording.)');
+        Alert.alert(t('common.error'), t('addAnimal.videoRecordFailed'));
       }
     }
   };
@@ -361,7 +365,7 @@ export default function AddAnimalScreen({ navigation }) {
       clearInterval(videoIntervalRef.current);
     }
     setIsVideoRecording(false);
-    
+
     const finalDuration = forcedDuration !== undefined && typeof forcedDuration === 'number' ? forcedDuration : videoTimer;
 
     if (cameraRef.current) {
@@ -383,8 +387,8 @@ export default function AddAnimalScreen({ navigation }) {
   const handleConfirmVideo = () => {
     if (!videoPreview || videoPreview.duration < 20) {
       Alert.alert(
-        'कमी वेळ (Too Short)',
-        'कृपया किमान २० सेकंदांचा व्हिडिओ रेकॉर्ड करा. (Please record at least 20 seconds.)'
+        t('addAnimal.videoTooShort'),
+        t('addAnimal.videoMinDurationWarning')
       );
       return;
     }
@@ -401,7 +405,7 @@ export default function AddAnimalScreen({ navigation }) {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('परवानगी नाकारली (Permission Denied)', 'गॅलरी परवानगी आवश्यक आहे. (Gallery permissions are required to select video.)');
+        Alert.alert(t('common.permissionDenied'), t('addAnimal.galleryVideoPermission'));
         return;
       }
 
@@ -421,7 +425,7 @@ export default function AddAnimalScreen({ navigation }) {
       }
     } catch (err) {
       console.warn('Video picker failed:', err.message);
-      Alert.alert('त्रुटी (Error)', 'व्हिडिओ निवडण्यात अयशस्वी. (Failed to pick video.)');
+      Alert.alert(t('common.error'), t('addAnimal.videoPickFailed'));
     }
   };
 
@@ -431,11 +435,11 @@ export default function AddAnimalScreen({ navigation }) {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'GPS permission is required to fetch coordinates.');
+        Alert.alert(t('common.permissionDenied'), t('addAnimal.gpsPermissionWarning'));
         setGpsLoading(false);
         return;
       }
-      
+
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       setLatitude(loc.coords.latitude);
       setLongitude(loc.coords.longitude);
@@ -465,8 +469,7 @@ export default function AddAnimalScreen({ navigation }) {
 
     // 1. Guest Mode Check
     if (userToken === 'guest') {
-      const guestMsg = 'जाहिरात प्रसिद्ध करण्यासाठी कृपया लॉग इन करा. (Please log in to publish a listing.)';
-      showAlert('लॉगिन आवश्यक (Login Required)', guestMsg);
+      showAlert(t('addAnimal.loginRequired'), t('addAnimal.loginToPublish'));
       return;
     }
 
@@ -476,37 +479,37 @@ export default function AddAnimalScreen({ navigation }) {
 
 
     if (validPhotos.length < 5) {
-      missingFields.push(`किमान ५ फोटो आवश्यक आहेत (At least 5 photos are required. Current count: ${validPhotos.length})`);
+      missingFields.push(t('addAnimal.photosRequired', { count: validPhotos.length }));
     }
     if (!video) {
-      missingFields.push("१ पडताळणी व्हिडिओ आवश्यक आहे (1 verification video is required)");
+      missingFields.push(t('addAnimal.videoRequired'));
     }
     if (!title || !title.trim()) {
-      missingFields.push("जाहिरातीचे नाव (Listing Title)");
+      missingFields.push(t('addAnimal.previewLabelTitle'));
     }
     if (!selectedBreed) {
-      missingFields.push("जात (Breed)");
+      missingFields.push(t('addAnimal.breedPlaceholder'));
     }
     if (!price || !price.toString().trim()) {
-      missingFields.push("अपेक्षित किंमत (Expected Price)");
+      missingFields.push(t('addAnimal.expectedPriceLabel'));
     }
     if (!selectedState) {
-      missingFields.push("राज्य (State)");
+      missingFields.push(t('addAnimal.stateLabel'));
     }
     if (!selectedDistrict) {
-      missingFields.push("जिल्हा (District)");
+      missingFields.push(t('addAnimal.districtLabel'));
     }
     if (!selectedTaluka) {
-      missingFields.push("तालुका (Taluka)");
+      missingFields.push(t('addAnimal.talukaLabel'));
     }
     const villageVal = typeof selectedVillage === 'object' ? selectedVillage?.name : selectedVillage;
     if (!villageVal || !villageVal.trim()) {
-      missingFields.push("गाव (Village)");
+      missingFields.push(t('addAnimal.villageLabel'));
     }
 
     if (missingFields.length > 0) {
-      const errMsg = `कृपया खालील माहिती अपूर्ण आहे:\n- ${missingFields.join('\n- ')}`;
-      showAlert('त्रुटी (Error)', errMsg);
+      const errMsg = t('addAnimal.missingFieldsError', { fields: missingFields.join('\n- ') });
+      showAlert(t('common.error'), errMsg);
       return;
     }
 
@@ -549,10 +552,10 @@ export default function AddAnimalScreen({ navigation }) {
     try {
       const isRemoteUrl = (uri) => {
         if (!uri) return false;
-        return (uri.startsWith('http://') || uri.startsWith('https://')) && 
-               !uri.includes('localhost') && 
-               !uri.includes('127.0.0.1') && 
-               !uri.includes('10.0.2.2');
+        return (uri.startsWith('http://') || uri.startsWith('https://')) &&
+          !uri.includes('localhost') &&
+          !uri.includes('127.0.0.1') &&
+          !uri.includes('10.0.2.2');
       };
 
       const uploadedPhotoUrls = [];
@@ -568,7 +571,7 @@ export default function AddAnimalScreen({ navigation }) {
         } else {
           const formData = new FormData();
           const filename = `photo_${i}.jpg`;
-          
+
           if (Platform.OS === 'web') {
             const resBlob = await fetch(photo.uri);
             const blob = await resBlob.blob();
@@ -593,7 +596,7 @@ export default function AddAnimalScreen({ navigation }) {
         }
 
         if (!uploadedUrl) {
-          throw new Error(`फोटो ${i+1} अपलोड करण्यात अयशस्वी. (Failed to upload photo ${i+1}.)`);
+          throw new Error(`फोटो ${i + 1} अपलोड करण्यात अयशस्वी. (Failed to upload photo ${i + 1}.)`);
         }
 
         uploadedPhotoUrls.push(uploadedUrl);
@@ -644,8 +647,8 @@ export default function AddAnimalScreen({ navigation }) {
       const body = await animalApi.createAnimal(finalPayload);
       if (body.status === 'success') {
         showAlert(
-          'यशस्वी! (Success)',
-          'तुमची जाहिरात यशस्वीरित्या पाठवली गेली आहे आणि मंजुरीसाठी प्रलंबित आहे. (Your listing was posted and is pending admin approval.)',
+          t('common.success'),
+          t('addAnimal.publishSuccess'),
           [{ text: 'OK', onPress: () => navigation.navigate('MyListings') }]
         );
       } else {
@@ -662,12 +665,12 @@ export default function AddAnimalScreen({ navigation }) {
       if (isNetworkError) {
         await saveDraftLocally(basePayload);
         showAlert(
-          'नेटवर्क नाही (No Internet)',
-          'तुमची जाहिरात ड्राफ्ट म्हणून जतन केली आहे. कनेक्शन उपलब्ध झाल्यावर ती अपलोड होईल.',
+          t('addAnimal.noInternet'),
+          t('addAnimal.savedAsDraft'),
           [{ text: 'OK', onPress: () => navigation.navigate('MyListings') }]
         );
       } else {
-        showAlert('त्रुटी (Error)', err.message || 'जाहिरात प्रसिद्ध करण्यात अडचण आली. (Failed to publish listing.)');
+        showAlert(t('common.error'), err.message || t('addAnimal.publishFailed'));
       }
     } finally {
       setIsSubmitting(false);
@@ -769,14 +772,16 @@ export default function AddAnimalScreen({ navigation }) {
       case 1:
         return (
           <View style={styles.wizardCard}>
-            <Text style={styles.wizardLabel}>जनावराचा प्रकार निवडा / Select Animal Category</Text>
+            <AppText style={styles.wizardLabel}>
+              {t('addAnimal.selectAnimalCategory')}
+            </AppText>
             <View style={styles.categoryGrid}>
               {categories.map((cat) => {
                 let icon = 'cow';
                 if (cat.slug === 'buffalo') icon = 'water';
                 if (cat.slug === 'goat') icon = 'sheep';
                 if (cat.slug === 'horse') icon = 'horse-variant';
-                
+
                 return (
                   <TouchableOpacity
                     key={cat._id}
@@ -787,7 +792,11 @@ export default function AddAnimalScreen({ navigation }) {
                     <View style={styles.categoryIconCircle}>
                       <MaterialCommunityIcons name={icon} size={38} color="#16A34A" />
                     </View>
-                    <Text style={styles.categoryNameText}>{cat.name}</Text>
+                    <AppText style={styles.categoryNameText}>
+                      {t(`buy.${cat.slug}`, {
+                        defaultValue: cat.name,
+                      })}
+                    </AppText>
                   </TouchableOpacity>
                 );
               })}
@@ -820,8 +829,8 @@ export default function AddAnimalScreen({ navigation }) {
               elevation: 1
             }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <Text style={{ fontSize: 14, fontWeight: '700', color: '#1E293B' }}>माध्यम प्रगती / Media Progress</Text>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: '#16A34A' }}>{totalCompletedMedia} / 6 Completed</Text>
+                <AppText style={{ fontSize: 14, fontWeight: '700', color: '#1E293B' }}>{t('addAnimal.mediaProgress')}</AppText>
+                <AppText style={{ fontSize: 13, fontWeight: '700', color: '#16A34A' }}>{totalCompletedMedia} / 6 Completed</AppText>
               </View>
               <View style={{ height: 8, backgroundColor: '#E2E8F0', borderRadius: 4, overflow: 'hidden' }}>
                 <View style={{ width: `${mediaPercentage}%`, height: '100%', backgroundColor: '#16A34A', borderRadius: 4 }} />
@@ -855,7 +864,7 @@ export default function AddAnimalScreen({ navigation }) {
                         style={StyleSheet.absoluteFillObject}
                         facing="back"
                       />
-                      
+
                       {/* Semi-transparent overlay to ensure text is highly readable */}
                       <View style={{
                         position: 'absolute',
@@ -866,11 +875,18 @@ export default function AddAnimalScreen({ navigation }) {
                         padding: 10,
                         alignItems: 'center'
                       }}>
-                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF', textAlign: 'center' }}>
-                          {currentReq.nameMr} ({currentReq.name})
-                        </Text>
+                        <AppText
+                          style={{
+                            fontSize: 13,
+                            fontWeight: '700',
+                            color: '#FFFFFF',
+                            textAlign: 'center',
+                          }}
+                        >
+                          {t(currentReq.nameKey)}
+                        </AppText>
                       </View>
-                      
+
                       <TouchableOpacity style={[styles.shutterBtn, { position: 'absolute', bottom: 12 }]} onPress={handleCapturePhoto}>
                         <View style={styles.shutterBtnInner} />
                       </TouchableOpacity>
@@ -878,12 +894,12 @@ export default function AddAnimalScreen({ navigation }) {
                   ) : (
                     <View style={{ alignItems: 'center', justifyContent: 'center', padding: 20, flex: 1 }}>
                       <MaterialCommunityIcons name="camera-off" size={50} color="#94A3B8" />
-                      <Text style={{ fontSize: 14, fontWeight: '700', color: '#1E293B', marginTop: 8, textAlign: 'center' }}>
-                        {currentReq.nameMr}
-                      </Text>
-                      <Text style={{ fontSize: 12, color: '#64748B', textAlign: 'center', marginTop: 4, paddingHorizontal: 10 }}>
+                      <AppText style={{ fontSize: 14, fontWeight: '700', color: '#1E293B', marginTop: 8, textAlign: 'center' }}>
+                        {t(currentReq.nameKey)}
+                      </AppText>
+                      <AppText style={{ fontSize: 12, color: '#64748B', textAlign: 'center', marginTop: 4, paddingHorizontal: 10 }}>
                         Camera is not supported in this browser. Please upload from gallery.
-                      </Text>
+                      </AppText>
                       <TouchableOpacity
                         style={{
                           backgroundColor: '#16A34A',
@@ -897,9 +913,9 @@ export default function AddAnimalScreen({ navigation }) {
                         onPress={handlePickImage}
                       >
                         <Ionicons name="image-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                        <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>
+                        <AppText style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>
                           गॅलरीतून निवडा / Upload
-                        </Text>
+                        </AppText>
                       </TouchableOpacity>
                     </View>
                   )}
@@ -929,7 +945,7 @@ export default function AddAnimalScreen({ navigation }) {
                     onPress={handleRetakePhoto}
                   >
                     <Ionicons name="refresh-outline" size={18} color="#EF4444" style={{ marginRight: 6 }} />
-                    <Text style={{ color: '#EF4444', fontWeight: '700', fontSize: 14 }}>पुन्हा काढा / Retake</Text>
+                    <AppText style={{ color: '#EF4444', fontWeight: '700', fontSize: 14 }}>{t('addAnimal.retakeBtn')}</AppText>
                   </TouchableOpacity>
 
                   {isPhotoAccepted ? (
@@ -947,7 +963,7 @@ export default function AddAnimalScreen({ navigation }) {
                       }}
                     >
                       <Ionicons name="checkmark-circle" size={18} color="#16A34A" style={{ marginRight: 6 }} />
-                      <Text style={{ color: '#16A34A', fontWeight: '800', fontSize: 14 }}>स्वीकारले / Accepted</Text>
+                      <AppText style={{ color: '#16A34A', fontWeight: '800', fontSize: 14 }}>{t('addAnimal.accepted')}</AppText>
                     </View>
                   ) : (
                     <TouchableOpacity
@@ -963,7 +979,7 @@ export default function AddAnimalScreen({ navigation }) {
                       onPress={handleConfirmPhoto}
                     >
                       <Ionicons name="checkmark-circle-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-                      <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>फोटो वापरा / Use Photo</Text>
+                      <AppText style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>फोटो वापरा / Use Photo</AppText>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -981,40 +997,40 @@ export default function AddAnimalScreen({ navigation }) {
             }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
                 <Ionicons name="information-circle" size={20} color="#1D4ED8" style={{ marginRight: 8 }} />
-                <Text style={{ fontSize: 14, fontWeight: '700', color: '#1E3A8A' }}>
+                <AppText style={{ fontSize: 14, fontWeight: '700', color: '#1E3A8A' }}>
                   मार्गदर्शक सूचना / Instructions
-                </Text>
+                </AppText>
               </View>
-              
-              <Text style={{ fontSize: 14, fontWeight: '700', color: '#1E293B', marginBottom: 8 }}>
-                {currentReq.nameMr} ({currentReq.name})
-              </Text>
-              
+
+              <AppText style={{ fontSize: 14, fontWeight: '700', color: '#1E293B', marginBottom: 8 }}>
+                {t(currentReq.nameKey)}
+              </AppText>
+
               <View style={{ paddingLeft: 4 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                  <Text style={{ color: '#1D4ED8', marginRight: 8, fontSize: 12 }}>✔</Text>
-                  <Text style={{ fontSize: 12.5, color: '#1E293B', fontWeight: '500' }}>
-                    {currentReq.instructionEn}
-                  </Text>
+                  <AppText style={{ color: '#1D4ED8', marginRight: 8, fontSize: 12 }}>✔</AppText>
+                  <AppText style={{ fontSize: 12.5, color: '#1E293B', fontWeight: '500' }}>
+                    {t(currentReq.instructionKey)}
+                  </AppText>
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                  <Text style={{ color: '#1D4ED8', marginRight: 8, fontSize: 12 }}>✔</Text>
-                  <Text style={{ fontSize: 12.5, color: '#475569' }}>
-                    {currentReq.instructionMr}
-                  </Text>
+                  <AppText style={{ color: '#1D4ED8', marginRight: 8, fontSize: 12 }}>✔</AppText>
+                  <AppText style={{ fontSize: 12.5, color: '#475569' }}>
+                    {t(currentReq.instructionKey)}
+                  </AppText>
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                  <Text style={{ color: '#1D4ED8', marginRight: 8, fontSize: 12 }}>✔</Text>
-                  <Text style={{ fontSize: 12.5, color: '#475569' }}>Good lighting and no blur (चांगला प्रकाश आणि स्पष्ट फोटो)</Text>
+                  <AppText style={{ color: '#1D4ED8', marginRight: 8, fontSize: 12 }}>✔</AppText>
+                  <AppText style={{ fontSize: 12.5, color: '#475569' }}>Good lighting and no blur (चांगला प्रकाश आणि स्पष्ट फोटो)</AppText>
                 </View>
               </View>
             </View>
 
             {/* Required Media Checklist */}
             <View style={{ marginBottom: 20 }}>
-              <Text style={{ fontSize: 14, fontWeight: '700', color: '#1E293B', marginBottom: 12 }}>
+              <AppText style={{ fontSize: 14, fontWeight: '700', color: '#1E293B', marginBottom: 12 }}>
                 आवश्यक मीडिया यादी / Required Media Checklist
-              </Text>
+              </AppText>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
                 {PHOTO_STEPS.map((step, idx) => {
                   const isCompleted = !!photos[idx];
@@ -1040,15 +1056,15 @@ export default function AddAnimalScreen({ navigation }) {
                         elevation: 1
                       }}
                     >
-                      <Text style={{
+                      <AppText style={{
                         fontSize: 12.5,
                         fontWeight: '700',
                         color: isCurrent ? '#16A34A' : '#475569',
                         flex: 1,
                         marginRight: 4
                       }} numberOfLines={1}>
-                        {step.nameMr}
-                      </Text>
+                        {t(step.nameKey)}
+                      </AppText>
                       {isCompleted ? (
                         <Ionicons name="checkmark-circle" size={18} color="#16A34A" />
                       ) : (
@@ -1057,7 +1073,7 @@ export default function AddAnimalScreen({ navigation }) {
                     </View>
                   );
                 })}
-                
+
                 {/* Verification Video checklist item */}
                 <View
                   style={{
@@ -1078,7 +1094,7 @@ export default function AddAnimalScreen({ navigation }) {
                     elevation: 1
                   }}
                 >
-                  <Text style={{
+                  <AppText style={{
                     fontSize: 12.5,
                     fontWeight: '700',
                     color: '#475569',
@@ -1086,7 +1102,7 @@ export default function AddAnimalScreen({ navigation }) {
                     marginRight: 4
                   }} numberOfLines={1}>
                     व्हिडिओ / Video
-                  </Text>
+                  </AppText>
                   {isVideoRecorded ? (
                     <Ionicons name="checkmark-circle" size={18} color="#16A34A" />
                   ) : (
@@ -1108,9 +1124,7 @@ export default function AddAnimalScreen({ navigation }) {
               marginBottom: 8
             }}>
               <Ionicons name="warning" size={20} color="#D97706" style={{ marginRight: 10 }} />
-              <Text style={{ fontSize: 12, fontWeight: '700', color: '#B45309', flex: 1, lineHeight: 16 }}>
-                पुढील प्रक्रियेसाठी सर्व ५ फोटो आणि १ पडताळणी व्हिडिओ अनिवार्य आहेत. (All 5 Photos and Verification Video are mandatory before proceeding.)
-              </Text>
+              <AppText style={{ fontSize: 12, fontWeight: '700', color: '#B45309', flex: 1, lineHeight: 16 }}>{t('addAnimal.mandatoryMediaWarning')}</AppText>
             </View>
           </View>
         );
@@ -1135,10 +1149,8 @@ export default function AddAnimalScreen({ navigation }) {
               elevation: 1
             }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <Text style={{ fontSize: 14, fontWeight: '700', color: '#1E293B' }}>माध्यम प्रगती / Media Progress</Text>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: '#16A34A' }}>
-                  {photos.filter(p => !!p).length + (video ? 1 : 0)} / 6 Completed
-                </Text>
+                <AppText style={{ fontSize: 14, fontWeight: '700', color: '#1E293B' }}>{t('addAnimal.mediaProgress')}</AppText>
+                <AppText style={{ fontSize: 13, fontWeight: '700', color: '#16A34A' }}>{t('addAnimal.mediaCompletedCount', { completed: photos.filter(p => !!p).length + (video ? 1 : 0) })}</AppText>
               </View>
               <View style={{ height: 8, backgroundColor: '#E2E8F0', borderRadius: 4, overflow: 'hidden' }}>
                 <View style={{ width: `${videoPercentage}%`, height: '100%', backgroundColor: '#16A34A', borderRadius: 4 }} />
@@ -1163,32 +1175,20 @@ export default function AddAnimalScreen({ navigation }) {
                 {videoPreview ? (
                   <View style={{ width: '100%', padding: 16, borderRadius: 14, backgroundColor: '#F8FAFC', justifyContent: 'center', alignItems: 'center' }}>
                     <Ionicons name="videocam" size={64} color={videoPreview.duration < 20 ? '#EF4444' : '#16A34A'} />
-                    <Text style={{ fontSize: 15, fontWeight: '800', color: '#1E293B', marginTop: 8 }}>
-                      Uploaded Video Duration: 00:{videoPreview.duration < 10 ? `0${videoPreview.duration}` : videoPreview.duration} / 00:30
-                    </Text>
-                    <Text style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>
-                      Size: {Math.round((videoPreview.fileSize || 0) / (1024 * 1024))} MB
-                    </Text>
+                    <AppText style={{ fontSize: 15, fontWeight: '800', color: '#1E293B', marginTop: 8 }}>{t('addAnimal.uploadedVideoDuration', { duration: videoPreview.duration < 10 ? `0${videoPreview.duration}` : videoPreview.duration })}</AppText>
+                    <AppText style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>{t('addAnimal.videoSize', { size: Math.round((videoPreview.fileSize || 0) / (1024 * 1024)) })}</AppText>
                     {videoPreview.duration < 20 && (
                       <View style={{ padding: 12, backgroundColor: '#FEF2F2', borderRadius: 8, marginTop: 10, borderWidth: 1, borderColor: '#FEE2E2', width: '100%' }}>
-                        <Text style={{ fontSize: 13, color: '#EF4444', fontWeight: '700', textAlign: 'center', lineHeight: 18 }}>
-                          Please record at least 20 seconds for animal verification.
-                        </Text>
-                        <Text style={{ fontSize: 13, color: '#EF4444', fontWeight: '700', textAlign: 'center', marginTop: 6, lineHeight: 18 }}>
-                          प्राण्याच्या पडताळणीसाठी कृपया किमान 20 सेकंदांचा व्हिडिओ रेकॉर्ड करा.
-                        </Text>
+                        <AppText style={{ fontSize: 13, color: '#EF4444', fontWeight: '700', textAlign: 'center', lineHeight: 18 }}>{t('addAnimal.videoMinDurationWarning')}</AppText>
+                        <AppText style={{ fontSize: 13, color: '#EF4444', fontWeight: '700', textAlign: 'center', marginTop: 6, lineHeight: 18 }}>{t('addAnimal.videoMinDurationWarning')}</AppText>
                       </View>
                     )}
                   </View>
                 ) : (
                   <View style={{ height: 240, borderRadius: 14, backgroundColor: '#F8FAFC', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
                     <MaterialCommunityIcons name="video-off" size={50} color="#94A3B8" />
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#1E293B', marginTop: 8, textAlign: 'center' }}>
-                      Video recording is available only on Android and iOS devices.
-                    </Text>
-                    <Text style={{ fontSize: 12, color: '#64748B', textAlign: 'center', marginTop: 4, paddingHorizontal: 10 }}>
-                      Please select and upload an existing video file of the animal.
-                    </Text>
+                    <AppText style={{ fontSize: 14, fontWeight: '700', color: '#1E293B', marginTop: 8, textAlign: 'center' }}>{t('addAnimal.videoUnsupportedTitle')}</AppText>
+                    <AppText style={{ fontSize: 12, color: '#64748B', textAlign: 'center', marginTop: 4, paddingHorizontal: 10 }}>{t('addAnimal.videoUnsupportedSub')}</AppText>
                     <TouchableOpacity
                       style={{
                         backgroundColor: '#16A34A',
@@ -1202,9 +1202,7 @@ export default function AddAnimalScreen({ navigation }) {
                       onPress={handlePickVideo}
                     >
                       <Ionicons name="cloud-upload-outline" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-                      <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 14 }}>
-                        Upload Verification Video
-                      </Text>
+                      <AppText style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 14 }}>{t('addAnimal.uploadVideoBtn')}</AppText>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -1232,7 +1230,7 @@ export default function AddAnimalScreen({ navigation }) {
                       onPress={handleRetakeVideo}
                     >
                       <Ionicons name="refresh-outline" size={18} color="#EF4444" style={{ marginRight: 6 }} />
-                      <Text style={{ color: '#EF4444', fontWeight: '700', fontSize: 14 }}>पुन्हा काढा / Retake</Text>
+                      <AppText style={{ color: '#EF4444', fontWeight: '700', fontSize: 14 }}>{t('addAnimal.retakeBtn')}</AppText>
                     </TouchableOpacity>
 
                     {isVideoRecordingAccepted ? (
@@ -1250,7 +1248,7 @@ export default function AddAnimalScreen({ navigation }) {
                         }}
                       >
                         <Ionicons name="checkmark-circle" size={18} color="#16A34A" style={{ marginRight: 6 }} />
-                        <Text style={{ color: '#16A34A', fontWeight: '800', fontSize: 14 }}>स्वीकारले / Accepted</Text>
+                        <AppText style={{ color: '#16A34A', fontWeight: '800', fontSize: 14 }}>{t('addAnimal.accepted')}</AppText>
                       </View>
                     ) : (
                       <TouchableOpacity
@@ -1270,7 +1268,7 @@ export default function AddAnimalScreen({ navigation }) {
                         disabled={videoPreview.duration < 20}
                       >
                         <Ionicons name="checkmark-circle-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-                        <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>वापरा / Use Video</Text>
+                        <AppText style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>{t('addAnimal.useVideo')}</AppText>
                       </TouchableOpacity>
                     )}
                   </View>
@@ -1294,17 +1292,11 @@ export default function AddAnimalScreen({ navigation }) {
                 {videoPreview ? (
                   <View style={{ width: '100%', padding: 16, borderRadius: 14, backgroundColor: '#F8FAFC', justifyContent: 'center', alignItems: 'center' }}>
                     <Ionicons name="videocam" size={64} color={videoPreview.duration < 20 ? '#EF4444' : '#16A34A'} />
-                    <Text style={{ fontSize: 15, fontWeight: '800', color: '#1E293B', marginTop: 8 }}>
-                      Video Duration: 00:{videoPreview.duration < 10 ? `0${videoPreview.duration}` : videoPreview.duration} / 00:30
-                    </Text>
+                    <AppText style={{ fontSize: 15, fontWeight: '800', color: '#1E293B', marginTop: 8 }}>{t('addAnimal.videoDuration', { duration: videoPreview.duration < 10 ? `0${videoPreview.duration}` : videoPreview.duration })}</AppText>
                     {videoPreview.duration < 20 && (
                       <View style={{ padding: 12, backgroundColor: '#FEF2F2', borderRadius: 8, marginTop: 10, borderWidth: 1, borderColor: '#FEE2E2', width: '100%' }}>
-                        <Text style={{ fontSize: 13, color: '#EF4444', fontWeight: '700', textAlign: 'center', lineHeight: 18 }}>
-                          Please record at least 20 seconds for animal verification.
-                        </Text>
-                        <Text style={{ fontSize: 13, color: '#EF4444', fontWeight: '700', textAlign: 'center', marginTop: 6, lineHeight: 18 }}>
-                          प्राण्याच्या पडताळणीसाठी कृपया किमान 20 सेकंदांचा व्हिडिओ रेकॉर्ड करा.
-                        </Text>
+                        <AppText style={{ fontSize: 13, color: '#EF4444', fontWeight: '700', textAlign: 'center', lineHeight: 18 }}>{t('addAnimal.videoMinDurationWarning')}</AppText>
+                        <AppText style={{ fontSize: 13, color: '#EF4444', fontWeight: '700', textAlign: 'center', marginTop: 6, lineHeight: 18 }}>{t('addAnimal.videoMinDurationWarning')}</AppText>
                       </View>
                     )}
                   </View>
@@ -1342,20 +1334,14 @@ export default function AddAnimalScreen({ navigation }) {
                           padding: 10,
                           alignItems: 'center'
                         }}>
-                          <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF', textAlign: 'center' }}>
-                            पडताळणी व्हिडिओ / Verification Video
-                          </Text>
+                          <AppText style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF', textAlign: 'center' }}>{t('addAnimal.cameraBoxTitle')}</AppText>
                         </View>
                       </>
                     ) : (
                       <View style={{ alignItems: 'center', justifyContent: 'center', flex: 1 }}>
                         <MaterialCommunityIcons name="video-off" size={50} color="#94A3B8" />
-                        <Text style={{ fontSize: 14, fontWeight: '700', color: '#1E293B', marginTop: 8, textAlign: 'center' }}>
-                          Camera Unsupported
-                        </Text>
-                        <Text style={{ fontSize: 12, color: '#64748B', textAlign: 'center', marginTop: 4, paddingHorizontal: 10 }}>
-                          Recording is not supported in this browser. Please upload from gallery.
-                        </Text>
+                        <AppText style={{ fontSize: 14, fontWeight: '700', color: '#1E293B', marginTop: 8, textAlign: 'center' }}>{t('addAnimal.cameraUnsupportedTitle')}</AppText>
+                        <AppText style={{ fontSize: 12, color: '#64748B', textAlign: 'center', marginTop: 4, paddingHorizontal: 10 }}>{t('addAnimal.cameraUnsupportedSub')}</AppText>
                         <TouchableOpacity
                           style={{
                             backgroundColor: '#16A34A',
@@ -1369,9 +1355,7 @@ export default function AddAnimalScreen({ navigation }) {
                           onPress={handlePickVideo}
                         >
                           <Ionicons name="cloud-upload-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                          <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>
-                            गॅलरीतून व्हिडिओ निवडा / Upload Video
-                          </Text>
+                          <AppText style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>{t('addAnimal.uploadVideoBtn')}</AppText>
                         </TouchableOpacity>
                       </View>
                     )}
@@ -1383,16 +1367,12 @@ export default function AddAnimalScreen({ navigation }) {
                   <View style={{ alignItems: 'center', marginTop: 12 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
                       <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444', marginRight: 6 }} />
-                      <Text style={{ fontSize: 14, fontWeight: '700', color: '#EF4444' }}>
-                        Recording: 00:{videoTimer < 10 ? `0${videoTimer}` : videoTimer} / 00:30
-                      </Text>
+                      <AppText style={{ fontSize: 14, fontWeight: '700', color: '#EF4444' }}>{t('addAnimal.recordingTimer', { timer: videoTimer < 10 ? `0${videoTimer}` : videoTimer })}</AppText>
                     </View>
                     <View style={{ height: 6, backgroundColor: '#E2E8F0', borderRadius: 3, width: '80%', overflow: 'hidden', marginTop: 6, marginBottom: 8 }}>
                       <View style={{ width: `${(videoTimer / 30) * 100}%`, height: '100%', backgroundColor: '#EF4444' }} />
                     </View>
-                    <Text style={{ fontSize: 11, color: '#64748B' }}>
-                      (Min. 20s required / किमान २० सेकंद रेकॉर्ड करा)
-                    </Text>
+                    <AppText style={{ fontSize: 11, color: '#64748B' }}>{t('addAnimal.minDurationRequired')}</AppText>
                   </View>
                 )}
 
@@ -1419,7 +1399,7 @@ export default function AddAnimalScreen({ navigation }) {
                       onPress={handleRetakeVideo}
                     >
                       <Ionicons name="refresh-outline" size={18} color="#EF4444" style={{ marginRight: 6 }} />
-                      <Text style={{ color: '#EF4444', fontWeight: '700', fontSize: 14 }}>पुन्हा काढा / Retake</Text>
+                      <AppText style={{ color: '#EF4444', fontWeight: '700', fontSize: 14 }}>{t('addAnimal.retakeBtn')}</AppText>
                     </TouchableOpacity>
 
                     {isVideoRecordingAccepted ? (
@@ -1437,7 +1417,7 @@ export default function AddAnimalScreen({ navigation }) {
                         }}
                       >
                         <Ionicons name="checkmark-circle" size={18} color="#16A34A" style={{ marginRight: 6 }} />
-                        <Text style={{ color: '#16A34A', fontWeight: '800', fontSize: 14 }}>स्वीकारले / Accepted</Text>
+                        <AppText style={{ color: '#16A34A', fontWeight: '800', fontSize: 14 }}>{t('addAnimal.accepted')}</AppText>
                       </View>
                     ) : (
                       <TouchableOpacity
@@ -1457,7 +1437,7 @@ export default function AddAnimalScreen({ navigation }) {
                         disabled={videoPreview.duration < 20}
                       >
                         <Ionicons name="checkmark-circle-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-                        <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>वापरा / Use Video</Text>
+                        <AppText style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>{t('addAnimal.useVideo')}</AppText>
                       </TouchableOpacity>
                     )}
                   </View>
@@ -1477,7 +1457,7 @@ export default function AddAnimalScreen({ navigation }) {
                           onPress={handleStopRecording}
                         >
                           <Ionicons name="square" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-                          <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>रेकॉर्डिंग थांबवा / Stop Recording</Text>
+                          <AppText style={{ color: '#FFFFFF', fontWeight: '700' }}>रेकॉर्डिंग थांबवा / Stop Recording</AppText>
                         </TouchableOpacity>
                       ) : (
                         <TouchableOpacity
@@ -1492,7 +1472,7 @@ export default function AddAnimalScreen({ navigation }) {
                           onPress={handleStartRecording}
                         >
                           <Ionicons name="radio-button-on" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-                          <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>रेकॉर्डिंग सुरू करा / Start Recording</Text>
+                          <AppText style={{ color: '#FFFFFF', fontWeight: '700' }}>रेकॉर्डिंग सुरू करा / Start Recording</AppText>
                         </TouchableOpacity>
                       )}
                     </View>
@@ -1512,30 +1492,30 @@ export default function AddAnimalScreen({ navigation }) {
             }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
                 <Ionicons name="information-circle" size={20} color="#1D4ED8" style={{ marginRight: 8 }} />
-                <Text style={{ fontSize: 14, fontWeight: '700', color: '#1E3A8A' }}>
+                <AppText style={{ fontSize: 14, fontWeight: '700', color: '#1E3A8A' }}>
                   व्हिडिओ मार्गदर्शक सूचना / Video Instructions
-                </Text>
+                </AppText>
               </View>
               <View style={{ paddingLeft: 4 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                  <Text style={{ color: '#1D4ED8', marginRight: 8, fontSize: 12 }}>✔</Text>
-                  <Text style={{ fontSize: 12.5, color: '#1E293B', fontWeight: '500' }}>
+                  <AppText style={{ color: '#1D4ED8', marginRight: 8, fontSize: 12 }}>✔</AppText>
+                  <AppText style={{ fontSize: 12.5, color: '#1E293B', fontWeight: '500' }}>
                     Walk around the animal (जनावराला चालवून व्हिडिओ काढा)
-                  </Text>
+                  </AppText>
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                  <Text style={{ color: '#1D4ED8', marginRight: 8, fontSize: 12 }}>✔</Text>
-                  <Text style={{ fontSize: 12.5, color: '#475569' }}>
+                  <AppText style={{ color: '#1D4ED8', marginRight: 8, fontSize: 12 }}>✔</AppText>
+                  <AppText style={{ fontSize: 12.5, color: '#475569' }}>
                     Show Front, Left, Right, Back (सर्व बाजू स्पष्ट दाखवा)
-                  </Text>
+                  </AppText>
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                  <Text style={{ color: '#1D4ED8', marginRight: 8, fontSize: 12 }}>✔</Text>
-                  <Text style={{ fontSize: 12.5, color: '#475569' }}>Record in good lighting (चांगल्या प्रकाशात रेकॉर्ड करा)</Text>
+                  <AppText style={{ color: '#1D4ED8', marginRight: 8, fontSize: 12 }}>✔</AppText>
+                  <AppText style={{ fontSize: 12.5, color: '#475569' }}>Record in good lighting (चांगल्या प्रकाशात रेकॉर्ड करा)</AppText>
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                  <Text style={{ color: '#1D4ED8', marginRight: 8, fontSize: 12 }}>✔</Text>
-                  <Text style={{ fontSize: 12.5, color: '#16A34A', fontWeight: '700' }}>Minimum 20 seconds (किमान २० सेकंदांचा व्हिडिओ)</Text>
+                  <AppText style={{ color: '#1D4ED8', marginRight: 8, fontSize: 12 }}>✔</AppText>
+                  <AppText style={{ fontSize: 12.5, color: '#16A34A', fontWeight: '700' }}>Minimum 20 seconds (किमान २० सेकंदांचा व्हिडिओ)</AppText>
                 </View>
               </View>
             </View>
@@ -1552,9 +1532,9 @@ export default function AddAnimalScreen({ navigation }) {
               marginBottom: 8
             }}>
               <Ionicons name="warning" size={20} color="#D97706" style={{ marginRight: 10 }} />
-              <Text style={{ fontSize: 12, fontWeight: '700', color: '#B45309', flex: 1, lineHeight: 16 }}>
+              <AppText style={{ fontSize: 12, fontWeight: '700', color: '#B45309', flex: 1, lineHeight: 16 }}>
                 पडताळणी व्हिडिओ अनिवार्य आहे. जनावराभोवती फिरून सर्व बाजू स्पष्टपणे दाखवा. (Verification video is mandatory. Walk around the animal and clearly show all sides.)
-              </Text>
+              </AppText>
             </View>
           </View>
         );
@@ -1562,11 +1542,11 @@ export default function AddAnimalScreen({ navigation }) {
       case 4:
         return (
           <View style={styles.wizardCard}>
-            <Text style={styles.wizardLabel}>जनावराची माहिती भरा / Animal Details</Text>
-            
+            <AppText style={styles.wizardLabel}>जनावराची माहिती भरा / Animal Details</AppText>
+
             <View style={styles.inputGroup}>
-              <Text style={styles.largeFieldLabel}>जाहिरातीचे नाव / Listing Title *</Text>
-              <TextInput
+              <AppText style={styles.largeFieldLabel}>जाहिरातीचे नाव / Listing Title *</AppText>
+              <AppTextInput
                 style={styles.largeInput}
                 placeholder="उदा. २ वर्षांची जर्सी गाय (e.g. 2 Yr Jersey Cow)"
                 value={title}
@@ -1575,7 +1555,7 @@ export default function AddAnimalScreen({ navigation }) {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.largeFieldLabel}>जात / Breed *</Text>
+              <AppText style={styles.largeFieldLabel}>जात / Breed *</AppText>
               {loadingBreeds ? (
                 <ActivityIndicator size="small" color="#16A34A" />
               ) : (
@@ -1586,7 +1566,7 @@ export default function AddAnimalScreen({ navigation }) {
                       style={[styles.pillOption, selectedBreed?._id === b._id && styles.selectedPillOption]}
                       onPress={() => setSelectedBreed(b)}
                     >
-                      <Text style={[styles.pillText, selectedBreed?._id === b._id && styles.selectedPillText]}>{b.name}</Text>
+                      <AppText style={[styles.pillText, selectedBreed?._id === b._id && styles.selectedPillText]}>{b.name}</AppText>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -1595,8 +1575,8 @@ export default function AddAnimalScreen({ navigation }) {
 
             <View style={styles.rowInputs}>
               <View style={[styles.inputGroup, { width: '48%' }]}>
-                <Text style={styles.largeFieldLabel}>वय / Age (वर्ष) *</Text>
-                <TextInput
+                <AppText style={styles.largeFieldLabel}>वय / Age (वर्ष) *</AppText>
+                <AppTextInput
                   style={styles.largeInput}
                   keyboardType="numeric"
                   placeholder="उदा. ३"
@@ -1605,8 +1585,8 @@ export default function AddAnimalScreen({ navigation }) {
                 />
               </View>
               <View style={[styles.inputGroup, { width: '48%' }]}>
-                <Text style={styles.largeFieldLabel}>वजन / Weight (किलो)</Text>
-                <TextInput
+                <AppText style={styles.largeFieldLabel}>वजन / Weight (किलो)</AppText>
+                <AppTextInput
                   style={styles.largeInput}
                   keyboardType="numeric"
                   placeholder="उदा. ३५०"
@@ -1617,7 +1597,7 @@ export default function AddAnimalScreen({ navigation }) {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.largeFieldLabel}>लिंग / Gender</Text>
+              <AppText style={styles.largeFieldLabel}>लिंग / Gender</AppText>
               <View style={styles.pillRow}>
                 {['Female', 'Male'].map((g) => (
                   <TouchableOpacity
@@ -1625,15 +1605,15 @@ export default function AddAnimalScreen({ navigation }) {
                     style={[styles.pillOption, gender === g && styles.selectedPillOption]}
                     onPress={() => setGender(g)}
                   >
-                    <Text style={[styles.pillText, gender === g && styles.selectedPillText]}>{g === 'Female' ? 'मादी (Female)' : 'नर (Male)'}</Text>
+                    <AppText style={[styles.pillText, gender === g && styles.selectedPillText]}>{g === 'Female' ? 'मादी (Female)' : 'नर (Male)'}</AppText>
                   </TouchableOpacity>
                 ))}
               </View>
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.largeFieldLabel}>रंग / Color</Text>
-              <TextInput
+              <AppText style={styles.largeFieldLabel}>रंग / Color</AppText>
+              <AppTextInput
                 style={styles.largeInput}
                 placeholder="उदा. तांबडा / काळा (e.g. Red / Black)"
                 value={color}
@@ -1642,8 +1622,8 @@ export default function AddAnimalScreen({ navigation }) {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.largeFieldLabel}>इतर माहिती / Description</Text>
-              <TextInput
+              <AppText style={styles.largeFieldLabel}>इतर माहिती / Description</AppText>
+              <AppTextInput
                 style={[styles.largeInput, { height: 70 }]}
                 multiline
                 placeholder="उदा. जनावर दूध देण्यास अतिशय शांत आहे."
@@ -1657,12 +1637,12 @@ export default function AddAnimalScreen({ navigation }) {
       case 5:
         return (
           <View style={styles.wizardCard}>
-            <Text style={styles.wizardLabel}>आरोग्याची माहिती / Health Details</Text>
+            <AppText style={styles.wizardLabel}>आरोग्याची माहिती / Health Details</AppText>
 
             <View style={styles.toggleRow}>
               <View>
-                <Text style={styles.toggleTitle}>लसीकरण केले आहे का? (Vaccinated)</Text>
-                <Text style={styles.toggleSubtitle}>नियमित सरकारी लसी पूर्ण झाल्या आहेत</Text>
+                <AppText style={styles.toggleTitle}>लसीकरण केले आहे का? (Vaccinated)</AppText>
+                <AppText style={styles.toggleSubtitle}>नियमित सरकारी लसी पूर्ण झाल्या आहेत</AppText>
               </View>
               <Switch
                 value={isVaccinated}
@@ -1673,8 +1653,8 @@ export default function AddAnimalScreen({ navigation }) {
 
             <View style={styles.toggleRow}>
               <View>
-                <Text style={styles.toggleTitle}>जनावर पूर्ण निरोगी आहे? (Healthy)</Text>
-                <Text style={styles.toggleSubtitle}>कोणतीही जखम किंवा आजार नाही</Text>
+                <AppText style={styles.toggleTitle}>जनावर पूर्ण निरोगी आहे? (Healthy)</AppText>
+                <AppText style={styles.toggleSubtitle}>कोणतीही जखम किंवा आजार नाही</AppText>
               </View>
               <Switch
                 value={isHealthy}
@@ -1686,8 +1666,8 @@ export default function AddAnimalScreen({ navigation }) {
             {gender === 'Female' && (
               <View style={styles.toggleRow}>
                 <View>
-                  <Text style={styles.toggleTitle}>गाभण आहे का? (Pregnant)</Text>
-                  <Text style={styles.toggleSubtitle}>सध्या जनावराला गाभ आहे का</Text>
+                  <AppText style={styles.toggleTitle}>{t('addAnimal.togglePregnant')}</AppText>
+                  <AppText style={styles.toggleSubtitle}>{t('addAnimal.togglePregnantSub')}</AppText>
                 </View>
                 <Switch
                   value={isPregnant}
@@ -1699,8 +1679,8 @@ export default function AddAnimalScreen({ navigation }) {
 
             {gender === 'Female' && (
               <View style={styles.inputGroup}>
-                <Text style={styles.largeFieldLabel}>दूध देण्याची क्षमता / Milk Capacity (लिटर/दिवस)</Text>
-                <TextInput
+                <AppText style={styles.largeFieldLabel}>दूध देण्याची क्षमता / Milk Capacity (लिटर/दिवस)</AppText>
+                <AppTextInput
                   style={styles.largeInput}
                   keyboardType="numeric"
                   placeholder="उदा. १२ लिटर"
@@ -1715,11 +1695,11 @@ export default function AddAnimalScreen({ navigation }) {
       case 6:
         return (
           <View style={styles.wizardCard}>
-            <Text style={styles.wizardLabel}>किंमत ठरवा / Set Price</Text>
+            <AppText style={styles.wizardLabel}>किंमत ठरवा / Set Price</AppText>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.largeFieldLabel}>अपेक्षित किंमत / Expected Price (₹) *</Text>
-              <TextInput
+              <AppText style={styles.largeFieldLabel}>अपेक्षित किंमत / Expected Price (₹) *</AppText>
+              <AppTextInput
                 style={[styles.largeInput, { fontSize: 24, fontWeight: '700' }]}
                 keyboardType="numeric"
                 placeholder="उदा. ५०,०००"
@@ -1730,8 +1710,8 @@ export default function AddAnimalScreen({ navigation }) {
 
             <View style={styles.toggleRow}>
               <View>
-                <Text style={styles.toggleTitle}>दर कमी-जास्त होईल? (Negotiable)</Text>
-                <Text style={styles.toggleSubtitle}>किंमतीमध्ये तडजोड करता येईल का</Text>
+                <AppText style={styles.toggleTitle}>{t('addAnimal.toggleNegotiable')}</AppText>
+                <AppText style={styles.toggleSubtitle}>{t('addAnimal.toggleNegotiableSub')}</AppText>
               </View>
               <Switch
                 value={isNegotiable}
@@ -1759,11 +1739,11 @@ export default function AddAnimalScreen({ navigation }) {
 
         return (
           <View style={styles.wizardCard}>
-            <Text style={styles.wizardLabel}>पत्ता आणि जीपीएस / Location Details</Text>
+            <AppText style={styles.wizardLabel}>{t('addAnimal.locationDetails')}</AppText>
 
             {/* State Select Trigger */}
             <View style={styles.inputGroup}>
-              <Text style={styles.largeFieldLabel}>राज्य / State *</Text>
+              <AppText style={styles.largeFieldLabel}>{t('addAnimal.stateLabel')}</AppText>
               <TouchableOpacity
                 style={styles.dropdownSelector}
                 onPress={() => {
@@ -1771,9 +1751,9 @@ export default function AddAnimalScreen({ navigation }) {
                   setActiveDropdown('state');
                 }}
               >
-                <Text style={styles.dropdownSelectorText}>
-                  {selectedState ? selectedState.name : 'राज्य निवडा / Select State'}
-                </Text>
+                <AppText style={styles.dropdownSelectorText}>
+                  {selectedState ? selectedState.name : t('addAnimal.selectStateModal')}
+                </AppText>
                 <Ionicons name="chevron-down" size={20} color="#64748B" />
               </TouchableOpacity>
             </View>
@@ -1788,12 +1768,12 @@ export default function AddAnimalScreen({ navigation }) {
               <View style={styles.modalOverlay}>
                 <View style={styles.modalContent}>
                   <View style={styles.modalHeader}>
-                    <Text style={styles.modalTitle}>राज्य निवडा / Select State</Text>
+                    <AppText style={styles.modalTitle}>{t('addAnimal.selectStateModal')}</AppText>
                     <TouchableOpacity onPress={() => setActiveDropdown(null)}>
                       <Ionicons name="close" size={24} color="#334155" />
                     </TouchableOpacity>
                   </View>
-                  <TextInput
+                  <AppTextInput
                     style={styles.modalSearchInput}
                     placeholder="शोधा / Search State..."
                     value={stateSearch}
@@ -1819,14 +1799,14 @@ export default function AddAnimalScreen({ navigation }) {
                           setActiveDropdown(null);
                         }}
                       >
-                        <Text style={styles.modalOptionText}>{s.name}</Text>
+                        <AppText style={styles.modalOptionText}>{s.name}</AppText>
                         {selectedState?._id === s._id && (
                           <Ionicons name="checkmark" size={20} color="#16A34A" style={{ marginLeft: 'auto' }} />
                         )}
                       </TouchableOpacity>
                     )}
                     ListEmptyComponent={
-                      <Text style={styles.noResultsText}>कोणतेही परिणाम आढळले नाहीत / No results found</Text>
+                      <AppText style={styles.noResultsText}>{t('common.noData')}</AppText>
                     }
                   />
                 </View>
@@ -1836,7 +1816,7 @@ export default function AddAnimalScreen({ navigation }) {
             {/* District Select Trigger */}
             {selectedState && (
               <View style={styles.inputGroup}>
-                <Text style={styles.largeFieldLabel}>जिल्हा / District *</Text>
+                <AppText style={styles.largeFieldLabel}>{t('addAnimal.districtLabel')}</AppText>
                 <TouchableOpacity
                   style={styles.dropdownSelector}
                   onPress={() => {
@@ -1844,9 +1824,9 @@ export default function AddAnimalScreen({ navigation }) {
                     setActiveDropdown('district');
                   }}
                 >
-                  <Text style={styles.dropdownSelectorText}>
-                    {selectedDistrict ? selectedDistrict.name : 'जिल्हा निवडा / Select District'}
-                  </Text>
+                  <AppText style={styles.dropdownSelectorText}>
+                    {selectedDistrict ? selectedDistrict.name : t('addAnimal.selectDistrictModal')}
+                  </AppText>
                   <Ionicons name="chevron-down" size={20} color="#64748B" />
                 </TouchableOpacity>
               </View>
@@ -1862,12 +1842,12 @@ export default function AddAnimalScreen({ navigation }) {
               <View style={styles.modalOverlay}>
                 <View style={styles.modalContent}>
                   <View style={styles.modalHeader}>
-                    <Text style={styles.modalTitle}>जिल्हा निवडा / Select District</Text>
+                    <AppText style={styles.modalTitle}>{t('addAnimal.selectDistrictModal')}</AppText>
                     <TouchableOpacity onPress={() => setActiveDropdown(null)}>
                       <Ionicons name="close" size={24} color="#334155" />
                     </TouchableOpacity>
                   </View>
-                  <TextInput
+                  <AppTextInput
                     style={styles.modalSearchInput}
                     placeholder="शोधा / Search District..."
                     value={districtSearch}
@@ -1891,14 +1871,14 @@ export default function AddAnimalScreen({ navigation }) {
                           setActiveDropdown(null);
                         }}
                       >
-                        <Text style={styles.modalOptionText}>{d.name}</Text>
+                        <AppText style={styles.modalOptionText}>{d.name}</AppText>
                         {selectedDistrict?._id === d._id && (
                           <Ionicons name="checkmark" size={20} color="#16A34A" style={{ marginLeft: 'auto' }} />
                         )}
                       </TouchableOpacity>
                     )}
                     ListEmptyComponent={
-                      <Text style={styles.noResultsText}>कोणतेही परिणाम आढळले नाहीत / No results found</Text>
+                      <AppText style={styles.noResultsText}>{t('common.noData')}</AppText>
                     }
                   />
                 </View>
@@ -1908,7 +1888,7 @@ export default function AddAnimalScreen({ navigation }) {
             {/* Taluka Select Trigger */}
             {selectedDistrict && (
               <View style={styles.inputGroup}>
-                <Text style={styles.largeFieldLabel}>तालुका / Taluka *</Text>
+                <AppText style={styles.largeFieldLabel}>{t('addAnimal.talukaLabel')}</AppText>
                 <TouchableOpacity
                   style={styles.dropdownSelector}
                   onPress={() => {
@@ -1916,9 +1896,9 @@ export default function AddAnimalScreen({ navigation }) {
                     setActiveDropdown('taluka');
                   }}
                 >
-                  <Text style={styles.dropdownSelectorText}>
-                    {selectedTaluka ? selectedTaluka.name : 'तालुका निवडा / Select Taluka'}
-                  </Text>
+                  <AppText style={styles.dropdownSelectorText}>
+                    {selectedTaluka ? selectedTaluka.name : t('addAnimal.selectTalukaModal')}
+                  </AppText>
                   <Ionicons name="chevron-down" size={20} color="#64748B" />
                 </TouchableOpacity>
               </View>
@@ -1934,12 +1914,12 @@ export default function AddAnimalScreen({ navigation }) {
               <View style={styles.modalOverlay}>
                 <View style={styles.modalContent}>
                   <View style={styles.modalHeader}>
-                    <Text style={styles.modalTitle}>तालुका निवडा / Select Taluka</Text>
+                    <AppText style={styles.modalTitle}>{t('addAnimal.selectTalukaModal')}</AppText>
                     <TouchableOpacity onPress={() => setActiveDropdown(null)}>
                       <Ionicons name="close" size={24} color="#334155" />
                     </TouchableOpacity>
                   </View>
-                  <TextInput
+                  <AppTextInput
                     style={styles.modalSearchInput}
                     placeholder="शोधा / Search Taluka..."
                     value={talukaSearch}
@@ -1961,14 +1941,14 @@ export default function AddAnimalScreen({ navigation }) {
                           setActiveDropdown(null);
                         }}
                       >
-                        <Text style={styles.modalOptionText}>{t.name}</Text>
+                        <AppText style={styles.modalOptionText}>{t.name}</AppText>
                         {selectedTaluka?._id === t._id && (
                           <Ionicons name="checkmark" size={20} color="#16A34A" style={{ marginLeft: 'auto' }} />
                         )}
                       </TouchableOpacity>
                     )}
                     ListEmptyComponent={
-                      <Text style={styles.noResultsText}>कोणतेही परिणाम आढळले नाहीत / No results found</Text>
+                      <AppText style={styles.noResultsText}>{t('common.noData')}</AppText>
                     }
                   />
                 </View>
@@ -1978,8 +1958,8 @@ export default function AddAnimalScreen({ navigation }) {
             {/* Village Input & Suggestions */}
             {selectedTaluka && (
               <View style={styles.inputGroup}>
-                <Text style={styles.largeFieldLabel}>गाव / Village *</Text>
-                <TextInput
+                <AppText style={styles.largeFieldLabel}>{t('addAnimal.villageLabel')}</AppText>
+                <AppTextInput
                   style={[styles.largeInput, { marginBottom: 12 }]}
                   placeholder="Enter your village name / गावचे नाव टाका"
                   value={typeof selectedVillage === 'object' ? (selectedVillage?.name || '') : (selectedVillage || '')}
@@ -1987,25 +1967,25 @@ export default function AddAnimalScreen({ navigation }) {
                 />
                 {filteredVillages && filteredVillages.length > 0 && (
                   <View style={{ marginTop: 8 }}>
-                    <Text style={{ fontSize: 13, color: '#64748B', marginBottom: 8, fontWeight: '600' }}>
+                    <AppText style={{ fontSize: 13, color: '#64748B', marginBottom: 8, fontWeight: '600' }}>
                       पडताळणी यादीतील गाव निवडा / Select from Master List:
-                    </Text>
+                    </AppText>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', paddingVertical: 4 }}>
                       {filteredVillages.map((v) => {
-                        const isSelected = typeof selectedVillage === 'object' 
-                          ? selectedVillage?._id === v._id 
+                        const isSelected = typeof selectedVillage === 'object'
+                          ? selectedVillage?._id === v._id
                           : selectedVillage === v.name;
                         return (
                           <TouchableOpacity
                             key={v._id}
                             style={[
-                              styles.pillOption, 
+                              styles.pillOption,
                               isSelected && styles.selectedPillOption,
                               { marginRight: 8, paddingVertical: 8, paddingHorizontal: 14 }
                             ]}
                             onPress={() => setSelectedVillage(v)}
                           >
-                            <Text style={[styles.pillText, isSelected && styles.selectedPillText]}>{v.name}</Text>
+                            <AppText style={[styles.pillText, isSelected && styles.selectedPillText]}>{v.name}</AppText>
                           </TouchableOpacity>
                         );
                       })}
@@ -2017,12 +1997,12 @@ export default function AddAnimalScreen({ navigation }) {
 
             {/* GPS Trigger */}
             <View style={styles.gpsContainer}>
-              <Text style={styles.gpsLabel}>जनावराचे मूळ स्थान (GPS Coordinates) *</Text>
-              
+              <AppText style={styles.gpsLabel}>{t('addAnimal.gpsCoordinates')}</AppText>
+
               {gpsSuccess ? (
                 <View style={styles.gpsSuccessBox}>
                   <Ionicons name="checkmark-circle" size={24} color="#16A34A" />
-                  <Text style={styles.gpsSuccessText}>GPS Location Attached ({latitude.toFixed(4)}, {longitude.toFixed(4)})</Text>
+                  <AppText style={styles.gpsSuccessText}>{t('addAnimal.gpsLocationAttached', { lat: latitude.toFixed(4), lng: longitude.toFixed(4) })}</AppText>
                 </View>
               ) : (
                 <TouchableOpacity
@@ -2035,7 +2015,7 @@ export default function AddAnimalScreen({ navigation }) {
                   ) : (
                     <>
                       <Ionicons name="locate" size={20} color="#fff" />
-                      <Text style={styles.gpsFetchBtnText}>स्वयंचलित जीपीएस मिळवा / Get Auto GPS</Text>
+                      <AppText style={styles.gpsFetchBtnText}>{t('addAnimal.getAutoGps')}</AppText>
                     </>
                   )}
                 </TouchableOpacity>
@@ -2047,10 +2027,10 @@ export default function AddAnimalScreen({ navigation }) {
       case 8:
         return (
           <View style={styles.wizardCard}>
-            <Text style={styles.wizardLabel}>जाहिरातीची तपासणी / Preview Listing</Text>
+            <AppText style={styles.wizardLabel}>{t('addAnimal.previewListing')}</AppText>
 
             {/* Photos scroll */}
-            <Text style={styles.previewTitle}>Live Photos:</Text>
+            <AppText style={styles.previewTitle}>Live Photos:</AppText>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.previewPhotoRow}>
               {photos.map((p, idx) => (
                 <Image key={idx} source={{ uri: p.uri }} style={styles.previewThumb} />
@@ -2059,20 +2039,20 @@ export default function AddAnimalScreen({ navigation }) {
 
             {/* Details panel */}
             <View style={styles.previewPanel}>
-              <Text style={styles.previewItem}><strong>नाव / Title:</strong> {title}</Text>
-              <Text style={styles.previewItem}><strong>जात / Breed:</strong> {selectedBreed?.name}</Text>
-              <Text style={styles.previewItem}><strong>वय / Age:</strong> {age} Years</Text>
-              {weight !== '' && <Text style={styles.previewItem}><strong>वजन / Weight:</strong> {weight} kg</Text>}
-              <Text style={styles.previewItem}><strong>लिंग / Gender:</strong> {gender}</Text>
-              <Text style={styles.previewItem}><strong>लसीकरण / Vaccinated:</strong> {isVaccinated ? 'होय / Yes' : 'नाही / No'}</Text>
-              {milkCapacity !== '' && <Text style={styles.previewItem}><strong>दूध देण्याची क्षमता / Milk:</strong> {milkCapacity} L/day</Text>}
-              <Text style={styles.previewItem}><strong>अपेक्षित किंमत / Price:</strong> ₹{price} ({isNegotiable ? 'Negotiable' : 'Fixed'})</Text>
-              <Text style={styles.previewItem}><strong>पत्ता / Location:</strong> {typeof selectedVillage === 'object' ? selectedVillage?.name : selectedVillage}, {selectedTaluka?.name}, {selectedDistrict?.name}, {selectedState?.name}</Text>
+              <AppText style={styles.previewItem}><strong>नाव / Title:</strong> {title}</AppText>
+              <AppText style={styles.previewItem}><strong>जात / Breed:</strong> {selectedBreed?.name}</AppText>
+              <AppText style={styles.previewItem}><strong>वय / Age:</strong> {age} Years</AppText>
+              {weight !== '' && <AppText style={styles.previewItem}><strong>वजन / Weight:</strong> {weight} kg</AppText>}
+              <AppText style={styles.previewItem}><strong>लिंग / Gender:</strong> {gender}</AppText>
+              <AppText style={styles.previewItem}><strong>लसीकरण / Vaccinated:</strong> {isVaccinated ? 'होय / Yes' : 'नाही / No'}</AppText>
+              {milkCapacity !== '' && <AppText style={styles.previewItem}><strong>दूध देण्याची क्षमता / Milk:</strong> {milkCapacity} L/day</AppText>}
+              <AppText style={styles.previewItem}><strong>अपेक्षित किंमत / Price:</strong> ₹{price} ({isNegotiable ? 'Negotiable' : 'Fixed'})</AppText>
+              <AppText style={styles.previewItem}><strong>पत्ता / Location:</strong> {typeof selectedVillage === 'object' ? selectedVillage?.name : selectedVillage}, {selectedTaluka?.name}, {selectedDistrict?.name}, {selectedState?.name}</AppText>
             </View>
 
             <TouchableOpacity style={styles.editSectionBtn} onPress={() => setCurrentStep(4)}>
               <Ionicons name="create" size={16} color="#16A34A" />
-              <Text style={styles.editSectionBtnText}>माहिती बदला / Edit Details</Text>
+              <AppText style={styles.editSectionBtnText}>{t('addAnimal.editDetailsBtn')}</AppText>
             </TouchableOpacity>
           </View>
         );
@@ -2082,31 +2062,31 @@ export default function AddAnimalScreen({ navigation }) {
           <View style={styles.wizardCard}>
             <View style={styles.submitFinalBox}>
               <MaterialCommunityIcons name="check-decagram" size={72} color="#16A34A" />
-              <Text style={styles.submitTitle}>सर्व माहिती तयार आहे! (All Ready!)</Text>
-              <Text style={styles.submitSub}>खालच्या बटणावर दाबून तुमची जाहिरात पाठवा. (Click button below to post listing.)</Text>
+              <AppText style={styles.submitTitle}>{t('addAnimal.allReadyTitle')}</AppText>
+              <AppText style={styles.submitSub}>{t('addAnimal.allReadySub')}</AppText>
 
               {isSubmitting && (
                 <View style={[styles.uploadingBox, { width: '100%', marginVertical: 12 }]}>
-                  <Text style={styles.uploadProgressTitle}>जाहिरात अपलोड होत आहे... (Uploading Listing...)</Text>
-                  <Text style={styles.uploadProgressPercent}>{uploadProgress}% Complete</Text>
+                  <AppText style={styles.uploadProgressTitle}>{t('addAnimal.uploadingListing')}</AppText>
+                  <AppText style={styles.uploadProgressPercent}>{uploadProgress}% Complete</AppText>
                   <View style={styles.progressTrack}>
                     <View style={[styles.progressBar, { width: `${uploadProgress}%` }]} />
                   </View>
                 </View>
               )}
 
-              <TouchableOpacity 
-                style={[styles.publishBtn, isSubmitting && { backgroundColor: '#94A3B8' }]} 
+              <TouchableOpacity
+                style={[styles.publishBtn, isSubmitting && { backgroundColor: '#94A3B8' }]}
                 onPress={handlePublishListing}
                 disabled={isSubmitting}
               >
                 {isSubmitting ? (
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />
-                    <Text style={styles.publishBtnText}>प्रसिद्ध होत आहे... / Publishing...</Text>
+                    <AppText style={styles.publishBtnText}>{t('addAnimal.publishingStatus')}</AppText>
                   </View>
                 ) : (
-                  <Text style={styles.publishBtnText}>जाहिरात प्रसिद्ध करा / Publish Listing</Text>
+                  <AppText style={styles.publishBtnText}>{t('addAnimal.publishBtn')}</AppText>
                 )}
               </TouchableOpacity>
             </View>
@@ -2126,10 +2106,8 @@ export default function AddAnimalScreen({ navigation }) {
           <Ionicons name="arrow-back" size={24} color="#0F172A" />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>जाहिरात टाका / Post Listing</Text>
-          <Text style={styles.headerSubtitle}>
-            Step {currentStep} of 9 - {STEPS[currentStep - 1].titleMr}
-          </Text>
+          <AppText style={styles.headerTitle}>{t('addAnimal.headerTitle')}</AppText>
+          <AppText style={styles.headerSubtitle}>{t('addAnimal.headerSubtitle', { current: currentStep, stepName: t(STEPS[currentStep - 1].titleKey) })}</AppText>
         </View>
         <View style={styles.placeholderBox} />
       </View>
@@ -2143,7 +2121,7 @@ export default function AddAnimalScreen({ navigation }) {
         <View style={styles.footerNav}>
           <TouchableOpacity style={styles.navPrevBtn} onPress={handlePrevStep}>
             <Ionicons name="chevron-back" size={20} color="#64748B" />
-            <Text style={styles.navPrevText}>मागे / Back</Text>
+            <AppText style={styles.navPrevText}>{t('common.back')}</AppText>
           </TouchableOpacity>
 
           {currentStep === 2 ? (
@@ -2155,7 +2133,7 @@ export default function AddAnimalScreen({ navigation }) {
               onPress={handleNextStep}
               disabled={!photos[currentPhotoIndex]}
             >
-              <Text style={styles.navNextText}>पुढे / Next</Text>
+              <AppText style={styles.navNextText}>{t('common.next')}</AppText>
               <Ionicons name="chevron-forward" size={20} color="#fff" />
             </TouchableOpacity>
           ) : currentStep === 3 ? (
@@ -2167,17 +2145,17 @@ export default function AddAnimalScreen({ navigation }) {
               onPress={handleNextStep}
               disabled={!video}
             >
-              <Text style={styles.navNextText}>पुढे / Next</Text>
+              <AppText style={styles.navNextText}>{t('common.next')}</AppText>
               <Ionicons name="chevron-forward" size={20} color="#fff" />
             </TouchableOpacity>
           ) : currentStep < 8 ? (
             <TouchableOpacity style={styles.navNextBtn} onPress={handleNextStep}>
-              <Text style={styles.navNextText}>पुढे / Next</Text>
+              <AppText style={styles.navNextText}>{t('common.next')}</AppText>
               <Ionicons name="chevron-forward" size={20} color="#fff" />
             </TouchableOpacity>
           ) : currentStep === 8 ? (
             <TouchableOpacity style={[styles.navNextBtn, { backgroundColor: '#16A34A' }]} onPress={handleNextStep}>
-              <Text style={styles.navNextText}>नक्की करा / Confirm</Text>
+              <AppText style={styles.navNextText}>{t('common.confirm')}</AppText>
               <Ionicons name="checkmark" size={20} color="#fff" />
             </TouchableOpacity>
           ) : null}

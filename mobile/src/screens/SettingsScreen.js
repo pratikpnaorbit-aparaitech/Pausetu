@@ -35,57 +35,39 @@ const LANGUAGES = [
 // ── Font size options ──────────────────────────────────────────────────────
 const FONT_SIZES = ['Small', 'Medium', 'Large'];
 
-// ── FAQ data ──────────────────────────────────────────────────────────────
+// ── FAQ data keys ─────────────────────────────────────────────────────────
 const FAQ_DATA = [
-  {
-    q: 'How do I list my animal for sale?',
-    a: 'Go to the Post tab, fill in all required details including at least 5 photos and one video, and submit. Your listing will go live after admin approval.',
-  },
-  {
-    q: 'How long does approval take?',
-    a: 'Listings are typically approved within 24 hours by our moderation team. You will receive a notification once approved.',
-  },
-  {
-    q: 'Is my phone number visible to buyers?',
-    a: 'Your phone number is only shared when a buyer taps Call or WhatsApp on your listing. It is not displayed publicly.',
-  },
-  {
-    q: 'How do I contact a seller?',
-    a: 'Open any animal listing and tap Call, WhatsApp, or Chat in the seller section.',
-  },
-  {
-    q: 'Can I edit my listing after posting?',
-    a: 'Yes. Go to My Listings, select the listing, and tap Edit. Note: editing resets approval status.',
-  },
-  {
-    q: 'How do I delete my account?',
-    a: 'Contact us at support@pashusetu.com with your registered email and we will process the deletion within 7 business days.',
-  },
+  { qKey: 'settings.faq1_q', aKey: 'settings.faq1_a' },
+  { qKey: 'settings.faq2_q', aKey: 'settings.faq2_a' },
+  { qKey: 'settings.faq3_q', aKey: 'settings.faq3_a' },
+  { qKey: 'settings.faq4_q', aKey: 'settings.faq4_a' },
+  { qKey: 'settings.faq5_q', aKey: 'settings.faq5_a' },
+  { qKey: 'settings.faq6_q', aKey: 'settings.faq6_a' },
 ];
 
-// ── Privacy Policy sections ───────────────────────────────────────────────
+// ── Privacy Policy sections keys ──────────────────────────────────────────
 const POLICY_SECTIONS = [
-  ['1. Information We Collect', 'We collect your name, phone number, email address, and location (village, taluka, district, state) to provide our livestock marketplace services. Photos and videos you upload are stored on our secure servers.'],
-  ['2. How We Use Your Information', 'Your information is used to show your listings to potential buyers, verify your identity, send OTP-based login codes, and improve our services. We do not sell your personal data to third parties.'],
-  ['3. Data Storage & Security', 'All data is stored on encrypted servers hosted in India. JWT tokens are stored securely using device Keychain (iOS) or KeyStore (Android). We follow industry-standard security practices.'],
-  ['4. Location Data', 'Location information (village, district, state) is used to display your listing to nearby buyers. We do not collect GPS coordinates without your explicit permission.'],
-  ['5. Media Uploads', 'Photos and videos of animals you upload become part of your public listing. Ensure you have the right to share any media you upload. Uploads are stored securely and deleted when you remove a listing.'],
-  ['6. Your Rights', 'You may request deletion of your account and all associated data by emailing support@pashusetu.com. Data deletion is processed within 7 business days.'],
-  ['7. Contact', 'For privacy concerns: support@pashusetu.com'],
+  ['settings.policy1_h', 'settings.policy1_b'],
+  ['settings.policy2_h', 'settings.policy2_b'],
+  ['settings.policy3_h', 'settings.policy3_b'],
+  ['settings.policy4_h', 'settings.policy4_b'],
+  ['settings.policy5_h', 'settings.policy5_b'],
+  ['settings.policy6_h', 'settings.policy6_b'],
+  ['settings.policy7_h', 'settings.policy7_b'],
 ];
 
-// ── Terms sections ────────────────────────────────────────────────────────
+// ── Terms sections keys ───────────────────────────────────────────────────
 const TERMS_SECTIONS = [
-  ['1. Acceptance', 'By using PashuSetu, you agree to these Terms. If you do not agree, please do not use the application.'],
-  ['2. Eligibility', 'You must be at least 18 years old to use PashuSetu. By registering, you confirm you are legally eligible to enter into contracts under Indian law.'],
-  ['3. Listing Rules', "Listings must be genuine and accurate. Posting animals you do not own, using stock photos, or misrepresenting an animal's health or age is strictly prohibited and will result in immediate account suspension."],
-  ['4. Mandatory Media', 'Each listing requires a minimum of 5 photographs and one live video of the actual animal being sold. This is enforced to build buyer trust.'],
-  ['5. Prohibited Content', 'Illegal animals, protected species, or any listing that violates Indian wildlife protection laws are strictly prohibited.'],
-  ['6. Transactions', 'PashuSetu is a marketplace platform. We facilitate connections between buyers and sellers but are not a party to any transaction. All deals are between buyers and sellers directly.'],
-  ['7. Liability', 'PashuSetu is not liable for the quality, health, or accuracy of any animal listed. We recommend buyers verify animals in person before completing any transaction.'],
-  ['8. Termination', 'We reserve the right to suspend or terminate accounts that violate these terms without prior notice.'],
-  ['9. Governing Law', 'These terms are governed by the laws of India. Disputes shall be subject to the jurisdiction of courts in Pune, Maharashtra.'],
-  ['10. Contact', 'For legal queries: support@pashusetu.com'],
+  ['settings.terms1_h', 'settings.terms1_b'],
+  ['settings.terms2_h', 'settings.terms2_b'],
+  ['settings.terms3_h', 'settings.terms3_b'],
+  ['settings.terms4_h', 'settings.terms4_b'],
+  ['settings.terms5_h', 'settings.terms5_b'],
+  ['settings.terms6_h', 'settings.terms6_b'],
+  ['settings.terms7_h', 'settings.terms7_b'],
+  ['settings.terms8_h', 'settings.terms8_b'],
+  ['settings.terms9_h', 'settings.terms9_b'],
+  ['settings.terms10_h', 'settings.terms10_b'],
 ];
 
 // ── Dynamic version from app.json via expo-constants ─────────────────────
@@ -110,17 +92,6 @@ const DARK = {
   border: '#334155',
 };
 
-// ═══════════════════════════════════════════════════════════════════════════
-// ROOT CAUSE FIX NOTE:
-// All modal components MUST NOT be defined as component functions inside
-// the parent component body (const LanguageModal = () => ...).
-// Doing so causes React to treat them as new component types on every render,
-// which unmounts and remounts them mid-animation → UI freeze / dim overlay.
-//
-// FIX: All modals are rendered as inline JSX directly in the return tree,
-// controlled by boolean `visible` props. React preserves them across renders
-// and only runs the slide animation when `visible` changes.
-// ═══════════════════════════════════════════════════════════════════════════
 export default function SettingsScreen({ navigation }) {
   const {
     logout, exitGuestSession, isGuest, userToken,
@@ -166,37 +137,37 @@ export default function SettingsScreen({ navigation }) {
   const handleLogout = useCallback(() => {
     const isGuestUser = isGuest || userToken === 'guest';
     if (Platform.OS === 'web') {
-      const msg = isGuestUser ? 'Exit Guest Session?' : 'Are you sure you want to logout?';
+      const msg = isGuestUser ? t('settings.exitGuestConfirm') : t('settings.confirmLogout');
       if (window.confirm(msg)) {
         isGuestUser ? exitGuestSession() : logout();
       }
       return;
     }
     Alert.alert(
-      isGuestUser ? 'Exit Session' : 'Logout',
+      isGuestUser ? t('settings.exitSession') : t('settings.title'),
       isGuestUser
-        ? 'Exit your guest session? You will need to log in to continue.'
-        : 'Are you sure you want to log out? This will clear your session and cached data.',
+        ? t('settings.exitGuestConfirm')
+        : t('settings.confirmLogout'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: isGuestUser ? 'Exit' : 'Logout',
+          text: isGuestUser ? t('common.exit') : t('settings.logoutAccount'),
           style: 'destructive',
           onPress: async () => { isGuestUser ? await exitGuestSession() : await logout(); },
         },
       ]
     );
-  }, [isGuest, userToken, exitGuestSession, logout]);
+  }, [isGuest, userToken, exitGuestSession, logout, t]);
 
   const handleSelectLanguage = useCallback(async (code) => {
     try {
       await completeOnboarding(code);
     } catch (e) {
-      Alert.alert('Error', 'Could not save language preference.');
+      Alert.alert(t('common.error'), t('settings.saveLangError'));
     } finally {
       setShowLangModal(false);
     }
-  }, [completeOnboarding]);
+  }, [completeOnboarding, t]);
 
   const currentLang = useMemo(
     () => LANGUAGES.find(l => l.code === language) || LANGUAGES[0],
@@ -207,19 +178,19 @@ export default function SettingsScreen({ navigation }) {
     try {
       await toggleDarkMode();
     } catch (e) {
-      Alert.alert('Error', 'Could not save theme preference.');
+      Alert.alert(t('common.error'), t('settings.saveThemeError'));
     }
-  }, [toggleDarkMode]);
+  }, [toggleDarkMode, t]);
 
   const handleSelectFont = useCallback(async (size) => {
     try {
       await setAppFontSize(size);
     } catch (e) {
-      Alert.alert('Error', 'Could not save font size preference.');
+      Alert.alert(t('common.error'), t('settings.saveFontError'));
     } finally {
       setShowFontModal(false);
     }
-  }, [setAppFontSize]);
+  }, [setAppFontSize, t]);
 
   const handleEditProfile = useCallback(() => {
     navigation.navigate('Profile');
@@ -227,7 +198,7 @@ export default function SettingsScreen({ navigation }) {
 
   const handleSendOtpReset = useCallback(async () => {
     if (!userProfile?.email && !userProfile?.mobile) {
-      Alert.alert('No Contact Found', 'No email or phone associated with your account.');
+      Alert.alert(t('settings.noContactFound'), t('settings.noContactMsg'));
       return;
     }
     setOtpSending(true);
@@ -236,43 +207,43 @@ export default function SettingsScreen({ navigation }) {
       await api.sendOtp(identifier);
       setOtpSent(true);
     } catch (err) {
-      Alert.alert('Failed', err.message || 'Could not send OTP. Please try again.');
+      Alert.alert(t('common.error'), err.message || t('otp.otpError'));
     } finally {
       setOtpSending(false);
     }
-  }, [userProfile]);
+  }, [userProfile, t]);
 
   const handleContactEmail = useCallback(async () => {
     const url = `mailto:${SUPPORT_EMAIL}?subject=PashuSetu Support Request`;
     try {
       const ok = await Linking.canOpenURL(url);
       if (ok) { await Linking.openURL(url); }
-      else { Alert.alert('No Email App', `Please email us at ${SUPPORT_EMAIL}`); }
+      else { Alert.alert(t('settings.noEmailApp'), `${t('settings.didNotFindAnswer')} ${SUPPORT_EMAIL}`); }
     } catch (e) {
-      Alert.alert('No Email App', `Please email us at ${SUPPORT_EMAIL}`);
+      Alert.alert(t('settings.noEmailApp'), `${t('settings.didNotFindAnswer')} ${SUPPORT_EMAIL}`);
     }
-  }, []);
+  }, [t]);
 
   const handleContactPhone = useCallback(async () => {
     const url = `tel:${SUPPORT_PHONE}`;
     try {
       const ok = await Linking.canOpenURL(url);
       if (ok) { await Linking.openURL(url); }
-      else { Alert.alert('Cannot Call', `Please call us at ${SUPPORT_PHONE}`); }
+      else { Alert.alert(t('settings.cannotCall'), `Please call us at ${SUPPORT_PHONE}`); }
     } catch (e) {
-      Alert.alert('Cannot Call', `Please call us at ${SUPPORT_PHONE}`);
+      Alert.alert(t('settings.cannotCall'), `Please call us at ${SUPPORT_PHONE}`);
     }
-  }, []);
+  }, [t]);
 
   const handleContactWeb = useCallback(async () => {
     try {
       const ok = await Linking.canOpenURL(SUPPORT_WEBSITE);
       if (ok) { await Linking.openURL(SUPPORT_WEBSITE); }
-      else { Alert.alert('Cannot Open', `Visit ${SUPPORT_WEBSITE}`); }
+      else { Alert.alert(t('settings.cannotOpen'), `Visit ${SUPPORT_WEBSITE}`); }
     } catch (e) {
-      Alert.alert('Cannot Open', `Visit ${SUPPORT_WEBSITE}`);
+      Alert.alert(t('settings.cannotOpen'), `Visit ${SUPPORT_WEBSITE}`);
     }
-  }, []);
+  }, [t]);
 
   const handleContactUs = useCallback(() => {
     if (Platform.OS === 'web') {
@@ -280,16 +251,16 @@ export default function SettingsScreen({ navigation }) {
       return;
     }
     Alert.alert(
-      'Contact PashuSetu',
-      "Choose how you'd like to reach us:",
+      t('settings.contactPashuSetu'),
+      t('settings.chooseContact'),
       [
-        { text: '✉️  Email Support', onPress: handleContactEmail },
-        { text: '📞  Call Support', onPress: handleContactPhone },
-        { text: '🌐  Visit Website', onPress: handleContactWeb },
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('settings.emailSupportOption'), onPress: handleContactEmail },
+        { text: t('settings.callSupportOption'), onPress: handleContactPhone },
+        { text: t('settings.visitWebsite'), onPress: handleContactWeb },
+        { text: t('common.cancel'), style: 'cancel' },
       ]
     );
-  }, [handleContactEmail, handleContactPhone, handleContactWeb]);
+  }, [handleContactEmail, handleContactPhone, handleContactWeb, t]);
 
   const handleRateApp = useCallback(async () => {
     if (Platform.OS === 'web') {
@@ -301,11 +272,11 @@ export default function SettingsScreen({ navigation }) {
 
     if (!url) {
       Alert.alert(
-        'Rate PashuSetu',
-        `We are not yet published on the App Store. Your feedback means a lot!\n\nPlease email us at ${SUPPORT_EMAIL}`,
+        t('settings.ratePashuSetu'),
+        `${t('settings.rateNotPublished')} ${SUPPORT_EMAIL}`,
         [
-          { text: 'Email Feedback', onPress: handleContactEmail },
-          { text: 'Close', style: 'cancel' },
+          { text: t('settings.emailFeedback'), onPress: handleContactEmail },
+          { text: t('common.close'), style: 'cancel' },
         ]
       );
       return;
@@ -318,18 +289,18 @@ export default function SettingsScreen({ navigation }) {
       } else if (Platform.OS === 'android') {
         await Linking.openURL(PLAY_STORE_WEB_URL);
       } else {
-        Alert.alert('Store Unavailable', 'Could not open the app store on this device.');
+        Alert.alert(t('settings.storeUnavailable'), t('settings.storeUnavailableMsg'));
       }
     } catch (e) {
       if (Platform.OS === 'android') {
         try { await Linking.openURL(PLAY_STORE_WEB_URL); } catch (e) {
-          Alert.alert('Store Unavailable', 'Could not open the app store on this device.');
+          Alert.alert(t('settings.storeUnavailable'), t('settings.storeUnavailableMsg'));
         }
       } else {
-        Alert.alert('Store Unavailable', 'Could not open the app store on this device.');
+        Alert.alert(t('settings.storeUnavailable'), t('settings.storeUnavailableMsg'));
       }
     }
-  }, [handleContactEmail]);
+  }, [handleContactEmail, t]);
 
   const closeLangModal = useCallback(() => setShowLangModal(false), []);
   const closeFontModal = useCallback(() => setShowFontModal(false), []);
@@ -371,11 +342,6 @@ export default function SettingsScreen({ navigation }) {
     </TouchableOpacity>
   );
 
-  // ─────────────────────────────────────────────────────────────────────
-  // MAIN RENDER
-  // All modals rendered as inline JSX — NOT as component functions —
-  // so React keeps them mounted and only slides them in/out via `visible`.
-  // ─────────────────────────────────────────────────────────────────────
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: T.bg }]}>
 
@@ -426,7 +392,7 @@ export default function SettingsScreen({ navigation }) {
           {renderMenuRow({
             iconName: 'format-size', iconBg: '#F3E8FF', iconColor: '#8B5CF6', iconLib: 'mc',
             title: t('settings.fontSize'),
-            value: fontSize,
+            value: t(`settings.fontSize_${fontSize.toLowerCase()}`),
             onPress: () => setShowFontModal(true),
           })}
         </View>
@@ -520,8 +486,6 @@ export default function SettingsScreen({ navigation }) {
           })}
         </View>
 
-
-
         <TouchableOpacity
           style={styles.logoutButton}
           onPress={handleLogout}
@@ -534,12 +498,6 @@ export default function SettingsScreen({ navigation }) {
         </TouchableOpacity>
 
       </ScrollView>
-
-      {/* ═══════════════════════════════════════════════════════════════
-          MODALS — rendered as plain inline JSX.
-          They are ALWAYS mounted; `visible` prop slides them in/out.
-          This is the correct React pattern that prevents UI freezes.
-      ════════════════════════════════════════════════════════════════ */}
 
       {/* ── Language picker ─────────────────────────────────────────── */}
       <Modal
@@ -601,7 +559,7 @@ export default function SettingsScreen({ navigation }) {
                   size === 'Small' && { fontSize: 14 },
                   size === 'Large' && { fontSize: 20 },
                 ]}>
-                  {size}
+                  {t(`settings.fontSize_${size.toLowerCase()}`)}
                 </AppText>
                 {fontSize === size && <Ionicons name="checkmark-circle" size={22} color="#16A34A" />}
               </TouchableOpacity>
@@ -624,7 +582,7 @@ export default function SettingsScreen({ navigation }) {
           <View style={[styles.modalSheet, { backgroundColor: T.card }]}>
             <View style={styles.modalHandle} />
             <View style={styles.modalHeaderRow}>
-              <Text style={[styles.modalTitle, { color: T.text }]}>Reset Password</Text>
+              <AppText style={[styles.modalTitle, { color: T.text }]}>{t('settings.resetPassword')}</AppText>
               <TouchableOpacity onPress={closeChangePassModal} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                 <Ionicons name="close" size={22} color="#64748B" />
               </TouchableOpacity>
@@ -632,24 +590,24 @@ export default function SettingsScreen({ navigation }) {
 
             <View style={[styles.infoBanner, { backgroundColor: '#DBEAFE' }]}>
               <Ionicons name="shield-checkmark-outline" size={18} color="#2563EB" />
-              <Text style={[styles.infoBannerText, { color: '#1E40AF' }]}>
-                PashuSetu uses OTP-based authentication. To reset your login, we will send a one-time password to your registered contact.
-              </Text>
+              <AppText style={[styles.infoBannerText, { color: '#1E40AF' }]}>
+                {t('settings.otpAuthInfo')}
+              </AppText>
             </View>
 
             <View style={styles.infoRowModal}>
               <Ionicons name="person-circle-outline" size={18} color="#64748B" />
-              <Text style={styles.infoRowText}>
-                {userProfile?.email || userProfile?.mobile || 'No contact on file'}
-              </Text>
+              <AppText style={styles.infoRowText}>
+                {userProfile?.email || userProfile?.mobile || t('settings.noContactFound')}
+              </AppText>
             </View>
 
             {otpSent ? (
               <View style={styles.successBanner}>
                 <Ionicons name="checkmark-circle" size={20} color="#16A34A" />
-                <Text style={styles.successText}>
-                  OTP sent! Check your email / SMS and use it to log in with a new session.
-                </Text>
+                <AppText style={styles.successText}>
+                  {t('settings.otpSent')}
+                </AppText>
               </View>
             ) : (
               <TouchableOpacity
@@ -659,7 +617,7 @@ export default function SettingsScreen({ navigation }) {
               >
                 {otpSending
                   ? <ActivityIndicator color="#FFFFFF" />
-                  : <Text style={styles.primaryBtnText}>Send OTP to Reset</Text>}
+                  : <AppText style={styles.primaryBtnText}>{t('settings.sendOtpReset')}</AppText>}
               </TouchableOpacity>
             )}
           </View>
@@ -677,21 +635,21 @@ export default function SettingsScreen({ navigation }) {
           <View style={[styles.modalSheet, { backgroundColor: T.card }]}>
             <View style={styles.modalHandle} />
             <View style={styles.modalHeaderRow}>
-              <Text style={[styles.modalTitle, { color: T.text }]}>Privacy Settings</Text>
+              <AppText style={[styles.modalTitle, { color: T.text }]}>{t('settings.privacySettingsTitle')}</AppText>
               <TouchableOpacity onPress={closePrivacyModal} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                 <Ionicons name="close" size={22} color="#64748B" />
               </TouchableOpacity>
             </View>
 
             {[
-              { key: 'locationData', label: 'Location Data', sub: 'Allow PashuSetu to use your location for nearby listings', color: '#16A34A' },
-              { key: 'marketingNotifications', label: 'Marketing Notifications', sub: 'Receive promotions and new feature announcements', color: '#2563EB' },
-              { key: 'analytics', label: 'Usage Analytics', sub: 'Help us improve the app with anonymous usage data', color: '#8B5CF6' },
+              { key: 'locationData', label: t('settings.locationData'), sub: t('settings.locationDataSub'), color: '#16A34A' },
+              { key: 'marketingNotifications', label: t('settings.marketingNotifications'), sub: t('settings.marketingNotificationsSub'), color: '#2563EB' },
+              { key: 'analytics', label: t('settings.analytics'), sub: t('settings.analyticsSub'), color: '#8B5CF6' },
             ].map(item => (
               <View key={item.key} style={styles.privacyRow}>
                 <View style={{ flex: 1, marginRight: 12 }}>
-                  <Text style={[styles.privacyLabel, { color: T.text }]}>{item.label}</Text>
-                  <Text style={styles.privacySub}>{item.sub}</Text>
+                  <AppText style={[styles.privacyLabel, { color: T.text }]}>{item.label}</AppText>
+                  <AppText style={styles.privacySub}>{item.sub}</AppText>
                 </View>
                 <Switch
                   value={privacyToggles[item.key]}
@@ -706,7 +664,7 @@ export default function SettingsScreen({ navigation }) {
               style={[styles.primaryBtn, { marginTop: 8 }]}
               onPress={closePrivacyModal}
             >
-              <Text style={styles.primaryBtnText}>Save Preferences</Text>
+              <AppText style={styles.primaryBtnText}>{t('settings.savePreferences')}</AppText>
             </TouchableOpacity>
           </View>
         </View>
@@ -723,7 +681,7 @@ export default function SettingsScreen({ navigation }) {
           <View style={[styles.modalSheetTall, { backgroundColor: T.card }]}>
             <View style={styles.modalHandle} />
             <View style={styles.modalHeaderRow}>
-              <Text style={[styles.modalTitle, { color: T.text }]}>Help & Support</Text>
+              <AppText style={[styles.modalTitle, { color: T.text }]}>{t('settings.helpSupportTitle')}</AppText>
               <TouchableOpacity onPress={closeHelpModal} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                 <Ionicons name="close" size={22} color="#64748B" />
               </TouchableOpacity>
@@ -733,34 +691,34 @@ export default function SettingsScreen({ navigation }) {
               <View style={[styles.helpCard, { backgroundColor: '#DCFCE7' }]}>
                 <Ionicons name="headset-outline" size={24} color="#16A34A" />
                 <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={[styles.helpCardTitle, { color: '#15803D' }]}>Live Support</Text>
-                  <Text style={styles.helpCardSub}>Mon–Sat, 9 AM – 6 PM IST</Text>
+                  <AppText style={[styles.helpCardTitle, { color: '#15803D' }]}>{t('settings.liveSupport')}</AppText>
+                  <AppText style={styles.helpCardSub}>{t('settings.liveSupportHours')}</AppText>
                 </View>
                 <TouchableOpacity onPress={handleContactPhone} style={styles.helpCardBtn}>
-                  <Text style={styles.helpCardBtnText}>Call</Text>
+                  <AppText style={styles.helpCardBtnText}>{t('common.call')}</AppText>
                 </TouchableOpacity>
               </View>
 
               <View style={[styles.helpCard, { backgroundColor: '#DBEAFE' }]}>
                 <Ionicons name="mail-outline" size={24} color="#2563EB" />
                 <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={[styles.helpCardTitle, { color: '#1D4ED8' }]}>Email Support</Text>
-                  <Text style={styles.helpCardSub}>{SUPPORT_EMAIL}</Text>
+                  <AppText style={[styles.helpCardTitle, { color: '#1D4ED8' }]}>{t('settings.emailSupport')}</AppText>
+                  <AppText style={styles.helpCardSub}>{SUPPORT_EMAIL}</AppText>
                 </View>
                 <TouchableOpacity
                   onPress={handleContactEmail}
                   style={[styles.helpCardBtn, { backgroundColor: '#2563EB' }]}
                 >
-                  <Text style={styles.helpCardBtnText}>Email</Text>
+                  <AppText style={styles.helpCardBtnText}>{t('common.email')}</AppText>
                 </TouchableOpacity>
               </View>
 
-              <Text style={[styles.subSectionTitle, { color: T.text }]}>Common Topics</Text>
+              <AppText style={[styles.subSectionTitle, { color: T.text }]}>{t('settings.commonTopics')}</AppText>
               {[
-                { icon: 'add-circle-outline', label: 'How to post a listing', onPress: () => { closeHelpModal(); setShowFaqModal(true); } },
-                { icon: 'camera-outline', label: 'Photo & video requirements', onPress: () => { closeHelpModal(); setShowFaqModal(true); } },
-                { icon: 'shield-outline', label: 'Account & security', onPress: () => { closeHelpModal(); setShowPrivacySettingsModal(true); } },
-                { icon: 'star-outline', label: 'Rate the app', onPress: handleRateApp },
+                { icon: 'add-circle-outline', label: t('settings.howToPost'), onPress: () => { closeHelpModal(); setShowFaqModal(true); } },
+                { icon: 'camera-outline', label: t('settings.photoVideoReq'), onPress: () => { closeHelpModal(); setShowFaqModal(true); } },
+                { icon: 'shield-outline', label: t('settings.accountSecurity'), onPress: () => { closeHelpModal(); setShowPrivacySettingsModal(true); } },
+                { icon: 'star-outline', label: t('settings.rateAppTopic'), onPress: handleRateApp },
               ].map((item, i) => (
                 <TouchableOpacity
                   key={i}
@@ -769,7 +727,7 @@ export default function SettingsScreen({ navigation }) {
                   activeOpacity={0.7}
                 >
                   <Ionicons name={item.icon} size={18} color="#64748B" />
-                  <Text style={[styles.helpTopicText, { color: T.text }]}>{item.label}</Text>
+                  <AppText style={[styles.helpTopicText, { color: T.text }]}>{item.label}</AppText>
                   <Ionicons name="chevron-forward" size={14} color="#94A3B8" />
                 </TouchableOpacity>
               ))}
@@ -789,7 +747,7 @@ export default function SettingsScreen({ navigation }) {
           <View style={[styles.modalSheetTall, { backgroundColor: T.card }]}>
             <View style={styles.modalHandle} />
             <View style={styles.modalHeaderRow}>
-              <Text style={[styles.modalTitle, { color: T.text }]}>Frequently Asked Questions</Text>
+              <AppText style={[styles.modalTitle, { color: T.text }]}>{t('settings.faqTitle')}</AppText>
               <TouchableOpacity onPress={closeFaqModal} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                 <Ionicons name="close" size={22} color="#64748B" />
               </TouchableOpacity>
@@ -804,7 +762,7 @@ export default function SettingsScreen({ navigation }) {
                   activeOpacity={0.75}
                 >
                   <View style={styles.faqHeader}>
-                    <Text style={[styles.faqQ, { color: T.text }]}>{item.q}</Text>
+                    <AppText style={[styles.faqQ, { color: T.text }]}>{t(item.qKey)}</AppText>
                     <Ionicons
                       name={expandedFaq === i ? 'chevron-up' : 'chevron-down'}
                       size={16}
@@ -812,16 +770,16 @@ export default function SettingsScreen({ navigation }) {
                     />
                   </View>
                   {expandedFaq === i && (
-                    <Text style={styles.faqA}>{item.a}</Text>
+                    <AppText style={styles.faqA}>{t(item.aKey)}</AppText>
                   )}
                 </TouchableOpacity>
               ))}
 
               <View style={[styles.infoBanner, { backgroundColor: '#F1F5F9', marginTop: 8 }]}>
                 <Ionicons name="mail-outline" size={16} color="#64748B" />
-                <Text style={[styles.infoBannerText, { color: '#475569' }]}>
-                  Didn't find your answer? Email us at {SUPPORT_EMAIL}
-                </Text>
+                <AppText style={[styles.infoBannerText, { color: '#475569' }]}>
+                  {t('settings.didNotFindAnswer')} {SUPPORT_EMAIL}
+                </AppText>
               </View>
             </ScrollView>
           </View>
@@ -839,7 +797,7 @@ export default function SettingsScreen({ navigation }) {
           <View style={[styles.modalSheet, { backgroundColor: T.card }]}>
             <View style={styles.modalHandle} />
             <View style={styles.modalHeaderRow}>
-              <Text style={[styles.modalTitle, { color: T.text }]}>About PashuSetu</Text>
+              <AppText style={[styles.modalTitle, { color: T.text }]}>{t('settings.aboutTitle')}</AppText>
               <TouchableOpacity onPress={closeAboutModal} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                 <Ionicons name="close" size={22} color="#64748B" />
               </TouchableOpacity>
@@ -849,33 +807,33 @@ export default function SettingsScreen({ navigation }) {
               <View style={styles.aboutLogo}>
                 <MaterialCommunityIcons name="cow" size={40} color="#16A34A" />
               </View>
-              <Text style={[styles.aboutAppName, { color: T.text }]}>PashuSetu</Text>
-              <Text style={styles.aboutTagline}>Connecting Farmers & Livestock Buyers</Text>
+              <AppText style={[styles.aboutAppName, { color: T.text }]}>PashuSetu</AppText>
+              <AppText style={styles.aboutTagline}>{t('settings.aboutTagline')}</AppText>
             </View>
 
             <View style={styles.aboutGrid}>
               {[
-                { label: 'Version', value: `v${APP_VERSION}` },
-                { label: 'Platform', value: Platform.OS === 'ios' ? 'iOS' : Platform.OS === 'android' ? 'Android' : 'Web' },
-                { label: 'Language', value: currentLang.label },
-                { label: 'Build', value: 'Production' },
+                { label: t('settings.aboutVersion'), value: `v${APP_VERSION}` },
+                { label: t('settings.aboutPlatform'), value: Platform.OS === 'ios' ? 'iOS' : Platform.OS === 'android' ? 'Android' : 'Web' },
+                { label: t('settings.language'), value: currentLang.label },
+                { label: t('settings.aboutBuild'), value: 'Production' },
               ].map(item => (
                 <View key={item.label} style={styles.aboutGridItem}>
-                  <Text style={styles.aboutGridLabel}>{item.label}</Text>
-                  <Text style={[styles.aboutGridValue, { color: T.text }]}>{item.value}</Text>
+                  <AppText style={styles.aboutGridLabel}>{item.label}</AppText>
+                  <AppText style={[styles.aboutGridValue, { color: T.text }]}>{item.value}</AppText>
                 </View>
               ))}
             </View>
 
             <View style={[styles.infoBanner, { backgroundColor: '#DCFCE7', marginTop: 4 }]}>
               <Ionicons name="leaf-outline" size={16} color="#16A34A" />
-              <Text style={[styles.infoBannerText, { color: '#15803D' }]}>
-                PashuSetu empowers rural farmers across India to buy, sell, and connect through a trusted livestock marketplace.
-              </Text>
+              <AppText style={[styles.infoBannerText, { color: '#15803D' }]}>
+                {t('settings.aboutEmpower')}
+              </AppText>
             </View>
 
             <TouchableOpacity style={styles.modalCancelBtn} onPress={closeAboutModal}>
-              <Text style={styles.modalCancelText}>Close</Text>
+              <AppText style={styles.modalCancelText}>{t('common.close')}</AppText>
             </TouchableOpacity>
           </View>
         </View>
@@ -892,18 +850,18 @@ export default function SettingsScreen({ navigation }) {
           <View style={[styles.modalSheetFull, { backgroundColor: T.card }]}>
             <View style={styles.modalHandle} />
             <View style={styles.modalHeaderRow}>
-              <Text style={[styles.modalTitle, { color: T.text }]}>Privacy Policy</Text>
+              <AppText style={[styles.modalTitle, { color: T.text }]}>{t('settings.privacyPolicyTitle')}</AppText>
               <TouchableOpacity onPress={closePolicyModal} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                 <Ionicons name="close" size={22} color="#64748B" />
               </TouchableOpacity>
             </View>
             <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
-              <Text style={styles.legalHeading}>Privacy Policy — PashuSetu</Text>
-              <Text style={styles.legalDate}>Effective Date: 1 July 2025</Text>
+              <AppText style={styles.legalHeading}>{t('settings.privacyPolicy')}</AppText>
+              <AppText style={styles.legalDate}>{t('settings.lastUpdated')}</AppText>
               {POLICY_SECTIONS.map(([heading, body]) => (
                 <View key={heading} style={styles.legalSection}>
-                  <Text style={styles.legalSectionTitle}>{heading}</Text>
-                  <Text style={styles.legalBody}>{body}</Text>
+                  <AppText style={styles.legalSectionTitle}>{t(heading)}</AppText>
+                  <AppText style={styles.legalBody}>{t(body)}</AppText>
                 </View>
               ))}
             </ScrollView>
@@ -911,7 +869,7 @@ export default function SettingsScreen({ navigation }) {
               style={[styles.primaryBtn, { marginBottom: 8, marginTop: 12 }]}
               onPress={closePolicyModal}
             >
-              <Text style={styles.primaryBtnText}>I Understand</Text>
+              <AppText style={styles.primaryBtnText}>{t('common.confirm')}</AppText>
             </TouchableOpacity>
           </View>
         </View>
@@ -928,18 +886,18 @@ export default function SettingsScreen({ navigation }) {
           <View style={[styles.modalSheetFull, { backgroundColor: T.card }]}>
             <View style={styles.modalHandle} />
             <View style={styles.modalHeaderRow}>
-              <Text style={[styles.modalTitle, { color: T.text }]}>Terms & Conditions</Text>
+              <AppText style={[styles.modalTitle, { color: T.text }]}>{t('settings.termsTitle')}</AppText>
               <TouchableOpacity onPress={closeTermsModal} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                 <Ionicons name="close" size={22} color="#64748B" />
               </TouchableOpacity>
             </View>
             <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
-              <Text style={styles.legalHeading}>Terms & Conditions — PashuSetu</Text>
-              <Text style={styles.legalDate}>Effective Date: 1 July 2025</Text>
+              <AppText style={styles.legalHeading}>{t('settings.termsConditions')}</AppText>
+              <AppText style={styles.legalDate}>{t('settings.lastUpdated')}</AppText>
               {TERMS_SECTIONS.map(([heading, body]) => (
                 <View key={heading} style={styles.legalSection}>
-                  <Text style={styles.legalSectionTitle}>{heading}</Text>
-                  <Text style={styles.legalBody}>{body}</Text>
+                  <AppText style={styles.legalSectionTitle}>{t(heading)}</AppText>
+                  <AppText style={styles.legalBody}>{t(body)}</AppText>
                 </View>
               ))}
             </ScrollView>
@@ -947,7 +905,7 @@ export default function SettingsScreen({ navigation }) {
               style={[styles.primaryBtn, { marginBottom: 8, marginTop: 12 }]}
               onPress={closeTermsModal}
             >
-              <Text style={styles.primaryBtnText}>I Understand</Text>
+              <AppText style={styles.primaryBtnText}>{t('common.confirm')}</AppText>
             </TouchableOpacity>
           </View>
         </View>
@@ -957,9 +915,6 @@ export default function SettingsScreen({ navigation }) {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// STYLES
-// ═══════════════════════════════════════════════════════════════════════════
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
@@ -970,7 +925,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderBottomWidth: 1,
   },
-  backButton: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center' },
+  backButton: { width: 36, height: 36, justifycontent: 'center', alignItems: 'center' },
   headerTitle: { fontSize: 16, fontWeight: '700' },
   placeholderBox: { width: 36 },
   scrollContent: { paddingBottom: 48 },

@@ -1,10 +1,12 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { StyleSheet, View, Text, ScrollView, Image, TouchableOpacity, Dimensions, Modal, Share, FlatList, SafeAreaView, ActivityIndicator, Linking, Alert, Platform } from 'react-native';
-import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
+import { StyleSheet, View, ScrollView, Image, TouchableOpacity, Dimensions, Modal, Share, FlatList, SafeAreaView, ActivityIndicator, Linking, Alert } from 'react-native';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Video, ResizeMode } from 'expo-av';
 import SectionHeader from '../components/SectionHeader';
 import ListingCard from '../components/ListingCard';
 import { api, resolveMediaUrl } from '../api/api';
+import { useTranslation } from 'react-i18next';
+import AppText from '../components/AppText';
 
 const { width } = Dimensions.get('window');
 const GALLERY_HEIGHT = 280;
@@ -15,50 +17,8 @@ const MOCK_IMAGES = [
   'https://images.unsplash.com/photo-1527153857715-3908f2bacb31?auto=format&fit=crop&w=600&q=80', // Cow image 3
 ];
 
-const SIMILAR_ANIMALS = [
-  {
-    id: 's1',
-    name: 'Sahiwal Cow',
-    breed: 'Sahiwal',
-    age: '3 Years',
-    price: '₹48,000',
-    sellerName: 'Ramesh Patel',
-    location: 'Surat, Gujarat',
-    isVerified: true,
-    isFeatured: false,
-    postedTime: '2 hours ago',
-  },
-  {
-    id: 's2',
-    name: 'Gir Cow',
-    breed: 'Gir',
-    age: '2.8 Years',
-    price: '₹62,000',
-    sellerName: 'Devendra Vyas',
-    location: 'Rajkot, Gujarat',
-    isVerified: true,
-    isFeatured: true,
-    postedTime: '3 hours ago',
-  },
-  {
-    id: 's3',
-    name: 'HF Cross Cow',
-    breed: 'Holstein Friesian',
-    age: '3.5 Years',
-    price: '₹55,000',
-    location: 'Baramati, Pune',
-    isVerified: true,
-    isFeatured: true,
-    postedTime: '1 day ago',
-  },
-];
-
 export default function AnimalDetailsScreen({ route, navigation }) {
-  // Extract the pre-mapped item from route params (used as immediate preview)
   const passedAnimal = route.params?.animal || null;
-
-  // Derive the animal's MongoDB _id from whichever field the caller provided.
-  // BuyScreen maps _id → id, but similar-animal cards pass the raw object.
   const animalId = passedAnimal?._id || passedAnimal?.id || null;
 
   const [animal, setAnimal] = useState(passedAnimal);
@@ -68,17 +28,15 @@ export default function AnimalDetailsScreen({ route, navigation }) {
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [similarAnimals, setSimilarAnimals] = useState([]);
+  const { t } = useTranslation();
 
-  // Fetch the complete animal document from the API on mount.
-  // The pre-mapped object from BuyScreen is missing critical fields
-  // (_id, categoryId, description, gender, weight, color, health, sellerId object, etc.).
   useEffect(() => {
     let cancelled = false;
 
     const fetchAnimalDetails = async () => {
       if (!animalId) {
         setLoading(false);
-        setError('No animal ID provided.');
+        setError(t('animalDetails.notFound'));
         return;
       }
 
@@ -104,7 +62,6 @@ export default function AnimalDetailsScreen({ route, navigation }) {
             isVerified: a.status === 'approved',
             isFeatured: (a.views || 0) > 200,
             photos: a.photos || [],
-            // Backend field is 'video' (singular string), not 'videos'
             video: a.video || null,
             description: a.description || '',
             gender: a.gender || null,
@@ -122,16 +79,15 @@ export default function AnimalDetailsScreen({ route, navigation }) {
             village: a.village || null,
           });
         } else {
-          setError('Animal listing not found.');
+          setError(t('animalDetails.notFound'));
         }
       } catch (err) {
         if (!cancelled) {
           console.warn('[AnimalDetails] Failed to load animal:', err.message);
-          // If the API failed but we have the pre-mapped preview, show it
           if (passedAnimal) {
             setAnimal(passedAnimal);
           } else {
-            setError(err.message || 'Failed to load animal details.');
+            setError(err.message || t('animalDetails.notFound'));
           }
         }
       } finally {
@@ -141,9 +97,8 @@ export default function AnimalDetailsScreen({ route, navigation }) {
 
     fetchAnimalDetails();
     return () => { cancelled = true; };
-  }, [animalId]);
+  }, [animalId, passedAnimal, t]);
 
-  // Fetch similar animals once we have the full animal data with categoryId
   useEffect(() => {
     if (!animal?.categoryId) return;
 
@@ -176,7 +131,7 @@ export default function AnimalDetailsScreen({ route, navigation }) {
       }
     };
     fetchSimilar();
-  }, [animal?.categoryId]);
+  }, [animal?.categoryId, animal?._id, animal?.id]);
 
   const scrollRef = useRef(null);
 
@@ -197,12 +152,10 @@ export default function AnimalDetailsScreen({ route, navigation }) {
     }
   };
 
-  // ── Action Handlers ──────────────────────────────────────────────────────
-
   const handleCall = async () => {
     const phone = animal.sellerId?.mobile || animal.sellerId?.phoneNumber;
     if (!phone) {
-      Alert.alert('Phone Not Available', 'The seller has not provided a phone number for this listing.');
+      Alert.alert(t('animalDetails.phoneNotAvailable'), t('animalDetails.phoneNotAvailableMsg'));
       return;
     }
     const url = `tel:${phone}`;
@@ -210,17 +163,16 @@ export default function AnimalDetailsScreen({ route, navigation }) {
     if (supported) {
       Linking.openURL(url);
     } else {
-      Alert.alert('Cannot Open Dialer', 'Unable to open phone dialer on this device.');
+      Alert.alert(t('animalDetails.cannotOpenDialer'), t('animalDetails.cannotOpenDialerMsg'));
     }
   };
 
   const handleWhatsApp = async () => {
     const phone = animal.sellerId?.mobile || animal.sellerId?.phoneNumber;
     if (!phone) {
-      Alert.alert('Phone Not Available', 'The seller has not provided a phone number for this listing.');
+      Alert.alert(t('animalDetails.phoneNotAvailable'), t('animalDetails.phoneNotAvailableMsg'));
       return;
     }
-    // Normalize phone: strip leading zeros, spaces, dashes; prepend country code 91 for India
     const cleaned = phone.replace(/[^0-9]/g, '');
     const withCountry = cleaned.startsWith('91') ? cleaned : `91${cleaned}`;
     const url = `https://wa.me/${withCountry}?text=${encodeURIComponent(`Hi, I am interested in your animal listing: ${animal.name} (${animal.breed}) priced at ${animal.price} on PashuSetu.`)}`;
@@ -228,17 +180,16 @@ export default function AnimalDetailsScreen({ route, navigation }) {
     if (supported) {
       Linking.openURL(url);
     } else {
-      Alert.alert('WhatsApp Not Found', 'WhatsApp is not installed on this device.');
+      Alert.alert(t('animalDetails.whatsappNotFound'), t('animalDetails.whatsappNotFoundMsg'));
     }
   };
 
   const handleChat = () => {
     const sellerId = animal.sellerId?._id || animal.sellerId;
     if (!sellerId) {
-      Alert.alert('Seller Unavailable', 'Cannot start chat — seller information is missing.');
+      Alert.alert(t('common.error'), t('animalDetails.notFound'));
       return;
     }
-    // Navigate to Chat screen if available, otherwise show graceful fallback
     const state = navigation.getState();
     const routeNames = state?.routeNames || [];
     if (routeNames.includes('Chat')) {
@@ -248,14 +199,13 @@ export default function AnimalDetailsScreen({ route, navigation }) {
         animalTitle: animal.name,
       });
     } else {
-      // Chat screen not yet wired — offer Call or WhatsApp instead
       Alert.alert(
-        'Chat Coming Soon',
-        'In-app chat is being set up. Would you like to contact the seller via call or WhatsApp?',
+        t('animalDetails.chatComingSoon'),
+        t('animalDetails.chatComingSoonMsg'),
         [
-          { text: 'Call', onPress: handleCall },
-          { text: 'WhatsApp', onPress: handleWhatsApp },
-          { text: 'Cancel', style: 'cancel' },
+          { text: t('animalDetails.call'), onPress: handleCall },
+          { text: t('animalDetails.whatsapp'), onPress: handleWhatsApp },
+          { text: t('common.cancel'), style: 'cancel' },
         ]
       );
     }
@@ -264,54 +214,50 @@ export default function AnimalDetailsScreen({ route, navigation }) {
   const handleOpenMaps = async () => {
     let url = '';
     if (animal.latitude && animal.longitude) {
-      // Prefer precise coordinates
       url = `https://www.google.com/maps/search/?api=1&query=${animal.latitude},${animal.longitude}`;
     } else if (animal.location) {
-      // Fall back to address string
       const encoded = encodeURIComponent(
         [animal.village, animal.taluka, animal.district, animal.state].filter(Boolean).join(', ') || animal.location
       );
       url = `https://www.google.com/maps/search/?api=1&query=${encoded}`;
     } else {
-      Alert.alert('Location Unavailable', 'No location data is available for this listing.');
+      Alert.alert(t('animalDetails.locationUnavailable'), t('animalDetails.noLocationMsg'));
       return;
     }
     const supported = await Linking.canOpenURL(url);
     if (supported) {
       Linking.openURL(url);
     } else {
-      Alert.alert('Cannot Open Maps', 'Unable to open Google Maps on this device.');
+      Alert.alert(t('animalDetails.cannotOpenMaps'), t('animalDetails.cannotOpenMapsMsg'));
     }
   };
 
-  // Loading state
   if (loading) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
         <ActivityIndicator size="large" color="#16A34A" />
-        <Text style={{ marginTop: 12, color: '#64748B', fontSize: 14, fontWeight: '600' }}>
-          Loading animal details...
-        </Text>
+        <AppText style={{ marginTop: 12, color: '#64748B', fontSize: 14, fontWeight: '600' }}>
+          {t('animalDetails.loading')}
+        </AppText>
       </View>
     );
   }
 
-  // Error state
   if (error || !animal) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 32 }]}>
         <MaterialCommunityIcons name="alert-circle-outline" size={56} color="#94A3B8" />
-        <Text style={{ marginTop: 16, color: '#0F172A', fontSize: 16, fontWeight: '700', textAlign: 'center' }}>
-          {error || 'Animal not found'}
-        </Text>
-        <Text style={{ marginTop: 8, color: '#64748B', fontSize: 13, textAlign: 'center' }}>
-          The listing may have been removed or is temporarily unavailable.
-        </Text>
+        <AppText style={{ marginTop: 16, color: '#0F172A', fontSize: 16, fontWeight: '700', textAlign: 'center' }}>
+          {error || t('animalDetails.notFound')}
+        </AppText>
+        <AppText style={{ marginTop: 8, color: '#64748B', fontSize: 13, textAlign: 'center' }}>
+          {t('animalDetails.unavailable')}
+        </AppText>
         <TouchableOpacity
           style={{ marginTop: 20, paddingHorizontal: 24, paddingVertical: 10, backgroundColor: '#16A34A', borderRadius: 12 }}
           onPress={() => navigation.goBack()}
         >
-          <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>Go Back</Text>
+          <AppText style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>{t('animalDetails.goBack')}</AppText>
         </TouchableOpacity>
       </View>
     );
@@ -343,12 +289,10 @@ export default function AnimalDetailsScreen({ route, navigation }) {
             scrollEventThrottle={16}
             ref={scrollRef}
           >
-            {/* Images */}
             {(animal.photos && animal.photos.length > 0 ? animal.photos : MOCK_IMAGES).map((imgUri, index) => (
               <Image key={index} source={{ uri: resolveMediaUrl(imgUri) }} style={styles.galleryImage} resizeMode="cover" />
             ))}
 
-            {/* Video Thumbnail Slide — only render when the animal has an actual video */}
             {!!animal.video && (
               <View style={styles.videoSlide}>
                 <Image
@@ -361,13 +305,12 @@ export default function AnimalDetailsScreen({ route, navigation }) {
                   <TouchableOpacity style={styles.playButtonCircle} onPress={() => setIsVideoPlaying(true)}>
                     <Ionicons name="play" size={28} color="#FFFFFF" style={styles.playIconOffset} />
                   </TouchableOpacity>
-                  <Text style={styles.videoSlideLabel}>Tap to Watch Video</Text>
+                  <AppText style={styles.videoSlideLabel}>{t('animalDetails.watchVideo')}</AppText>
                 </View>
               </View>
             )}
           </ScrollView>
 
-          {/* Pagination Indicators — +1 for video slide only when video exists */}
           <View style={styles.paginationContainer}>
             {[...Array(
               (animal.photos && animal.photos.length > 0 ? animal.photos.length : MOCK_IMAGES.length) +
@@ -389,72 +332,74 @@ export default function AnimalDetailsScreen({ route, navigation }) {
           {/* Title and Price Info */}
           <View style={styles.infoCard}>
             <View style={styles.titleRow}>
-              <Text style={styles.animalName}>{animal.name}</Text>
+              <AppText style={styles.animalName}>{animal.name}</AppText>
               {animal.isVerified && (
                 <View style={styles.verifiedTextBadge}>
                   <MaterialCommunityIcons name="check-decagram" size={13} color="#FFFFFF" style={styles.verifiedIconMargin} />
-                  <Text style={styles.verifiedTextBadgeLabel}>Verified</Text>
+                  <AppText style={styles.verifiedTextBadgeLabel}>{t('common.verified')}</AppText>
                 </View>
               )}
             </View>
-            <Text style={styles.animalBreed}>{animal.breed}</Text>
-            <Text style={styles.animalPrice}>{animal.price}</Text>
+            <AppText style={styles.animalBreed}>{animal.breed}</AppText>
+            <AppText style={styles.animalPrice}>{animal.price}</AppText>
             <View style={styles.postedBadge}>
               <Ionicons name="time-outline" size={12} color="#64748B" />
-              <Text style={styles.postedText}>Listed 5 hours ago</Text>
+              <AppText style={styles.postedText}>{t('animalDetails.listedAgo')}</AppText>
             </View>
           </View>
 
           {/* Key Specifications Grid */}
-          <Text style={styles.sectionTitle}>Specifications</Text>
+          <AppText style={styles.sectionTitle}>{t('animalDetails.specifications')}</AppText>
           <View style={styles.specsGrid}>
             <View style={styles.specItem}>
               <MaterialCommunityIcons name="calendar-range" size={18} color="#16A34A" />
-              <Text style={styles.specLabel}>Age</Text>
-              <Text style={styles.specValue}>{animal.age}</Text>
+              <AppText style={styles.specLabel}>{t('animalDetails.age')}</AppText>
+              <AppText style={styles.specValue}>{animal.age}</AppText>
             </View>
             <View style={styles.specItem}>
               <MaterialCommunityIcons name="gender-male-female" size={18} color="#16A34A" />
-              <Text style={styles.specLabel}>Gender</Text>
-              <Text style={styles.specValue}>{animal.gender || 'Female'}</Text>
+              <AppText style={styles.specLabel}>{t('animalDetails.gender')}</AppText>
+              <AppText style={styles.specValue}>
+                {animal.gender ? t(`animalDetails.${animal.gender.toLowerCase()}`) : t('animalDetails.female')}
+              </AppText>
             </View>
             <View style={styles.specItem}>
               <MaterialCommunityIcons name="weight-kilogram" size={18} color="#16A34A" />
-              <Text style={styles.specLabel}>Weight</Text>
-              <Text style={styles.specValue}>{animal.weight ? `${animal.weight} kg` : 'N/A'}</Text>
+              <AppText style={styles.specLabel}>{t('animalDetails.weight')}</AppText>
+              <AppText style={styles.specValue}>{animal.weight ? `${animal.weight} kg` : t('animalDetails.na')}</AppText>
             </View>
             <View style={styles.specItem}>
               <MaterialCommunityIcons name="palette" size={18} color="#16A34A" />
-              <Text style={styles.specLabel}>Color</Text>
-              <Text style={styles.specValue}>{animal.color || 'N/A'}</Text>
+              <AppText style={styles.specLabel}>{t('animalDetails.color')}</AppText>
+              <AppText style={styles.specValue}>{animal.color || t('animalDetails.na')}</AppText>
             </View>
             <View style={styles.specItem}>
               <MaterialCommunityIcons name="heart-pulse" size={18} color="#16A34A" />
-              <Text style={styles.specLabel}>Health</Text>
-              <Text style={styles.specValue}>{animal.health?.healthy ? 'Healthy' : 'N/A'}</Text>
+              <AppText style={styles.specLabel}>{t('animalDetails.health')}</AppText>
+              <AppText style={styles.specValue}>{animal.health?.healthy ? t('animalDetails.healthy') : t('animalDetails.na')}</AppText>
             </View>
             <View style={styles.specItem}>
               <MaterialCommunityIcons name="shield-check" size={18} color="#16A34A" />
-              <Text style={styles.specLabel}>Vaccinated</Text>
-              <Text style={styles.specValue}>{animal.health?.vaccinated ? 'Yes' : 'No'}</Text>
+              <AppText style={styles.specLabel}>{t('animalDetails.vaccinated')}</AppText>
+              <AppText style={styles.specValue}>{animal.health?.vaccinated ? t('animalDetails.yes') : t('animalDetails.no')}</AppText>
             </View>
           </View>
 
           {/* Description Section */}
           <View style={styles.infoCard}>
-            <Text style={styles.cardSectionTitle}>Description</Text>
-            <Text style={styles.descriptionText} numberOfLines={descriptionExpanded ? undefined : 3}>
-              {animal.description || 'No description available for this livestock listing.'}
-            </Text>
+            <AppText style={styles.cardSectionTitle}>{t('animalDetails.description')}</AppText>
+            <AppText style={styles.descriptionText} numberOfLines={descriptionExpanded ? undefined : 3}>
+              {animal.description || t('animalDetails.noDescription')}
+            </AppText>
             <TouchableOpacity onPress={() => setDescriptionExpanded(!descriptionExpanded)}>
-              <Text style={styles.readMoreText}>
-                {descriptionExpanded ? 'Read Less' : 'Read More'}
-              </Text>
+              <AppText style={styles.readMoreText}>
+                {descriptionExpanded ? t('animalDetails.readLess') : t('animalDetails.readMore')}
+              </AppText>
             </TouchableOpacity>
           </View>
 
           {/* Seller Information */}
-          <Text style={styles.sectionTitle}>Seller Information</Text>
+          <AppText style={styles.sectionTitle}>{t('animalDetails.sellerInfo')}</AppText>
           <View style={styles.sellerCard}>
             <View style={styles.sellerMainInfo}>
               <View style={styles.avatarContainer}>
@@ -474,11 +419,11 @@ export default function AnimalDetailsScreen({ route, navigation }) {
               </View>
 
               <View style={styles.sellerMeta}>
-                <Text style={styles.sellerName}>{animal.sellerId?.name || animal.sellerName || 'Seller'}</Text>
-                <Text style={styles.sellerSubtext}>{animal.sellerId?.email || ''}</Text>
+                <AppText style={styles.sellerName}>{animal.sellerId?.name || animal.sellerName || 'Seller'}</AppText>
+                <AppText style={styles.sellerSubtext}>{animal.sellerId?.email || ''}</AppText>
                 <View style={styles.ratingStarsRow}>
                   <Ionicons name="star" size={12} color="#F59E0B" />
-                  <Text style={styles.ratingLabel}>Verified Seller</Text>
+                  <AppText style={styles.ratingLabel}>{t('animalDetails.verifiedSeller')}</AppText>
                 </View>
               </View>
             </View>
@@ -494,7 +439,7 @@ export default function AnimalDetailsScreen({ route, navigation }) {
                     activeOpacity={hasPhone ? 0.7 : 1}
                   >
                     <Ionicons name="call" size={16} color="#FFFFFF" />
-                    <Text style={styles.sellerActionTextWhite}>Call</Text>
+                    <AppText style={styles.sellerActionTextWhite}>{t('animalDetails.call')}</AppText>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -503,7 +448,7 @@ export default function AnimalDetailsScreen({ route, navigation }) {
                     activeOpacity={hasPhone ? 0.7 : 1}
                   >
                     <Ionicons name="logo-whatsapp" size={16} color="#FFFFFF" />
-                    <Text style={styles.sellerActionTextWhite}>WhatsApp</Text>
+                    <AppText style={styles.sellerActionTextWhite}>{t('animalDetails.whatsapp')}</AppText>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -512,7 +457,7 @@ export default function AnimalDetailsScreen({ route, navigation }) {
                     activeOpacity={0.7}
                   >
                     <Ionicons name="chatbubble-ellipses" size={16} color="#16A34A" />
-                    <Text style={styles.sellerActionTextGreen}>Chat</Text>
+                    <AppText style={styles.sellerActionTextGreen}>{t('animalDetails.chat')}</AppText>
                   </TouchableOpacity>
                 </View>
               );
@@ -520,27 +465,27 @@ export default function AnimalDetailsScreen({ route, navigation }) {
           </View>
 
           {/* Location details */}
-          <Text style={styles.sectionTitle}>Location</Text>
+          <AppText style={styles.sectionTitle}>{t('animalDetails.location')}</AppText>
           <View style={styles.infoCard}>
             <View style={styles.locationHeaderRow}>
               <Ionicons name="location" size={20} color="#16A34A" />
               <View style={styles.locationMeta}>
-                <Text style={styles.locationPrimary}>{animal.location}</Text>
-                <Text style={styles.locationSecondary}>
-                  {[animal.taluka && `Taluka: ${animal.taluka}`, animal.district && `District: ${animal.district}`, animal.state && `State: ${animal.state}`].filter(Boolean).join(', ') || 'Location details unavailable'}
-                </Text>
+                <AppText style={styles.locationPrimary}>{animal.location}</AppText>
+                <AppText style={styles.locationSecondary}>
+                  {[animal.taluka && `Taluka: ${animal.taluka}`, animal.district && `District: ${animal.district}`, animal.state && `State: ${animal.state}`].filter(Boolean).join(', ') || t('animalDetails.locationUnavailable')}
+                </AppText>
               </View>
             </View>
 
             <TouchableOpacity style={styles.mapButton} onPress={handleOpenMaps}>
               <Ionicons name="map-outline" size={16} color="#16A34A" />
-              <Text style={styles.mapButtonText}>Open in Google Maps</Text>
+              <AppText style={styles.mapButtonText}>{t('animalDetails.openMaps')}</AppText>
             </TouchableOpacity>
           </View>
 
           {/* Similar Listing Section */}
           <View style={styles.similarSection}>
-            <SectionHeader title="Similar Animals" onActionPress={() => {}} />
+            <SectionHeader title={t('animalDetails.similarAnimals')} onActionPress={() => {}} />
             <FlatList
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -551,7 +496,6 @@ export default function AnimalDetailsScreen({ route, navigation }) {
                 <ListingCard
                   item={item}
                   onViewDetailsPress={() => {
-                    // Navigate to details screen recursively with new item
                     navigation.push('AnimalDetails', { animal: item });
                   }}
                   style={styles.similarCardOverride}
@@ -566,15 +510,15 @@ export default function AnimalDetailsScreen({ route, navigation }) {
       <View style={styles.stickyBottomBar}>
         <TouchableOpacity style={styles.stickyCallBtn} onPress={handleCall} activeOpacity={0.8}>
           <Ionicons name="call" size={18} color="#FFFFFF" style={styles.primaryBtnIcon} />
-          <Text style={styles.stickyPrimaryBtnText}>Call Seller</Text>
+          <AppText style={styles.stickyPrimaryBtnText}>{t('animalDetails.callSeller')}</AppText>
         </TouchableOpacity>
         <TouchableOpacity style={styles.stickyPrimaryBtn} onPress={handleChat} activeOpacity={0.8}>
           <Ionicons name="chatbubble-ellipses" size={18} color="#FFFFFF" style={styles.primaryBtnIcon} />
-          <Text style={styles.stickyPrimaryBtnText}>Chat</Text>
+          <AppText style={styles.stickyPrimaryBtnText}>{t('animalDetails.chat')}</AppText>
         </TouchableOpacity>
       </View>
 
-      {/* Full-Screen Video Player Modal — uses expo-av for real uploaded video playback */}
+      {/* Full-Screen Video Player Modal */}
       <Modal visible={isVideoPlaying} transparent={false} animationType="slide" statusBarTranslucent>
         <View style={styles.videoPlayerContainer}>
           <SafeAreaView style={styles.videoSafeArea}>
@@ -594,16 +538,16 @@ export default function AnimalDetailsScreen({ route, navigation }) {
               onError={(err) => {
                 console.warn('[VideoPlayer] Playback error:', err);
                 Alert.alert(
-                  'Playback Error',
-                  'Unable to play the video. The file may still be processing or the URL is unavailable.',
-                  [{ text: 'Close', onPress: () => setIsVideoPlaying(false) }]
+                  t('common.error'),
+                  t('animalDetails.videoError'),
+                  [{ text: t('common.close'), onPress: () => setIsVideoPlaying(false) }]
                 );
               }}
             />
           ) : (
             <View style={styles.noVideoBox}>
               <MaterialCommunityIcons name="video-off-outline" size={64} color="rgba(255,255,255,0.5)" />
-              <Text style={styles.noVideoText}>No video available for this listing.</Text>
+              <AppText style={styles.noVideoText}>{t('animalDetails.noVideo')}</AppText>
             </View>
           )}
         </View>
@@ -1075,4 +1019,3 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
 });
-

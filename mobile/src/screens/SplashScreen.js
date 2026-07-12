@@ -1,8 +1,12 @@
 import React from 'react';
-import { StyleSheet, View, Text, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTranslation } from 'react-i18next';
+import AppText from '../components/AppText';
 
 export default function SplashScreen() {
+  const { t } = useTranslation();
+
   return (
     <LinearGradient
       colors={['#F0FDF4', '#DCFCE7']}
@@ -10,10 +14,10 @@ export default function SplashScreen() {
     >
       <View style={styles.content}>
         <View style={styles.logoCircle}>
-          <Text style={styles.logoText}>PS</Text>
+          <AppText style={styles.logoText}>PS</AppText>
         </View>
-        <Text style={styles.title}>PashuSetu</Text>
-        <Text style={styles.subtitle}>Connecting Husbandry Ecosystems</Text>
+        <AppText style={styles.title}>PashuSetu</AppText>
+        <AppText style={styles.subtitle}>{t('splash.subtitle')}</AppText>
         <ActivityIndicator size="large" color="#16A34A" style={styles.loader} />
       </View>
     </LinearGradient>

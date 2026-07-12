@@ -1,13 +1,20 @@
 import React, { useState, useContext } from 'react';
-import { StyleSheet, View, Text, TextInput, TouchableOpacity, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { StyleSheet, View, TextInput, TouchableOpacity, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView, Alert } from 'react-native';
 import { AppContext } from '../context/AppContext';
+import { useTranslation } from 'react-i18next';
+import AppText from '../components/AppText';
 
-const ROLES = ['Farmer', 'Veterinary Doctor', 'Merchant / Cattle Buyer'];
+const ROLES = [
+  { key: 'profileCompletion.farmer', value: 'Farmer' },
+  { key: 'profileCompletion.doctor', value: 'Veterinary Doctor' },
+  { key: 'profileCompletion.merchant', value: 'Merchant / Cattle Buyer' }
+];
 
 export default function ProfileCompletionScreen() {
   const { completeProfile } = useContext(AppContext);
+  const { t } = useTranslation();
   const [fullName, setFullName] = useState('');
-  const [selectedRole, setSelectedRole] = useState(ROLES[0]);
+  const [selectedRole, setSelectedRole] = useState(ROLES[0].value);
 
   const handleSubmit = () => {
     if (fullName.trim().length > 2) {
@@ -16,7 +23,7 @@ export default function ProfileCompletionScreen() {
         role: selectedRole,
       });
     } else {
-      alert('Please enter your full name');
+      Alert.alert(t('common.error'), t('profileCompletion.enterNameAlert'));
     }
   };
 
@@ -28,18 +35,18 @@ export default function ProfileCompletionScreen() {
       >
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           <View style={styles.header}>
-            <Text style={styles.title}>Complete Profile</Text>
-            <Text style={styles.subtitle}>Help us customize your PashuSetu experience</Text>
+            <AppText style={styles.title}>{t('profileCompletion.title')}</AppText>
+            <AppText style={styles.subtitle}>{t('profileCompletion.subtitle')}</AppText>
           </View>
 
           {/* Inputs */}
           <View style={styles.form}>
             {/* Full Name */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Full Name</Text>
+              <AppText style={styles.label}>{t('profileCompletion.fullName')}</AppText>
               <TextInput
                 style={styles.input}
-                placeholder="Enter your name"
+                placeholder={t('profileCompletion.enterName')}
                 placeholderTextColor="#90A4AE"
                 value={fullName}
                 onChangeText={setFullName}
@@ -48,18 +55,18 @@ export default function ProfileCompletionScreen() {
 
             {/* Role Picker */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Select Your Role</Text>
+              <AppText style={styles.label}>{t('profileCompletion.selectRole')}</AppText>
               {ROLES.map((role) => {
-                const isSelected = selectedRole === role;
+                const isSelected = selectedRole === role.value;
                 return (
                   <TouchableOpacity
-                    key={role}
+                    key={role.value}
                     style={[styles.roleOption, isSelected && styles.roleOptionSelected]}
-                    onPress={() => setSelectedRole(role)}
+                    onPress={() => setSelectedRole(role.value)}
                   >
-                    <Text style={[styles.roleOptionText, isSelected && styles.roleOptionTextSelected]}>
-                      {role}
-                    </Text>
+                    <AppText style={[styles.roleOptionText, isSelected && styles.roleOptionTextSelected]}>
+                      {t(role.key)}
+                    </AppText>
                     <View style={[styles.checkCircle, isSelected && styles.checkCircleSelected]}>
                       {isSelected && <View style={styles.checkInner} />}
                     </View>
@@ -70,7 +77,7 @@ export default function ProfileCompletionScreen() {
           </View>
 
           <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-            <Text style={styles.submitButtonText}>Save & Continue</Text>
+            <AppText style={styles.submitButtonText}>{t('profileCompletion.saveContinue')}</AppText>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>

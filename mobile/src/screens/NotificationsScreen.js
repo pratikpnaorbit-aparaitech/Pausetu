@@ -100,7 +100,7 @@ export default function NotificationsScreen({ navigation }) {
         )
       );
     } catch (err) {
-      Alert.alert('Error', 'Failed to mark notification as read.');
+      Alert.alert(t('common.error'), t('notifications.markReadFailed'));
     }
   };
 
@@ -111,9 +111,9 @@ export default function NotificationsScreen({ navigation }) {
       setNotifications(
         notifications.map((item) => ({ ...item, isRead: true }))
       );
-      Alert.alert('Success', 'All notifications marked as read.');
+      Alert.alert(t('common.success'), t('notifications.markAllReadSuccess'));
     } catch (err) {
-      Alert.alert('Error', 'Failed to mark all as read.');
+      Alert.alert(t('common.error'), t('notifications.markAllFailed'));
     }
   };
 
@@ -122,26 +122,26 @@ export default function NotificationsScreen({ navigation }) {
       await api.deleteNotification(id);
       setNotifications(notifications.filter((item) => item.id !== id));
     } catch (err) {
-      Alert.alert('Error', 'Failed to delete notification.');
+      Alert.alert(t('common.error'), t('notifications.deleteFailed'));
     }
   };
 
   const handleDeleteAll = () => {
     setIsMenuVisible(false);
     Alert.alert(
-      'Clear Notifications',
-      'Are you sure you want to clear all notifications?',
+      t('notifications.clearTitle'),
+      t('notifications.clearConfirm'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Clear All',
+          text: t('notifications.clearAll'),
           style: 'destructive',
           onPress: async () => {
             try {
               await Promise.all(notifications.map(n => api.deleteNotification(n.id)));
               setNotifications([]);
             } catch (err) {
-              Alert.alert('Error', 'Failed to clear all notifications.');
+              Alert.alert(t('common.error'), t('notifications.clearFailed'));
             }
           },
         },
@@ -201,7 +201,7 @@ export default function NotificationsScreen({ navigation }) {
                   styles.tabText,
                   isActive ? styles.tabTextActive : styles.tabTextInactive
                 ]}>
-                  {item}
+                  {t(`notifications.${item.toLowerCase()}`)}
                 </AppText>
               </TouchableOpacity>
             );

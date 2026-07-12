@@ -1,5 +1,5 @@
 import React, { useContext, useState } from 'react';
-import { StyleSheet, View, Text, SafeAreaView, ScrollView, Image, TouchableOpacity, Alert, Modal, TextInput, ActivityIndicator, Platform } from 'react-native';
+import { StyleSheet, View, SafeAreaView, ScrollView, Image, TouchableOpacity, Alert, Modal, TextInput, ActivityIndicator, Platform, Text } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { AppContext } from '../context/AppContext';
@@ -8,15 +8,15 @@ import { useTranslation } from 'react-i18next';
 import AppText from '../components/AppText';
 
 const SELLER_STATS = [
-  { id: '1', label: 'Active Listings', value: '3', icon: 'list-box-outline', color: '#16A34A' },
-  { id: '2', label: 'Sold Animals', value: '4', icon: 'checkbox-marked-circle-outline', color: '#3B82F6' },
-  { id: '3', label: 'Total Views', value: '240', icon: 'eye-outline', color: '#8B5CF6' },
+  { id: '1', labelKey: 'profile.activeListings', value: '3', icon: 'list-box-outline', color: '#16A34A' },
+  { id: '2', labelKey: 'profile.soldAnimals', value: '4', icon: 'checkbox-marked-circle-outline', color: '#3B82F6' },
+  { id: '3', labelKey: 'profile.totalViews', value: '240', icon: 'eye-outline', color: '#8B5CF6' },
 ];
 
 const MENU_ITEMS = [
-  { id: 'my_listings', title: 'My Listings', icon: 'clipboard-list-outline', type: 'material', screen: 'MyListings' },
-  { id: 'notifications', title: 'Notifications', icon: 'notifications-outline', type: 'ion', screen: 'Notifications' },
-  { id: 'settings', title: 'Settings', icon: 'cog-outline', type: 'ion', screen: 'Settings' },
+  { id: 'my_listings', titleKey: 'profile.myListings', icon: 'clipboard-list-outline', type: 'material', screen: 'MyListings' },
+  { id: 'notifications', titleKey: 'profile.notifications', icon: 'notifications-outline', type: 'ion', screen: 'Notifications' },
+  { id: 'settings', titleKey: 'profile.settings', icon: 'cog-outline', type: 'ion', screen: 'Settings' },
 ];
 
 export default function ProfileScreen({ navigation }) {
@@ -37,7 +37,7 @@ export default function ProfileScreen({ navigation }) {
     console.log('[ProfileScreen] handleLogout initiated, isGuestUser:', isGuestUser);
 
     if (Platform.OS === 'web') {
-      const msg = isGuestUser ? 'Exit Guest Session?' : 'Are you sure you want to logout?';
+      const msg = isGuestUser ? t('profile.exitGuestMsg') : t('profile.logoutMsg');
       const confirmed = window.confirm(msg);
       console.log('[ProfileScreen] Web confirm result:', confirmed);
       if (confirmed) {
@@ -54,12 +54,12 @@ export default function ProfileScreen({ navigation }) {
 
     if (isGuestUser) {
       Alert.alert(
-        'Logout',
-        'Exit Guest Session?',
+        t('profile.logoutTitle'),
+        t('profile.exitGuestMsg'),
         [
-          { text: 'Cancel', style: 'cancel' },
+          { text: t('common.cancel'), style: 'cancel' },
           {
-            text: 'Exit',
+            text: t('profile.exitBtn'),
             style: 'destructive',
             onPress: async () => {
               console.log('[ProfileScreen] Executing native exitGuestSession');
@@ -70,12 +70,12 @@ export default function ProfileScreen({ navigation }) {
       );
     } else {
       Alert.alert(
-        'Logout',
-        'Are you sure you want to logout?',
+        t('profile.logoutTitle'),
+        t('profile.logoutMsg'),
         [
-          { text: 'Cancel', style: 'cancel' },
+          { text: t('common.cancel'), style: 'cancel' },
           {
-            text: 'Logout',
+            text: t('profile.logoutBtn'),
             style: 'destructive',
             onPress: async () => {
               console.log('[ProfileScreen] Executing native logout');
@@ -91,7 +91,7 @@ export default function ProfileScreen({ navigation }) {
     if (item.screen) {
       navigation.navigate(item.screen);
     } else {
-      Alert.alert(item.title, `Placeholder action for "${item.title}".`);
+      Alert.alert(t(item.titleKey), `${t('common.loading')} "${t(item.titleKey)}".`);
     }
   };
 
@@ -110,11 +110,11 @@ export default function ProfileScreen({ navigation }) {
 
   const handleSaveProfile = async () => {
     if (editForm.name.trim().length < 3) {
-      Alert.alert('Validation Error', 'Please enter a valid full name (min 3 chars).');
+      Alert.alert(t('profile.validationError'), t('profile.validNameError'));
       return;
     }
     if (editForm.mobile.trim().length < 10) {
-      Alert.alert('Validation Error', 'Please enter a valid 10-digit mobile number.');
+      Alert.alert(t('profile.validationError'), t('profile.validMobileError'));
       return;
     }
 
@@ -131,9 +131,9 @@ export default function ProfileScreen({ navigation }) {
         language: editForm.language
       });
       setIsEditModalVisible(false);
-      Alert.alert('Success', 'Profile updated successfully!');
+      Alert.alert(t('common.success'), t('profile.updateSuccess'));
     } catch (err) {
-      Alert.alert('Update Failed', err.message || 'Could not update profile details.');
+      Alert.alert(t('profile.validationError'), err.message || t('profile.updateFailed'));
     } finally {
       setSyncing(false);
     }
@@ -142,7 +142,7 @@ export default function ProfileScreen({ navigation }) {
   const handleSelectPhoto = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission Denied', 'Please grant library permissions to change profile photo.');
+      Alert.alert(t('profile.permissionDenied'), t('profile.galleryPermission'));
       return;
     }
 
@@ -185,11 +185,11 @@ export default function ProfileScreen({ navigation }) {
       });
 
       if (res.status === 'success') {
-        Alert.alert('Success', 'Profile photo updated successfully!');
+        Alert.alert(t('common.success'), t('profile.uploadSuccess'));
         await refreshProfileData();
       }
     } catch (err) {
-      Alert.alert('Upload Failed', err.message || 'Could not upload photo.');
+      Alert.alert(t('profile.validationError'), err.message || t('profile.uploadFailed'));
     } finally {
       setUploading(false);
     }
@@ -199,9 +199,9 @@ export default function ProfileScreen({ navigation }) {
     setSyncing(true);
     try {
       await refreshProfileData();
-      Alert.alert('Refreshed', 'Latest profile fetched successfully.');
+      Alert.alert(t('common.success'), t('profile.refreshed'));
     } catch (err) {
-      Alert.alert('Sync Error', 'Could not fetch live updates. Please try again.');
+      Alert.alert(t('profile.validationError'), t('profile.syncError'));
     } finally {
       setSyncing(false);
     }
@@ -210,21 +210,21 @@ export default function ProfileScreen({ navigation }) {
   const profileImageUrl = userProfile?.photo
     ? (userProfile.photo.startsWith('http') ? userProfile.photo : `http://10.0.2.2:5000${userProfile.photo}`)
     : null;
-  const displayName = userProfile?.name?.trim() ? userProfile.name : 'Not provided';
-  const displayRole = userProfile?.role?.trim() ? userProfile.role : 'Not provided';
-  const displayMobile = userProfile?.mobile?.trim() ? userProfile.mobile : 'Not provided';
-  const displayEmail = userProfile?.email?.trim() ? userProfile.email : 'Not provided';
+  const displayName = userProfile?.name?.trim() ? userProfile.name : t('profile.notProvided');
+  const displayRole = userProfile?.role?.trim() ? userProfile.role : t('profile.notProvided');
+  const displayMobile = userProfile?.mobile?.trim() ? userProfile.mobile : t('profile.notProvided');
+  const displayEmail = userProfile?.email?.trim() ? userProfile.email : t('profile.notProvided');
   const displayLocation = userProfile?.village
     ? `${userProfile.village}, ${userProfile.taluka || ''}, ${userProfile.district || ''}, ${userProfile.state || ''}`.replace(/, ,/g, ',').replace(/(^,)|(,$)/g, '')
-    : 'Not configured';
+    : t('profile.notConfigured');
 
   if (isProfileLoading && !userProfile) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingState}>
           <ActivityIndicator size="large" color="#16A34A" />
-          <AppText style={styles.loadingTitle}>Loading your profile</AppText>
-          <AppText style={styles.loadingText}>We’re fetching your account details from the server.</AppText>
+          <AppText style={styles.loadingTitle}>{t('profile.loadingProfile')}</AppText>
+          <AppText style={styles.loadingText}>{t('profile.loadingProfileSub')}</AppText>
         </View>
       </SafeAreaView>
     );
@@ -253,7 +253,7 @@ export default function ProfileScreen({ navigation }) {
         {uploading && (
           <View style={styles.progressContainer}>
             <ActivityIndicator size="small" color="#16A34A" />
-            <AppText style={styles.progressText}>Uploading Profile Photo... {uploadProgress}%</AppText>
+            <AppText style={styles.progressText}>{t('profile.uploadingPhoto')} {uploadProgress}%</AppText>
           </View>
         )}
 
@@ -262,12 +262,12 @@ export default function ProfileScreen({ navigation }) {
             <View style={styles.emptyStateIcon}>
               <Ionicons name="person-circle-outline" size={40} color="#16A34A" />
             </View>
-            <AppText style={styles.emptyStateTitle}>Complete your profile</AppText>
+            <AppText style={styles.emptyStateTitle}>{t('profile.completeProfile')}</AppText>
             <AppText style={styles.emptyStateText}>
-              Your account is ready, but no profile details are available yet. Add your information to continue using PashuSetu with your real profile.
+              {t('profile.completeProfileSub')}
             </AppText>
             <TouchableOpacity style={styles.emptyStateButton} onPress={handleEditProfile}>
-              <AppText style={styles.emptyStateButtonText}>Add Profile Details</AppText>
+              <AppText style={styles.emptyStateButtonText}>{t('profile.addProfileDetails')}</AppText>
             </TouchableOpacity>
           </View>
         ) : (
@@ -299,7 +299,7 @@ export default function ProfileScreen({ navigation }) {
             </View>
 
             {/* Statistics Grid */}
-            <Text style={styles.sectionTitle}>Dashboard Stats</Text>
+            <AppText style={styles.sectionTitle}>{t('profile.dashboardStats')}</AppText>
             <View style={styles.statsGrid}>
               {SELLER_STATS.map((stat) => (
                 <View key={stat.id} style={styles.statCard}>
@@ -308,41 +308,41 @@ export default function ProfileScreen({ navigation }) {
                   </View>
                   <View style={styles.statInfo}>
                     <AppText style={styles.statValue}>{stat.value}</AppText>
-                    <AppText style={styles.statLabel}>{stat.label}</AppText>
+                    <AppText style={styles.statLabel}>{t(stat.labelKey)}</AppText>
                   </View>
                 </View>
               ))}
             </View>
 
             {/* Profile Information */}
-            <Text style={styles.sectionTitle}>Contact & Location Info</Text>
+            <AppText style={styles.sectionTitle}>{t('profile.contactInfo')}</AppText>
             <View style={styles.infoCard}>
               <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Full Name</Text>
-                <Text style={styles.infoValue}>{displayName}</Text>
+                <AppText style={styles.infoLabel}>{t('profile.fullName')}</AppText>
+                <AppText style={styles.infoValue}>{displayName}</AppText>
               </View>
               <View style={styles.divider} />
 
               <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Mobile Number</Text>
-                <Text style={styles.infoValue}>+91 {displayMobile}</Text>
+                <AppText style={styles.infoLabel}>{t('profile.mobileNumber')}</AppText>
+                <AppText style={styles.infoValue}>+91 {displayMobile}</AppText>
               </View>
               <View style={styles.divider} />
 
               <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Email Address</Text>
-                <Text style={styles.infoValue}>{displayEmail}</Text>
+                <AppText style={styles.infoLabel}>{t('profile.emailAddress')}</AppText>
+                <AppText style={styles.infoValue}>{displayEmail}</AppText>
               </View>
               <View style={styles.divider} />
 
               <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Location Address</Text>
-                <Text style={styles.infoValue}>{displayLocation}</Text>
+                <AppText style={styles.infoLabel}>{t('profile.locationAddress')}</AppText>
+                <AppText style={styles.infoValue}>{displayLocation}</AppText>
               </View>
             </View>
 
             {/* Account Menu Items Section */}
-            <Text style={styles.sectionTitle}>Account & Settings</Text>
+            <AppText style={styles.sectionTitle}>{t('profile.accountSettings')}</AppText>
             <View style={styles.menuCard}>
               {MENU_ITEMS.map((item, index) => (
                 <View key={item.id}>
@@ -355,7 +355,7 @@ export default function ProfileScreen({ navigation }) {
                           <Ionicons name={item.icon} size={20} color="#475569" />
                         )}
                       </View>
-                      <AppText style={styles.menuTitle}>{item.title}</AppText>
+                      <AppText style={styles.menuTitle}>{t(item.titleKey)}</AppText>
                     </View>
                     <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
                   </TouchableOpacity>
@@ -374,54 +374,54 @@ export default function ProfileScreen({ navigation }) {
       </ScrollView>
 
       {/* Edit Profile Details Modal Form */}
-        <Modal animationType="slide" transparent={true} visible={isEditModalVisible} onRequestClose={() => setIsEditModalVisible(false)}>
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Update Profile Details</Text>
-                <TouchableOpacity onPress={() => setIsEditModalVisible(false)}>
-                  <Ionicons name="close" size={24} color="#64748B" />
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView contentContainerStyle={styles.modalFormScroll}>
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Full Name</Text>
-                  <TextInput style={styles.input} value={editForm.name} onChangeText={(text) => setEditForm({ ...editForm, name: text })} placeholder="Enter Name" />
-                </View>
-
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Mobile Number</Text>
-                  <TextInput style={styles.input} keyboardType="phone-pad" value={editForm.mobile} onChangeText={(text) => setEditForm({ ...editForm, mobile: text })} placeholder="Enter Phone" maxLength={10} />
-                </View>
-
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Village</Text>
-                  <TextInput style={styles.input} value={editForm.village} onChangeText={(text) => setEditForm({ ...editForm, village: text })} placeholder="Enter Village" />
-                </View>
-
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Taluka</Text>
-                  <TextInput style={styles.input} value={editForm.taluka} onChangeText={(text) => setEditForm({ ...editForm, taluka: text })} placeholder="Enter Taluka" />
-                </View>
-
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>District</Text>
-                  <TextInput style={styles.input} value={editForm.district} onChangeText={(text) => setEditForm({ ...editForm, district: text })} placeholder="Enter District" />
-                </View>
-
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>State</Text>
-                  <TextInput style={styles.input} value={editForm.state} onChangeText={(text) => setEditForm({ ...editForm, state: text })} placeholder="Enter State" />
-                </View>
-              </ScrollView>
-
-              <TouchableOpacity style={styles.saveButton} onPress={handleSaveProfile} disabled={syncing}>
-                {syncing ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveButtonText}>Save Details</Text>}
+      <Modal animationType="slide" transparent={true} visible={isEditModalVisible} onRequestClose={() => setIsEditModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <AppText style={styles.modalTitle}>{t('profile.updateProfile')}</AppText>
+              <TouchableOpacity onPress={() => setIsEditModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#64748B" />
               </TouchableOpacity>
             </View>
+
+            <ScrollView contentContainerStyle={styles.modalFormScroll}>
+              <View style={styles.inputGroup}>
+                <AppText style={styles.label}>{t('profile.fullName')}</AppText>
+                <TextInput style={styles.input} value={editForm.name} onChangeText={(text) => setEditForm({ ...editForm, name: text })} placeholder={t('profile.enterName')} />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <AppText style={styles.label}>{t('profile.mobileNumber')}</AppText>
+                <TextInput style={styles.input} keyboardType="phone-pad" value={editForm.mobile} onChangeText={(text) => setEditForm({ ...editForm, mobile: text })} placeholder={t('profile.enterPhone')} maxLength={10} />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <AppText style={styles.label}>{t('profile.village')}</AppText>
+                <TextInput style={styles.input} value={editForm.village} onChangeText={(text) => setEditForm({ ...editForm, village: text })} placeholder={t('profile.enterVillage')} />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <AppText style={styles.label}>{t('profile.taluka')}</AppText>
+                <TextInput style={styles.input} value={editForm.taluka} onChangeText={(text) => setEditForm({ ...editForm, taluka: text })} placeholder={t('profile.enterTaluka')} />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <AppText style={styles.label}>{t('profile.district')}</AppText>
+                <TextInput style={styles.input} value={editForm.district} onChangeText={(text) => setEditForm({ ...editForm, district: text })} placeholder={t('profile.enterDistrict')} />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <AppText style={styles.label}>{t('profile.state')}</AppText>
+                <TextInput style={styles.input} value={editForm.state} onChangeText={(text) => setEditForm({ ...editForm, state: text })} placeholder={t('profile.enterState')} />
+              </View>
+            </ScrollView>
+
+            <TouchableOpacity style={styles.saveButton} onPress={handleSaveProfile} disabled={syncing}>
+              {syncing ? <ActivityIndicator color="#fff" /> : <AppText style={styles.saveButtonText}>{t('profile.saveDetails')}</AppText>}
+            </TouchableOpacity>
           </View>
-        </Modal>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -720,6 +720,72 @@ const styles = StyleSheet.create({
   saveButtonText: {
     color: '#fff',
     fontSize: 15,
+    fontWeight: '700',
+  },
+  loadingState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  loadingTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginTop: 16,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  emptyStateCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    padding: 24,
+    marginHorizontal: 16,
+    marginTop: 16,
+    alignItems: 'center',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.02,
+    shadowRadius: 8,
+    elevation: 1,
+  },
+  emptyStateIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#DCFCE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  emptyStateTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 8,
+  },
+  emptyStateText: {
+    fontSize: 13,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 20,
+  },
+  emptyStateButton: {
+    backgroundColor: '#16A34A',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  emptyStateButtonText: {
+    color: '#FFFFFF',
+    fontSize: 13,
     fontWeight: '700',
   },
 });

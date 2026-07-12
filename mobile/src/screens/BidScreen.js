@@ -1,16 +1,20 @@
 import React from 'react';
-import { StyleSheet, View, Text, SafeAreaView } from 'react-native';
+import { StyleSheet, View, SafeAreaView } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
+import AppText from '../components/AppText';
 
 export default function BidScreen() {
+  const { t } = useTranslation();
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <View style={styles.iconCircle}>
           <MaterialCommunityIcons name="gavel" size={60} color="#16A34A" />
         </View>
-        <Text style={styles.title}>Live Bidding</Text>
-        <Text style={styles.subtitle}>Place bids on active livestock auctions and track deals.</Text>
+        <AppText style={styles.title}>{t('bid.title')}</AppText>
+        <AppText style={styles.subtitle}>{t('bid.subtitle')}</AppText>
       </View>
     </SafeAreaView>
   );

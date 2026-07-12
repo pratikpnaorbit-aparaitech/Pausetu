@@ -1,8 +1,7 @@
-import React, { useContext } from 'react';
+import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import { AppContext } from '../context/AppContext';
 import { useFontScale } from '../hooks/useTypography';
 
 // Import Screens
@@ -20,7 +19,7 @@ export default function BottomTabNavigator() {
 
   return (
     <Tab.Navigator
-      screenOptions={{
+      screenOptions={({ route }) => ({
         headerShown: true,
         headerStyle: {
           backgroundColor: '#FFFFFF',
@@ -31,6 +30,7 @@ export default function BottomTabNavigator() {
         headerTitleStyle: {
           fontWeight: '700',
         },
+
         tabBarStyle: {
           position: 'absolute',
           bottom: 16,
@@ -48,59 +48,88 @@ export default function BottomTabNavigator() {
           paddingBottom: 8,
           paddingTop: 8,
         },
+
         tabBarActiveTintColor: '#16A34A',
         tabBarInactiveTintColor: '#64748B',
+
         tabBarLabelStyle: {
           fontSize: scaledTabLabel,
           fontWeight: '600',
           marginTop: 2,
         },
+
         tabBarIconStyle: {
           marginBottom: -2,
         },
-      }}
+
+        tabBarIcon: ({ focused, color }) => {
+          let iconName;
+          let iconColor = focused ? '#16A34A' : color;
+
+          switch (route.name) {
+            case 'Buy':
+              iconName = 'shopping';
+              iconColor = focused ? '#EF4444' : '#64748B';
+              break;
+
+            case 'Sell':
+              iconName = 'cash-plus';
+              iconColor = focused ? '#16A34A' : '#64748B';
+              break;
+
+            case 'Bid':
+              iconName = 'gavel';
+              break;
+
+            case 'Post':
+              iconName = 'plus-circle-outline';
+              break;
+
+            default:
+              iconName = 'circle';
+          }
+
+          return (
+            <MaterialCommunityIcons
+              name={iconName}
+              size={22}
+              color={iconColor}
+            />
+          );
+        },
+      })}
     >
       <Tab.Screen
         name="Buy"
         component={BuyScreen}
         options={{
           title: t('tabs.buy'),
-          tabBarIcon: ({ color }) => (
-            <MaterialCommunityIcons name="shopping" size={22} color={color} />
-          ),
         }}
       />
+
       <Tab.Screen
         name="Sell"
         component={SellScreen}
         options={{
           title: t('tabs.sell'),
-          tabBarIcon: ({ color }) => (
-            <MaterialCommunityIcons name="cash-plus" size={22} color={color} />
-          ),
         }}
       />
+
       <Tab.Screen
         name="Bid"
         component={BidScreen}
         options={{
           title: t('tabs.bid'),
-          tabBarIcon: ({ color }) => (
-            <MaterialCommunityIcons name="gavel" size={22} color={color} />
-          ),
         }}
       />
+
       <Tab.Screen
         name="Post"
         component={PostScreen}
         options={{
           title: t('tabs.post'),
-          tabBarIcon: ({ color }) => (
-            <MaterialCommunityIcons name="plus-circle-outline" size={22} color={color} />
-          ),
         }}
       />
     </Tab.Navigator>
   );
 }
-
