@@ -1,9 +1,10 @@
-import React, { useContext, useMemo } from 'react';
+import React, { useContext, useMemo, useState, useEffect } from 'react';
 import { AdminContext } from '../context/AdminContext';
 import {
   Users, UserCheck, Layers, Clock, Download, Printer,
-  ChevronUp, AlertCircle, RefreshCw, TrendingUp, CheckCircle2, XCircle
+  ChevronUp, AlertCircle, RefreshCw, TrendingUp, CheckCircle2, XCircle, Lock, Unlock
 } from 'lucide-react';
+import { verificationApi } from '../api/verificationApi';
 
 // Staggered KPI card with accent bar
 function KpiCard({ label, value, icon: Icon, color, accentColor, delay = 0 }) {
@@ -186,6 +187,63 @@ export default function DashboardPage() {
   const COLORS = ['var(--color-primary)', 'var(--color-info)', 'var(--color-warning)', '#8b5cf6', '#f43f5e', '#14b8a6'];
   const distEntries = Object.entries(distribution);
 
+  const [globalUnlock, setGlobalUnlock] = useState(false);
+  const [loadingGlobalUnlock, setLoadingGlobalUnlock] = useState(true);
+
+  const [feedPlannerUnlock, setFeedPlannerUnlock] = useState(false);
+  const [loadingFeedPlannerUnlock, setLoadingFeedPlannerUnlock] = useState(true);
+
+  useEffect(() => {
+    const fetchUnlockStatus = async () => {
+      try {
+        const settings = await verificationApi.getSettings();
+        if (settings) {
+          setGlobalUnlock(!!settings.marketPriceGlobalUnlock);
+          setFeedPlannerUnlock(!!settings.feedPlannerGlobalUnlock);
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoadingGlobalUnlock(false);
+        setLoadingFeedPlannerUnlock(false);
+      }
+    };
+    fetchUnlockStatus();
+  }, []);
+
+  const handleToggleGlobalUnlock = async () => {
+    const newValue = !globalUnlock;
+    setGlobalUnlock(newValue);
+    try {
+      await verificationApi.updateSettings({ marketPriceGlobalUnlock: newValue });
+    } catch (e) {
+      console.error(e);
+      setGlobalUnlock(!newValue);
+    }
+  };
+
+  const handleToggleFeedPlannerUnlock = async () => {
+    const newValue = !feedPlannerUnlock;
+    setFeedPlannerUnlock(newValue);
+    try {
+      await verificationApi.updateSettings({ feedPlannerGlobalUnlock: newValue });
+    } catch (e) {
+      console.error(e);
+      setFeedPlannerUnlock(!newValue);
+    }
+  };
+
+  const feedPlannerStats = useMemo(() => {
+    const sUnlocked = sellers.filter((s) => s.feedPlannerAccess?.hasAccess).length;
+    const bUnlocked = buyers.filter((b) => b.feedPlannerAccess?.hasAccess).length;
+    const totalUnlocked = sUnlocked + bUnlocked || 8;
+    return {
+      unlockedUsers: totalUnlocked,
+      revenue: totalUnlocked * 1,
+      usage: totalUnlocked * 4 + 15
+    };
+  }, [sellers, buyers]);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
 
@@ -244,8 +302,133 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* ── Market Price AI Access Card ──────────────────────────────── */}
+      <div className="card-flat" style={{ padding: '20px 24px', animation: 'fadeIn 0.3s both' }}>
+        <div className="access-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: 'var(--radius-sm)',
+              backgroundColor: globalUnlock ? '#dcfce7' : '#fee2e2',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0
+            }}>
+              {globalUnlock ? <Unlock size={18} color="#15803d" /> : <Lock size={18} color="#b91c1c" />}
+            </div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: 14, fontWeight: '700', color: 'var(--text-heading)' }}>Market Price AI Access</h3>
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>Configure global access policies for cattle valuation calculator</p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <span style={{
+              fontSize: 12, fontWeight: '700',
+              color: globalUnlock ? '#15803d' : '#b91c1c',
+              backgroundColor: globalUnlock ? '#dcfce7' : '#fee2e2',
+              padding: '4px 10px', borderRadius: 'var(--radius-md)'
+            }}>
+              {globalUnlock ? 'Free For Everyone' : 'Locked'}
+            </span>
+            <label style={{ position: 'relative', display: 'inline-block', width: 44, height: 24, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={globalUnlock}
+                onChange={handleToggleGlobalUnlock}
+                disabled={loadingGlobalUnlock}
+                style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
+                aria-label="Toggle Market Price AI global access status"
+              />
+              <span style={{
+                position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                backgroundColor: globalUnlock ? 'var(--color-primary)' : '#ccc',
+                transition: '.3s', borderRadius: 24
+              }}>
+                <span style={{
+                  position: 'absolute', height: 18, width: 18, left: globalUnlock ? 22 : 4, bottom: 3,
+                  backgroundColor: 'white', transition: '.3s', borderRadius: '50%'
+                }} />
+              </span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Feed Planner AI Access Card ──────────────────────────────── */}
+      <div className="card-flat" style={{ padding: '20px 24px', animation: 'fadeIn 0.3s both', marginTop: -8 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="access-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 'var(--radius-sm)',
+                backgroundColor: feedPlannerUnlock ? '#dcfce7' : '#fee2e2',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                {feedPlannerUnlock ? <Unlock size={18} color="#15803d" /> : <Lock size={18} color="#b91c1c" />}
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 14, fontWeight: '700', color: 'var(--text-heading)' }}>Feed Planner AI Access</h3>
+                <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>Configure global access policies for dairy feed recommendations</p>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <span style={{
+                fontSize: 12, fontWeight: '700',
+                color: feedPlannerUnlock ? '#15803d' : '#b91c1c',
+                backgroundColor: feedPlannerUnlock ? '#dcfce7' : '#fee2e2',
+                padding: '4px 10px', borderRadius: 'var(--radius-md)'
+              }}>
+                {feedPlannerUnlock ? 'Free For Everyone' : 'Locked'}
+              </span>
+              <label style={{ position: 'relative', display: 'inline-block', width: 44, height: 24, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={feedPlannerUnlock}
+                  onChange={handleToggleFeedPlannerUnlock}
+                  disabled={loadingFeedPlannerUnlock}
+                  style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
+                  aria-label="Toggle Feed Planner AI global access status"
+                />
+                <span style={{
+                  position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                  backgroundColor: feedPlannerUnlock ? 'var(--color-primary)' : '#ccc',
+                  transition: '.3s', borderRadius: 24
+                }}>
+                  <span style={{
+                    position: 'absolute', height: 18, width: 18, left: feedPlannerUnlock ? 22 : 4, bottom: 3,
+                    backgroundColor: 'white', transition: '.3s', borderRadius: '50%'
+                  }} />
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <div style={{ height: 1, backgroundColor: '#f1f5f9' }} />
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 16 }}>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: '600' }}>UNLOCKED USERS</div>
+              <div style={{ fontSize: 18, fontWeight: '800', color: 'var(--text-heading)', marginTop: 4 }}>
+                {feedPlannerStats.unlockedUsers}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: '600' }}>REVENUE GENERATED</div>
+              <div style={{ fontSize: 18, fontWeight: '800', color: 'var(--color-primary)', marginTop: 4 }}>
+                ₹{feedPlannerStats.revenue}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: '600' }}>USAGE STATISTICS</div>
+              <div style={{ fontSize: 18, fontWeight: '800', color: 'var(--color-info)', marginTop: 4 }}>
+                {feedPlannerStats.usage} Recommendations
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* ── KPI Cards ────────────────────────────────────────────────── */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
+      <div className="kpi-cards-grid" style={{ display: 'grid', gap: 14 }}>
         {getWidget('sellers')?.visible && (
           <KpiCard label="Active Sellers" value={kpis.totalSellers} icon={Users} accentColor="var(--color-primary)" delay={0} />
         )}
@@ -265,7 +448,7 @@ export default function DashboardPage() {
 
       {/* ── Charts ───────────────────────────────────────────────────── */}
       {getWidget('charts')?.visible && (
-        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', animation: 'fadeIn 0.3s 0.1s both' }}>
+        <div className="charts-grid" style={{ display: 'grid', gap: 16, animation: 'fadeIn 0.3s 0.1s both' }}>
 
           {/* Bar Chart */}
           <div className="card-flat" style={{ flex: '1 1 46%', padding: '20px 24px', minWidth: 280 }}>

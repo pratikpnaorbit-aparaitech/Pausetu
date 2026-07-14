@@ -291,36 +291,7 @@ export default function SellScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* Monthly Analytics Overview Card */}
-        <AppText style={styles.sectionTitle}>{t('sell.monthlyOverview')}</AppText>
-        <View style={styles.overviewCard}>
-          <AppText style={styles.overviewCardTitle}>{t('sell.juneSummary')}</AppText>
-          <View style={styles.overviewMetricsRow}>
-            <View style={styles.overviewMetric}>
-              <AppText style={styles.metricLabel}>{t('sell.revenue')}</AppText>
-              <AppText style={styles.metricValue}>₹1.85L</AppText>
-              <AppText style={styles.metricTrend}>+12.4%</AppText>
-            </View>
-            <View style={styles.overviewVerticalDivider} />
-            <View style={styles.overviewMetric}>
-              <AppText style={styles.metricLabel}>{t('sell.views')}</AppText>
-              <AppText style={styles.metricValue}>2.4K</AppText>
-              <AppText style={styles.metricTrend}>+18.1%</AppText>
-            </View>
-            <View style={styles.overviewVerticalDivider} />
-            <View style={styles.overviewMetric}>
-              <AppText style={styles.metricLabel}>{t('sell.enquiries')}</AppText>
-              <AppText style={styles.metricValue}>18</AppText>
-              <AppText style={styles.metricTrend}>+5 new</AppText>
-            </View>
-            <View style={styles.overviewVerticalDivider} />
-            <View style={styles.overviewMetric}>
-              <AppText style={styles.metricLabel}>{t('sell.soldListing')}</AppText>
-              <AppText style={styles.metricValue}>4</AppText>
-              <AppText style={styles.metricTrend}>100% fill</AppText>
-            </View>
-          </View>
-        </View>
+
 
         {/* Recent Listings Section */}
         <View style={styles.sectionHeaderRow}>
@@ -620,57 +591,7 @@ const styles = StyleSheet.create({
     color: '#475569',
     textAlign: 'center',
   },
-  overviewCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-    padding: 16,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.03,
-    shadowRadius: 10,
-    elevation: 2,
-  },
-  overviewCardTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#475569',
-    marginBottom: 14,
-  },
-  overviewMetricsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  overviewMetric: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  metricLabel: {
-    fontSize: 10,
-    color: '#94A3B8',
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  metricValue: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#0F172A',
-  },
-  metricTrend: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#16A34A',
-    marginTop: 2,
-  },
-  overviewVerticalDivider: {
-    height: 32,
-    width: 1,
-    backgroundColor: '#F1F5F9',
-  },
+
   sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -999,7 +920,7 @@ const styles = StyleSheet.create({
   },
   floatingFab: {
     position: 'absolute',
-    bottom: 90,
+    bottom: 110,
     right: 16,
     width: 52,
     height: 52,
@@ -1012,6 +933,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 10,
     elevation: 6,
+  },
+  scrollContent: {
+    paddingBottom: 150,
   },
   guestContainer: {
     flex: 1,

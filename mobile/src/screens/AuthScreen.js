@@ -231,12 +231,12 @@ export default function AuthScreen({ navigation }) {
               },
             ]}
           >
-            {/* Glassmorphic Login Card */}
-            <BlurView intensity={20} tint="light" style={styles.cardBlurContainer}>
+            {/* Solid White Login Card */}
+            <View style={styles.loginCard}>
               {/* Card Header inside the card */}
               <View style={styles.cardHeader}>
                 <View style={styles.cardHeaderIconCircle}>
-                  <MaterialCommunityIcons name="email-outline" size={20} color="#16A34A" />
+                  <MaterialCommunityIcons name="email-outline" size={18} color="#16A34A" />
                 </View>
                 <AppText style={styles.cardLabel}>{t('auth.continueWithEmail')}</AppText>
               </View>
@@ -250,7 +250,7 @@ export default function AuthScreen({ navigation }) {
               >
                 <MaterialCommunityIcons
                   name="email-outline"
-                  size={22}
+                  size={20}
                   color={isFocused ? '#16A34A' : '#94A3B8'}
                   style={styles.inputIcon}
                 />
@@ -288,7 +288,7 @@ export default function AuthScreen({ navigation }) {
                       <ActivityIndicator color="#FFFFFF" />
                     ) : (
                       <View style={styles.sendButtonContent}>
-                        <MaterialCommunityIcons name="send" size={18} color="#FFFFFF" style={styles.sendButtonIcon} />
+                        <MaterialCommunityIcons name="send" size={16} color="#FFFFFF" style={styles.sendButtonIcon} />
                         <AppText style={styles.sendButtonText}>{t('auth.continue')}</AppText>
                       </View>
                     )}
@@ -318,7 +318,7 @@ export default function AuthScreen({ navigation }) {
                 >
                   <MaterialCommunityIcons
                     name="account-outline"
-                    size={26}
+                    size={22}
                     color="#16A34A"
                     style={styles.guestIcon}
                   />
@@ -328,55 +328,7 @@ export default function AuthScreen({ navigation }) {
                   </View>
                 </TouchableOpacity>
               </Animated.View>
-
-              {/* 2x2 Grid Features Section */}
-              <View style={styles.featuresGridContainer}>
-                {/* Row 1 */}
-                <View style={styles.featuresGridRow}>
-                  {/* Secure */}
-                  <View style={styles.featureGridCol}>
-                    <MaterialCommunityIcons name="checkbox-marked-circle" size={20} color="#16A34A" style={styles.featureIcon} />
-                    <View style={styles.featureTextWrapper}>
-                      <AppText style={styles.featureTitle}>{t('auth.secure', { defaultValue: 'सुरक्षित' })}</AppText>
-                      <AppText style={styles.featureSubtext} numberOfLines={2}>{t('auth.secureSub', { defaultValue: 'तुमची माहिती सुरक्षित आहे' })}</AppText>
-                    </View>
-                  </View>
-
-                  {/* Fast */}
-                  <View style={styles.featureGridCol}>
-                    <MaterialCommunityIcons name="clock-outline" size={20} color="#16A34A" style={styles.featureIcon} />
-                    <View style={styles.featureTextWrapper}>
-                      <AppText style={styles.featureTitle}>{t('auth.fast', { defaultValue: 'जलद' })}</AppText>
-                      <AppText style={styles.featureSubtext} numberOfLines={2}>{t('auth.fastSub', { defaultValue: 'फक्त काही सेकंदात लॉगिन' })}</AppText>
-                    </View>
-                  </View>
-                </View>
-
-                {/* Horizontal Separator */}
-                <View style={styles.featuresGridDivider} />
-
-                {/* Row 2 */}
-                <View style={styles.featuresGridRow}>
-                  {/* Farmer Friendly */}
-                  <View style={styles.featureGridCol}>
-                    <MaterialCommunityIcons name="leaf" size={20} color="#16A34A" style={styles.featureIcon} />
-                    <View style={styles.featureTextWrapper}>
-                      <AppText style={styles.featureTitle}>{t('auth.farmerFriendly', { defaultValue: 'शेतकरी मित्र' })}</AppText>
-                      <AppText style={styles.featureSubtext} numberOfLines={2}>{t('auth.farmerFriendlySub', { defaultValue: 'शेतकर्यांसाठी विशेष बनवलेले' })}</AppText>
-                    </View>
-                  </View>
-
-                  {/* Simple */}
-                  <View style={styles.featureGridCol}>
-                    <MaterialCommunityIcons name="account-group" size={20} color="#16A34A" style={styles.featureIcon} />
-                    <View style={styles.featureTextWrapper}>
-                      <AppText style={styles.featureTitle}>{t('auth.secureLogin', { defaultValue: 'सोपे' })}</AppText>
-                      <AppText style={styles.featureSubtext} numberOfLines={2}>{t('auth.secureLoginSub', { defaultValue: 'सोपे आणि सुलभ वापर' })}</AppText>
-                    </View>
-                  </View>
-                </View>
-              </View>
-            </BlurView>
+            </View>
           </Animated.View>
 
           {/* Footer – App Version */}
@@ -394,7 +346,7 @@ export default function AuthScreen({ navigation }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F4F8F5', // reverted to light agricultural background blend
+    backgroundColor: '#F4F8F5',
   },
   background: {
     ...StyleSheet.absoluteFillObject,
@@ -407,56 +359,56 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: Platform.OS === 'ios' ? 44 : 36,
+    paddingHorizontal: 20,
+    paddingVertical: Platform.OS === 'ios' ? 20 : 15,
   },
 
   /* Header Section */
   header: {
     alignItems: 'center',
-    marginBottom: 40, // increased spacing to match reference
+    marginBottom: 20,
   },
   logoWrapper: {
     position: 'relative',
-    marginBottom: 20, // increased spacing
+    marginBottom: 10,
   },
   logoCircle: {
-    width: 110, // increased 10%
-    height: 110,
-    borderRadius: 55,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 4,
+    borderWidth: 3,
     borderColor: '#16A34A',
     shadowColor: '#16A34A',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.22,
-    shadowRadius: 16,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
   },
   logoDecoration: {
     position: 'absolute',
-    top: 4,
-    right: 4,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    top: 2,
+    right: 2,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     backgroundColor: '#16A34A',
-    borderWidth: 3.5,
+    borderWidth: 2.5,
     borderColor: '#FFFFFF',
   },
   logoText: {
-    fontSize: 42, // increased size
+    fontSize: 32,
     fontWeight: '900',
     color: '#16A34A',
-    letterSpacing: 1.5,
+    letterSpacing: 1,
   },
   titleContainer: {
-    fontSize: 32,
+    fontSize: 26,
     textAlign: 'center',
-    lineHeight: 38,
-    marginBottom: 10, // increased spacing
+    lineHeight: 32,
+    marginBottom: 4,
   },
   titleBrand: {
     fontWeight: '900',
@@ -467,63 +419,56 @@ const styles = StyleSheet.create({
     color: '#16A34A',
   },
   leafEmblem: {
-    marginVertical: 12, // increased spacing
+    marginVertical: 4,
   },
   shortTagline: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#334155',
     textAlign: 'center',
-    lineHeight: 24,
-    maxWidth: 360,
-    fontWeight: '700', // Subtitle weight 700
-    opacity: 0.9, // tagline opacity 0.9
+    lineHeight: 20,
+    maxWidth: 320,
+    fontWeight: '700',
+    opacity: 0.9,
   },
 
-  /* Floating Card Shadow & Blur Container */
+  /* Floating Card Shadow */
   cardShadow: {
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 20 }, // soft floating shadow
-    shadowOpacity: 0.08, // low opacity
-    shadowRadius: 36, // large blur radius
-    elevation: 14, // soft elevation
-    marginBottom: 16,
-    borderRadius: 30,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.05,
+    shadowRadius: 20,
+    elevation: 8,
+    marginBottom: 10,
+    borderRadius: 20,
     backgroundColor: 'transparent',
-    maxWidth: 490, // increased width slightly
+    maxWidth: 440,
     width: '100%',
     alignSelf: 'center',
   },
-  cardBlurContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.88)', // premium white frosted glass
-    borderColor: 'rgba(255, 255, 255, 0.55)',
-    borderWidth: 1.2,
-    borderRadius: 30,
-    padding: 28, // increased internal padding
-    overflow: 'hidden',
-    ...Platform.select({
-      web: {
-        backdropFilter: 'blur(10px)',
-        WebkitBackdropFilter: 'blur(10px)',
-      },
-    }),
+  loginCard: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E2E8F0',
+    borderWidth: 1,
+    borderRadius: 20,
+    padding: 20,
   },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 18,
+    marginBottom: 12,
   },
   cardHeaderIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#E8F5E9',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
   },
   cardLabel: {
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: 15,
+    fontWeight: '700',
     color: '#1E293B',
   },
 
@@ -531,53 +476,53 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 58, // increased height slightly
-    backgroundColor: '#FFFFFF', // solid white input
+    height: 48,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
-    borderColor: '#E2E8F0', // subtle border
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    marginBottom: 22, // increased vertical spacing
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    marginBottom: 14,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.02,
+    shadowRadius: 2,
     elevation: 1,
   },
   inputContainerFocused: {
     borderColor: '#16A34A',
-    borderWidth: 2, // better focus border
+    borderWidth: 2,
     backgroundColor: '#FFFFFF',
     shadowColor: '#16A34A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.14,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   inputIcon: {
-    marginRight: 10,
+    marginRight: 8,
   },
   input: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 14,
     color: '#0F172A',
     paddingVertical: 0,
     fontWeight: '600',
   },
 
-  /* Continue Button Gradient */
+  /* Continue Button */
   sendButtonTouch: {
-    borderRadius: 16,
+    borderRadius: 12,
     shadowColor: '#16A34A',
-    shadowOffset: { width: 0, height: 8 }, // improved shadow
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 6,
-    marginBottom: 22, // increased vertical spacing
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 3,
+    marginBottom: 14,
   },
   sendButtonGradient: {
-    height: 58, // increased height slightly
-    borderRadius: 16,
+    height: 48,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
     width: '100%',
@@ -588,21 +533,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sendButtonIcon: {
-    marginRight: 8,
-    transform: [{ rotate: '-15deg' }],
+    marginRight: 6,
   },
   sendButtonText: {
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: 15,
+    fontWeight: '700',
     color: '#FFFFFF',
     letterSpacing: 0.5,
   },
 
-  /* OR Divider with outline chip */
+  /* OR Divider */
   dividerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 22, // increased vertical spacing
+    marginBottom: 14,
   },
   dividerLine: {
     flex: 1,
@@ -614,109 +558,56 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
     borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 2,
     marginHorizontal: 8,
   },
   dividerText: {
     color: '#64748B',
-    fontSize: 13,
-    fontWeight: '800',
+    fontSize: 12,
+    fontWeight: '700',
   },
 
-  /* Guest Button - Glass Outlined */
+  /* Guest Button */
   guestButton: {
     flexDirection: 'row',
-    height: 64,
-    borderRadius: 16,
+    height: 52,
+    borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: '#16A34A', // outlines the guest button green
-    backgroundColor: 'rgba(255, 255, 255, 0.75)', // glass background
+    borderColor: '#16A34A',
+    backgroundColor: '#FFFFFF',
     justifyContent: 'flex-start',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
-    marginBottom: 24, // increased vertical spacing
+    paddingHorizontal: 16,
+    marginBottom: 10,
   },
   guestIcon: {
-    marginRight: 12,
+    marginRight: 10,
   },
   guestTextContainer: {
     flex: 1,
     justifyContent: 'center',
   },
   guestButtonText: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#15803D', // high contrast green
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#15803D',
   },
   guestSubtext: {
-    fontSize: 12,
-    color: '#64748B',
-    marginTop: 2,
-    fontWeight: '500',
-  },
-
-  /* Features grid inside the card */
-  featuresGridContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.88)', // matches card white frosted glass
-    borderColor: 'rgba(255, 255, 255, 0.55)',
-    borderWidth: 1.2,
-    borderRadius: 20,
-    padding: 16, // spaced out padding
-    marginTop: 20,
-    width: '100%',
-  },
-  featuresGridRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-  },
-  featureGridCol: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  featureIcon: {
-    marginRight: 8,
-    marginTop: 2,
-  },
-  featureTextWrapper: {
-    flex: 1,
-  },
-  featureTitle: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#15803D', // solid green
-  },
-  featureSubtext: {
     fontSize: 11,
-    color: '#475569',
-    marginTop: 2,
-    lineHeight: 14,
+    color: '#64748B',
+    marginTop: 1,
     fontWeight: '500',
-  },
-  featuresGridDivider: {
-    height: 1,
-    backgroundColor: '#E2E8F0', // clean grey grid divider
-    marginVertical: 10,
-    marginHorizontal: 8,
   },
 
   /* Footer */
   footer: {
-    marginTop: 18,
+    marginTop: 12,
     alignItems: 'center',
-    paddingBottom: 16,
+    paddingBottom: 10,
   },
   footerText: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#64748B',
     fontWeight: '600',
     opacity: 0.6,

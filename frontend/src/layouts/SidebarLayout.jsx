@@ -8,8 +8,8 @@ import {
 
 const NAV_ITEMS = [
   { name: 'Dashboard',        icon: LayoutDashboard, section: 'main' },
-  { name: 'Pending Approvals',icon: Clock,           section: 'main', hasBadge: true },
-  { name: 'Verification Requests', icon: Shield,     section: 'main' },
+  { name: 'Pending Approvals',icon: Clock,           section: 'main', badgeType: 'approvals' },
+  { name: 'Verification Requests', icon: Shield,     section: 'main', badgeType: 'verifications' },
   { name: 'Animals',          icon: Layers,          section: 'main' },
   { name: 'Sellers',          icon: Users,           section: 'main' },
   { name: 'Buyers',           icon: UserCheck,       section: 'main' },
@@ -33,6 +33,7 @@ export default function SidebarLayout({ children }) {
     currentView,
     setCurrentView,
     animals,
+    pendingVerificationCount,
     adminDetails,
     setIsAdminLoggedIn,
     triggerConfirm,
@@ -45,6 +46,7 @@ export default function SidebarLayout({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const pendingCount = animals.filter((a) => a.status === 'pending' && !a.isDeleted).length;
+  const pendingVerificationsCount = pendingVerificationCount;
 
   const handleNav = useCallback((name) => {
     setCurrentView(name);
@@ -119,7 +121,13 @@ export default function SidebarLayout({ children }) {
                 {items.map((item) => {
                   const Icon = item.icon;
                   const isActive = currentView === item.name;
-                  const badge = item.hasBadge ? pendingCount : 0;
+                  
+                  let badge = 0;
+                  if (item.badgeType === 'approvals') {
+                    badge = pendingCount;
+                  } else if (item.badgeType === 'verifications') {
+                    badge = pendingVerificationsCount;
+                  }
 
                   return (
                     <button
@@ -178,10 +186,10 @@ export default function SidebarLayout({ children }) {
       </aside>
 
       {/* ── Main Content Area ────────────────────────────────────────── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: '100vh', minWidth: 0 }}>
+      <div className="main-content-wrapper" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: '100vh', minWidth: 0 }}>
 
         {/* Top Header */}
-        <header style={{
+        <header className="top-header" style={{
           height: 60,
           backgroundColor: '#fff',
           borderBottom: '1px solid var(--border-color)',
@@ -282,7 +290,7 @@ export default function SidebarLayout({ children }) {
         </header>
 
         {/* Page Content View */}
-        <main style={{ flex: 1, padding: '24px 24px 36px', maxWidth: '100%', overflowX: 'hidden' }}>
+        <main className="main-content-container" style={{ flex: 1, padding: '24px 24px 36px', maxWidth: '100%', overflowX: 'hidden' }}>
           {children}
         </main>
       </div>

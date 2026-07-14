@@ -564,7 +564,7 @@ textarea.input {
 }
 
 .sidebar-aside {
-  width: 252px;
+  width: 280px;
   background-color: var(--bg-sidebar);
   display: flex;
   flex-direction: column;
@@ -575,7 +575,7 @@ textarea.input {
   overflow-y: auto;
   border-right: 1px solid rgba(255, 255, 255, 0.04);
   box-shadow: 4px 0 24px rgba(0, 0, 0, 0.2);
-  transition: width 220ms cubic-bezier(0.4, 0, 0.2, 1), transform 220ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition: width 220ms cubic-bezier(0.4, 0, 0.2, 1), transform 220ms cubic-bezier(0.4, 0, 0.2, 1), margin-right 220ms cubic-bezier(0.4, 0, 0.2, 1), left 220ms cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 150;
 }
 
@@ -765,53 +765,143 @@ textarea.input {
   transform: translateY(0) scale(0.98);
 }
 
-/* Tablet compact sidebar */
-@media (min-width: 769px) and (max-width: 1024px) {
+/* ── Responsive Layout & Sidebar System ───────────────────────────────────── */
+.main-content-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-width: 0;
+}
+
+.main-content {
+  min-width: 0;
+  flex: 1;
+}
+
+.sidebar {
+  flex-shrink: 0;
+}
+
+/* 1. Desktop Breakpoint (>= 1280px) */
+@media (min-width: 1280px) {
   .sidebar-aside {
-    width: 68px !important;
-    overflow: hidden;
-  }
-  .sidebar-aside .sidebar-nav-label,
-  .sidebar-aside .sidebar-brand-text,
-  .sidebar-aside .sidebar-brand-subtitle,
-  .sidebar-aside .sidebar-section-title,
-  .sidebar-aside .sidebar-profile-details {
-    display: none !important;
-  }
-  .sidebar-aside .sidebar-logo-box {
-    margin: 0 auto !important;
-  }
-  .sidebar-aside .sidebar-nav-item {
-    justify-content: center !important;
-    padding: 12px !important;
-  }
-  .sidebar-aside .sidebar-nav-item span {
-    gap: 0 !important;
-  }
-  .sidebar-aside .sidebar-badge {
-    position: absolute;
-    top: 4px;
-    right: 4px;
-  }
-  .sidebar-aside .sidebar-profile-card {
-    justify-content: center !important;
-    padding: 8px !important;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    width: 280px;
+    flex-shrink: 0;
   }
 }
 
-/* Mobile sidebar overlay drawer */
-@media (max-width: 768px) {
+/* 2. Laptop Breakpoint (1024px to 1279px) */
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .sidebar-aside {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    width: 240px;
+    flex-shrink: 0;
+  }
+}
+
+/* 3. Tablet Breakpoint (768px to 1023px) */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .sidebar-aside {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    width: 72px;
+    flex-shrink: 0;
+    z-index: 150;
+    transition: width 220ms cubic-bezier(0.4, 0, 0.2, 1), margin-right 220ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Overlay on hover without pushing sibling content */
+  .sidebar-aside:hover {
+    width: 240px;
+    margin-right: -168px;
+    box-shadow: 6px 0 30px rgba(0, 0, 0, 0.35);
+  }
+  
+  /* Collapsed layout states - Hide texts */
+  .sidebar-aside:not(:hover) .sidebar-brand-text,
+  .sidebar-aside:not(:hover) .sidebar-brand-subtitle,
+  .sidebar-aside:not(:hover) .sidebar-section-title,
+  .sidebar-aside:not(:hover) .sidebar-nav-label,
+  .sidebar-aside:not(:hover) .sidebar-profile-details {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+    display: none !important;
+  }
+  
+  .sidebar-aside:not(:hover) .sidebar-nav-item {
+    justify-content: center !important;
+    padding: 9.5px 0 !important;
+  }
+  .sidebar-aside:not(:hover) .sidebar-nav-item span {
+    gap: 0 !important;
+  }
+  .sidebar-aside:not(:hover) .sidebar-signout-btn {
+    justify-content: center !important;
+    padding: 9px 0 !important;
+  }
+  .sidebar-aside:not(:hover) .sidebar-signout-btn span {
+    display: none !important;
+  }
+  .sidebar-aside:not(:hover) .sidebar-profile-card {
+    justify-content: center !important;
+    padding: 8px !important;
+  }
+  .sidebar-aside:not(:hover) .sidebar-logo-box {
+    margin: 0 auto !important;
+  }
+  
+  /* Collapsed badge translates to dot indicator */
+  .sidebar-aside:not(:hover) .sidebar-badge {
+    position: absolute;
+    top: 2px;
+    right: 8px;
+    min-width: 8px;
+    height: 8px;
+    width: 8px;
+    padding: 0;
+    font-size: 0;
+    border: 1.5px solid var(--bg-sidebar);
+  }
+}
+
+/* 4. Mobile Breakpoint (< 768px) */
+@media (max-width: 767px) {
   .sidebar-aside {
     position: fixed;
-    left: -252px;
     top: 0;
     bottom: 0;
-    transform: translateX(0);
+    left: -260px; /* hidden by default */
+    width: 260px;
     z-index: 200;
     height: 100vh;
+    transition: left 220ms cubic-bezier(0.4, 0, 0.2, 1);
   }
+  
   .sidebar-aside.mobile-open {
-    transform: translateX(252px);
+    left: 0; /* slide in */
+  }
+
+  .sidebar-aside .sidebar-menu-btn {
+    display: flex !important; /* Close menu button visible */
+  }
+
+  .top-header .sidebar-menu-btn {
+    display: flex !important; /* Hamburger menu button visible */
+  }
+
+  .top-header .sidebar-nav-label {
+    display: none !important; /* Hide server status text to save space */
   }
 }
 
@@ -1004,11 +1094,7 @@ input:focus:not(:focus-visible) {
 .truncate     { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .flex-center  { display: flex; align-items: center; justify-content: center; }
 
-/* ── Responsive ───────────────────────────────────────────────────────────── */
-@media (max-width: 1024px) {
-  .sidebar-nav-label { display: none; }
-}
-
+/* ── Responsive Component Styles ──────────────────────────────────────────── */
 @media (max-width: 768px) {
   .page-title { font-size: 18px; }
   .filter-bar { gap: 8px; }
@@ -1017,6 +1103,77 @@ input:focus:not(:focus-visible) {
 
 @media (max-width: 640px) {
   .page-header { flex-direction: column; align-items: flex-start; }
+}
+
+/* ── Main Content Container ────────────────────────────────────────────────── */
+.main-content-container {
+  width: 100%;
+  max-width: 1600px !important;
+  margin: 0 auto;
+}
+
+/* ── KPI Cards Responsive Grid ─────────────────────────────────────────────── */
+.kpi-cards-grid {
+  display: grid !important;
+  gap: 16px;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+}
+
+@media (max-width: 1279px) {
+  .kpi-cards-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 1023px) {
+  .kpi-cards-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .kpi-cards-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+/* ── Charts Responsive Grid ────────────────────────────────────────────────── */
+.charts-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 16px;
+}
+
+@media (max-width: 1023px) {
+  .charts-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+/* ── Access Cards Styling ──────────────────────────────────────────────────── */
+.access-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .access-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* ── Table Container Styling ───────────────────────────────────────────────── */
+.table-container {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  overflow-x: auto !important; /* Ensure table scrolling */
+  box-shadow: var(--shadow-xs);
+  -webkit-overflow-scrolling: touch;
 }
 
 /* ── Print ────────────────────────────────────────────────────────────────── */

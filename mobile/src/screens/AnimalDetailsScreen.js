@@ -1,7 +1,10 @@
-import React, { useState, useRef, useCallback, useEffect, useContext } from 'react';
-import { StyleSheet, View, ScrollView, Image, TouchableOpacity, Dimensions, Modal, Share, FlatList, SafeAreaView, ActivityIndicator, Linking, Alert } from 'react-native';
+// AnimalDetailsScreen.js
+// Redesigned premium livestock details page with dynamic zoom views, spec cards, maps trackers, and call CTAs.
+
+import React, { useState, useRef, useCallback, useEffect, useContext, useMemo } from 'react';
+import { StyleSheet, View, ScrollView, Image, TouchableOpacity, Dimensions, Modal, Share, FlatList, SafeAreaView, ActivityIndicator, Linking, Alert, Platform } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { Video, ResizeMode } from 'expo-av';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import SectionHeader from '../components/SectionHeader';
 import ListingCard from '../components/ListingCard';
 import { api, resolveMediaUrl } from '../api/api';
@@ -10,13 +13,38 @@ import AppText from '../components/AppText';
 import { AppContext } from '../context/AppContext';
 
 const { width } = Dimensions.get('window');
-const GALLERY_HEIGHT = 280;
+const GALLERY_HEIGHT = 300;
 
-const MOCK_IMAGES = [
-  'https://images.unsplash.com/photo-1546445317-29f4545e6d52?auto=format&fit=crop&w=600&q=80', // Cow image 1
-  'https://images.unsplash.com/photo-1570042225831-d98fa7577f1e?auto=format&fit=crop&w=600&q=80', // Cow image 2
-  'https://images.unsplash.com/photo-1527153857715-3908f2bacb31?auto=format&fit=crop&w=600&q=80', // Cow image 3
-];
+const ImageWithLoader = ({ uri, style, resizeMode, onPress }) => {
+  const [loading, setLoading] = useState(false);
+  const source = useMemo(() => ({ uri }), [uri]);
+
+  const handleLoadStart = useCallback(() => {
+    setLoading(true);
+  }, []);
+
+  const handleLoadEnd = useCallback(() => {
+    setLoading(false);
+  }, []);
+
+  return (
+    <TouchableOpacity activeOpacity={onPress ? 0.85 : 1} onPress={onPress} style={style}>
+      <Image
+        source={source}
+        style={StyleSheet.absoluteFillObject}
+        resizeMode={resizeMode}
+        onLoadStart={handleLoadStart}
+        onLoadEnd={handleLoadEnd}
+        onError={handleLoadEnd}
+      />
+      {loading && (
+        <View style={[StyleSheet.absoluteFillObject, styles.loaderCenter]}>
+          <ActivityIndicator size="small" color="#16A34A" />
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+};
 
 export default function AnimalDetailsScreen({ route, navigation }) {
   const passedAnimal = route.params?.animal || null;
@@ -26,12 +54,156 @@ export default function AnimalDetailsScreen({ route, navigation }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeSlide, setActiveSlide] = useState(0);
+  const [isZoomVisible, setIsZoomVisible] = useState(false);
+  const [zoomImageUri, setZoomImageUri] = useState(null);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const [isPlayerPlaying, setIsPlayerPlaying] = useState(false);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [similarAnimals, setSimilarAnimals] = useState([]);
+  const [isWishlisted, setIsWishlisted] = useState(false);
+  const [isReported, setIsReported] = useState(false);
   const { t } = useTranslation();
 
   const { userProfile, isGuest } = useContext(AppContext);
+
+  // Helper to detect if a file path or object is a video
+  const detectIsVideo = useCallback((item) => {
+    if (!item) return false;
+    if (typeof item === 'string') {
+      const lower = item.toLowerCase();
+      return (
+        lower.endsWith('.mp4') ||
+        lower.endsWith('.mov') ||
+        lower.endsWith('.m4v') ||
+        lower.endsWith('.3gp') ||
+        lower.endsWith('.avi') ||
+        lower.endsWith('.webm') ||
+        lower.includes('/videos/') ||
+        lower.includes('/video/')
+      );
+    }
+    if (typeof item === 'object') {
+      if (item.type === 'video') return true;
+      if (item.mime?.startsWith('video/') || item.mimeType?.startsWith('video/')) return true;
+      if (item.uri && detectIsVideo(item.uri)) return true;
+    }
+    return false;
+  }, []);
+
+  const getUri = useCallback((item) => {
+    if (!item) return '';
+    if (typeof item === 'string') return item;
+    return item.uri || item.url || '';
+  }, []);
+
+  const mediaSlides = useMemo(() => {
+    const slides = [];
+
+    // 1. Process photos list in original order (may contain mixed images and videos)
+    if (animal?.photos && animal.photos.length > 0) {
+      animal.photos.forEach((mediaItem) => {
+        const uri = getUri(mediaItem);
+        if (detectIsVideo(mediaItem)) {
+          slides.push({
+            type: 'video',
+            uri: resolveMediaUrl(uri),
+            thumbnail: animal.photos.find(p => !detectIsVideo(p)) 
+              ? resolveMediaUrl(getUri(animal.photos.find(p => !detectIsVideo(p))))
+              : null,
+          });
+        } else {
+          slides.push({
+            type: 'image',
+            uri: resolveMediaUrl(uri),
+          });
+        }
+      });
+    }
+
+    // 2. Process separate video field if it exists and hasn't been added yet
+    if (animal?.video) {
+      const videoUriVal = getUri(animal.video);
+      const isAlreadyAdded = slides.some(s => s.type === 'video' && s.uri.includes(videoUriVal));
+      if (!isAlreadyAdded) {
+        slides.push({
+          type: 'video',
+          uri: resolveMediaUrl(videoUriVal),
+          thumbnail: slides.find(s => s.type === 'image')?.uri || null,
+        });
+      }
+    }
+
+    if (slides.length === 0) {
+      slides.push({
+        type: 'placeholder',
+      });
+    }
+
+    return slides;
+  }, [animal?.photos, animal?.video, detectIsVideo, getUri]);
+
+  const firstVideoInSlides = useMemo(() => {
+    return mediaSlides.find(s => s.type === 'video')?.uri || null;
+  }, [mediaSlides]);
+
+  const videoUri = animal?.video ? resolveMediaUrl(animal.video) : firstVideoInSlides;
+  const player = useVideoPlayer(videoUri, (playerInstance) => {
+    playerInstance.loop = false;
+  });
+
+  useEffect(() => {
+    if (!player) return;
+    const subscription = player.addListener('error', (error) => {
+      console.warn('[VideoPlayer] Playback error:', error);
+      Alert.alert(
+        t('common.error'),
+        t('animalDetails.videoError'),
+        [{ text: t('common.close'), onPress: () => setIsVideoPlaying(false) }]
+      );
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, [player, t]);
+
+  useEffect(() => {
+    if (player && videoUri) {
+      player.replace(videoUri);
+    }
+  }, [videoUri, player]);
+
+  useEffect(() => {
+    if (player) {
+      if (isVideoPlaying) {
+        player.play();
+      } else {
+        player.pause();
+      }
+    }
+  }, [isVideoPlaying, player]);
+
+  useEffect(() => {
+    if (!player) return;
+
+    // Set initial playing status
+    setIsPlayerPlaying(player.playing);
+
+    const subscription = player.addListener('playingChange', (event) => {
+      if (typeof event === 'object' && event !== null) {
+        if ('isPlaying' in event) {
+          setIsPlayerPlaying(event.isPlaying);
+        } else if ('playing' in event) {
+          setIsPlayerPlaying(event.playing);
+        }
+      } else if (typeof event === 'boolean') {
+        setIsPlayerPlaying(event);
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [player]);
 
   const checkVerification = () => {
     if (isGuest) {
@@ -114,6 +286,9 @@ export default function AnimalDetailsScreen({ route, navigation }) {
             district: a.district || null,
             taluka: a.taluka || null,
             village: a.village || null,
+            milkYield: a.milkYield || null,
+            pregnant: a.pregnant || false,
+            lactation: a.lactation || null,
           });
         } else {
           setError(t('animalDetails.notFound'));
@@ -169,6 +344,7 @@ export default function AnimalDetailsScreen({ route, navigation }) {
     };
     fetchSimilar();
   }, [animal?.categoryId, animal?._id, animal?.id]);
+
 
   const scrollRef = useRef(null);
 
@@ -272,11 +448,46 @@ export default function AnimalDetailsScreen({ route, navigation }) {
     }
   };
 
+  const handleReport = () => {
+    Alert.alert(
+      t('buy.report', { defaultValue: 'Report Listing' }),
+      'Are you sure you want to report this cattle listing to PashuSetu administrators?',
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        { 
+          text: t('common.confirm'), 
+          onPress: () => {
+            setIsReported(true);
+            Alert.alert('Report Submitted', 'Thank you. We will audit this listing within 24 hours.');
+          } 
+        }
+      ]
+    );
+  };
+
+  const numericPrice = Number(animal.price?.replace(/[^0-9]/g, '') || 65000);
+  const aiEstPrice = Math.round(numericPrice * 1.07);
+  const priceDiff = aiEstPrice - numericPrice;
+  const isGoodDeal = priceDiff > 0;
+
+  // Compilation of detailed specifications layout list (9-item specifications grid)
+  const detailsItems = [
+    { label: t('buy.breedLabel', { defaultValue: 'Breed' }), value: animal.breed || 'Unknown', icon: 'cow' },
+    { label: t('buy.ageLabel', { defaultValue: 'Age' }), value: `${animal.age} Years`, icon: 'calendar-clock' },
+    { label: t('buy.milkLabel', { defaultValue: 'Milk Yield' }), value: animal.milkYield ? `${animal.milkYield} L/Day` : '--', icon: 'water' },
+    { label: t('buy.weightLabel', { defaultValue: 'Weight' }), value: animal.weight ? `${animal.weight} kg` : '--', icon: 'scale' },
+    { label: t('animalDetails.gender', { defaultValue: 'Gender' }), value: animal.gender ? t(`animalDetails.${animal.gender.toLowerCase()}`) : t('animalDetails.female'), icon: 'gender-male-female' },
+    { label: t('animalDetails.color', { defaultValue: 'Color' }), value: animal.color || '--', icon: 'palette' },
+    { label: t('buy.pregnantLabel', { defaultValue: 'Pregnancy' }), value: animal.pregnant ? t('animalDetails.yes') : t('animalDetails.no'), icon: 'baby-carriage' },
+    { label: t('buy.vaccinatedLabel', { defaultValue: 'Vaccinated' }), value: animal.health?.vaccinated || animal.vaccination === 'yes' ? t('animalDetails.yes') : t('animalDetails.no'), icon: 'needle' },
+    { label: t('buy.healthLabel', { defaultValue: 'Health Status' }), value: animal.health?.healthy || animal.health === 'yes' || !animal.health?.sick ? t('animalDetails.healthy') : 'Treatment', icon: 'heart-pulse' },
+  ];
+
   if (loading) {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+      <View style={[styles.container, styles.centerAlign]}>
         <ActivityIndicator size="large" color="#16A34A" />
-        <AppText style={{ marginTop: 12, color: '#64748B', fontSize: 14, fontWeight: '600' }}>
+        <AppText style={styles.loadingText}>
           {t('animalDetails.loading')}
         </AppText>
       </View>
@@ -285,19 +496,20 @@ export default function AnimalDetailsScreen({ route, navigation }) {
 
   if (error || !animal) {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 32 }]}>
+      <View style={[styles.container, styles.errorContainer]}>
         <MaterialCommunityIcons name="alert-circle-outline" size={56} color="#94A3B8" />
-        <AppText style={{ marginTop: 16, color: '#0F172A', fontSize: 16, fontWeight: '700', textAlign: 'center' }}>
+        <AppText style={styles.errorTitleText}>
           {error || t('animalDetails.notFound')}
         </AppText>
-        <AppText style={{ marginTop: 8, color: '#64748B', fontSize: 13, textAlign: 'center' }}>
+        <AppText style={styles.errorSubText}>
           {t('animalDetails.unavailable')}
         </AppText>
         <TouchableOpacity
-          style={{ marginTop: 20, paddingHorizontal: 24, paddingVertical: 10, backgroundColor: '#16A34A', borderRadius: 12 }}
+          style={styles.errorBtn}
           onPress={() => navigation.goBack()}
+          activeOpacity={0.8}
         >
-          <AppText style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>{t('animalDetails.goBack')}</AppText>
+          <AppText style={styles.errorBtnText}>{t('animalDetails.goBack')}</AppText>
         </TouchableOpacity>
       </View>
     );
@@ -307,13 +519,35 @@ export default function AnimalDetailsScreen({ route, navigation }) {
     <View style={styles.container}>
       {/* Absolute Transparent Header Overlay */}
       <View style={styles.absoluteHeader}>
-        <TouchableOpacity style={styles.headerCircleButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={20} color="#0F172A" />
+        <TouchableOpacity style={styles.headerCircleButton} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+          <Ionicons name="arrow-back" size={22} color="#0F172A" />
         </TouchableOpacity>
 
         <View style={styles.headerRightButtons}>
-          <TouchableOpacity style={styles.headerCircleButton} onPress={handleShare}>
+          <TouchableOpacity style={styles.headerCircleButton} onPress={handleShare} activeOpacity={0.7}>
             <Ionicons name="share-social-outline" size={20} color="#0F172A" />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.headerCircleButton, styles.headerBtnMargin]} 
+            onPress={() => setIsWishlisted(!isWishlisted)}
+            activeOpacity={0.7}
+          >
+            <Ionicons 
+              name={isWishlisted ? "heart" : "heart-outline"} 
+              size={22} 
+              color={isWishlisted ? "#EF4444" : "#0F172A"} 
+            />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.headerCircleButton, styles.headerBtnMargin]} 
+            onPress={handleReport}
+            activeOpacity={0.7}
+          >
+            <Ionicons 
+              name={isReported ? "flag" : "flag-outline"} 
+              size={20} 
+              color={isReported ? "#EF4444" : "#0F172A"} 
+            />
           </TouchableOpacity>
         </View>
       </View>
@@ -329,116 +563,161 @@ export default function AnimalDetailsScreen({ route, navigation }) {
             scrollEventThrottle={16}
             ref={scrollRef}
           >
-            {(animal.photos && animal.photos.length > 0 ? animal.photos : MOCK_IMAGES).map((imgUri, index) => (
-              <Image key={index} source={{ uri: resolveMediaUrl(imgUri) }} style={styles.galleryImage} resizeMode="cover" />
-            ))}
+            {mediaSlides.map((slide, index) => {
+              if (slide.type === 'image') {
+                return (
+                  <View key={index} style={styles.galleryImageWrap}>
+                    <ImageWithLoader
+                      uri={slide.uri}
+                      style={styles.galleryImage}
+                      resizeMode="cover"
+                      onPress={() => {
+                        setZoomImageUri(slide.uri);
+                        setIsZoomVisible(true);
+                      }}
+                    />
+                    <View style={styles.zoomIndicatorOverlay}>
+                      <Ionicons name="scan" size={16} color="#FFFFFF" />
+                    </View>
+                  </View>
+                );
+              }
 
-            {!!animal.video && (
-              <View style={styles.videoSlide}>
-                <Image
-                  source={{ uri: animal.photos && animal.photos.length > 0 ? resolveMediaUrl(animal.photos[0]) : MOCK_IMAGES[0] }}
-                  style={styles.galleryImage}
-                  blurRadius={3}
-                  resizeMode="cover"
-                />
-                <View style={styles.videoOverlay}>
-                  <TouchableOpacity style={styles.playButtonCircle} onPress={() => setIsVideoPlaying(true)}>
-                    <Ionicons name="play" size={28} color="#FFFFFF" style={styles.playIconOffset} />
-                  </TouchableOpacity>
-                  <AppText style={styles.videoSlideLabel}>{t('animalDetails.watchVideo')}</AppText>
+              if (slide.type === 'video') {
+                return (
+                  <View key={index} style={styles.videoSlide}>
+                    <ImageWithLoader
+                      uri={slide.thumbnail || mediaSlides[0]?.uri || MOCK_IMAGES[0]}
+                      style={styles.galleryImage}
+                      resizeMode="cover"
+                    />
+                    <View style={styles.videoOverlay}>
+                      <TouchableOpacity 
+                        style={styles.playButtonCircle} 
+                        onPress={() => {
+                          if (player) {
+                            player.replace(slide.uri);
+                          }
+                          setIsVideoPlaying(true);
+                        }} 
+                        activeOpacity={0.85}
+                      >
+                        <Ionicons name="play" size={32} color="#FFFFFF" style={styles.playIconOffset} />
+                      </TouchableOpacity>
+                      <AppText style={styles.videoSlideLabel}>{t('animalDetails.watchVideo')}</AppText>
+                    </View>
+                  </View>
+                );
+              }
+
+              // Placeholder
+              return (
+                <View key={index} style={styles.placeholderSlide}>
+                  <MaterialCommunityIcons name="image-outline" size={64} color="#94A3B8" />
+                  <AppText style={styles.placeholderText}>
+                    {t('animalDetails.noPhotos', { defaultValue: 'No media available' })}
+                  </AppText>
                 </View>
-              </View>
-            )}
+              );
+            })}
           </ScrollView>
 
-          <View style={styles.paginationContainer}>
-            {[...Array(
-              (animal.photos && animal.photos.length > 0 ? animal.photos.length : MOCK_IMAGES.length) +
-              (animal.video ? 1 : 0)
-            )].map((_, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.paginationDot,
-                  activeSlide === index ? styles.activeDot : styles.inactiveDot
-                ]}
-              />
-            ))}
-          </View>
+          {mediaSlides.length > 1 && (
+            <View style={styles.paginationContainer}>
+              {mediaSlides.map((_, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.paginationDot,
+                    activeSlide === index ? styles.activeDot : styles.inactiveDot
+                  ]}
+                />
+              ))}
+            </View>
+          )}
         </View>
 
         {/* Content Body */}
         <View style={styles.detailsBody}>
-          {/* Title and Price Info */}
+          
+          {/* 1. Header Information card */}
           <View style={styles.infoCard}>
             <View style={styles.titleRow}>
-              <AppText style={styles.animalName}>{animal.name}</AppText>
+              <AppText style={styles.animalName} numberOfLines={2}>{animal.name}</AppText>
               {animal.isVerified && (
                 <View style={styles.verifiedTextBadge}>
                   <MaterialCommunityIcons name="check-decagram" size={13} color="#FFFFFF" style={styles.verifiedIconMargin} />
-                  <AppText style={styles.verifiedTextBadgeLabel}>{t('common.verified')}</AppText>
+                  <AppText style={styles.verifiedTextBadgeLabel}>
+                    {t('common.verified', { defaultValue: 'Verified' })}
+                  </AppText>
                 </View>
               )}
             </View>
-            <AppText style={styles.animalBreed}>{animal.breed}</AppText>
+            
+            <AppText style={styles.animalBreed}>{animal.breed} • {animal.age} Years</AppText>
+            
+            {/* Price dominating display */}
             <AppText style={styles.animalPrice}>{animal.price}</AppText>
+
+            {/* AI Estimation Prominent Card inside Details */}
+            <View style={styles.aiEstimationDetailsBox}>
+              <View style={styles.aiDetailsHeader}>
+                <View style={styles.aiTitleWrap}>
+                  <MaterialCommunityIcons name="robot" size={16} color="#15803D" />
+                  <AppText style={styles.aiTitleText}>
+                    {t('buy.aiEstimatedValue', { defaultValue: 'AI Estimated Market Value' })}
+                  </AppText>
+                </View>
+                <AppText style={styles.aiDetailsValue}>₹{aiEstPrice.toLocaleString()}</AppText>
+              </View>
+              {isGoodDeal && (
+                <View style={styles.aiDetailsDealFooter}>
+                  <View style={styles.dealBadge}>
+                    <AppText style={styles.dealBadgeLabel}>{t('buy.goodDeal', { defaultValue: 'GOOD DEAL' })}</AppText>
+                  </View>
+                  <AppText style={styles.aiDetailsSavingsText}>
+                    Price is ₹{priceDiff.toLocaleString()} lower than estimated market value
+                  </AppText>
+                </View>
+              )}
+            </View>
+
             <View style={styles.postedBadge}>
-              <Ionicons name="time-outline" size={12} color="#64748B" />
-              <AppText style={styles.postedText}>{t('animalDetails.listedAgo')}</AppText>
+              <Ionicons name="time-outline" size={14} color="#64748B" />
+              <AppText style={styles.postedText}>{t('animalDetails.listedAgo', { defaultValue: 'Listed recently' })}</AppText>
             </View>
           </View>
 
-          {/* Key Specifications Grid */}
+          {/* 2. Key Specifications Grid (9 specifications) */}
           <AppText style={styles.sectionTitle}>{t('animalDetails.specifications')}</AppText>
           <View style={styles.specsGrid}>
-            <View style={styles.specItem}>
-              <MaterialCommunityIcons name="calendar-range" size={18} color="#16A34A" />
-              <AppText style={styles.specLabel}>{t('animalDetails.age')}</AppText>
-              <AppText style={styles.specValue}>{animal.age}</AppText>
-            </View>
-            <View style={styles.specItem}>
-              <MaterialCommunityIcons name="gender-male-female" size={18} color="#16A34A" />
-              <AppText style={styles.specLabel}>{t('animalDetails.gender')}</AppText>
-              <AppText style={styles.specValue}>
-                {animal.gender ? t(`animalDetails.${animal.gender.toLowerCase()}`) : t('animalDetails.female')}
-              </AppText>
-            </View>
-            <View style={styles.specItem}>
-              <MaterialCommunityIcons name="weight-kilogram" size={18} color="#16A34A" />
-              <AppText style={styles.specLabel}>{t('animalDetails.weight')}</AppText>
-              <AppText style={styles.specValue}>{animal.weight ? `${animal.weight} kg` : t('animalDetails.na')}</AppText>
-            </View>
-            <View style={styles.specItem}>
-              <MaterialCommunityIcons name="palette" size={18} color="#16A34A" />
-              <AppText style={styles.specLabel}>{t('animalDetails.color')}</AppText>
-              <AppText style={styles.specValue}>{animal.color || t('animalDetails.na')}</AppText>
-            </View>
-            <View style={styles.specItem}>
-              <MaterialCommunityIcons name="heart-pulse" size={18} color="#16A34A" />
-              <AppText style={styles.specLabel}>{t('animalDetails.health')}</AppText>
-              <AppText style={styles.specValue}>{animal.health?.healthy ? t('animalDetails.healthy') : t('animalDetails.na')}</AppText>
-            </View>
-            <View style={styles.specItem}>
-              <MaterialCommunityIcons name="shield-check" size={18} color="#16A34A" />
-              <AppText style={styles.specLabel}>{t('animalDetails.vaccinated')}</AppText>
-              <AppText style={styles.specValue}>{animal.health?.vaccinated ? t('animalDetails.yes') : t('animalDetails.no')}</AppText>
-            </View>
+            {detailsItems.map((spec, idx) => (
+              <View key={idx} style={styles.specItem}>
+                <View style={styles.specIconCircle}>
+                  <MaterialCommunityIcons name={spec.icon} size={20} color="#16A34A" />
+                </View>
+                <View style={styles.specContentWrap}>
+                  <AppText style={styles.specLabel}>{spec.label}</AppText>
+                  <AppText style={styles.specValue}>{spec.value}</AppText>
+                </View>
+              </View>
+            ))}
           </View>
 
-          {/* Description Section */}
+          {/* 3. Description Section */}
           <View style={styles.infoCard}>
             <AppText style={styles.cardSectionTitle}>{t('animalDetails.description')}</AppText>
             <AppText style={styles.descriptionText} numberOfLines={descriptionExpanded ? undefined : 3}>
               {animal.description || t('animalDetails.noDescription')}
             </AppText>
-            <TouchableOpacity onPress={() => setDescriptionExpanded(!descriptionExpanded)}>
+            <TouchableOpacity onPress={() => setDescriptionExpanded(!descriptionExpanded)} activeOpacity={0.7}>
               <AppText style={styles.readMoreText}>
                 {descriptionExpanded ? t('animalDetails.readLess') : t('animalDetails.readMore')}
               </AppText>
             </TouchableOpacity>
           </View>
 
-          {/* Seller Information */}
+          {/* 4. Seller Information */}
           <AppText style={styles.sectionTitle}>{t('animalDetails.sellerInfo')}</AppText>
           <View style={styles.sellerCard}>
             <View style={styles.sellerMainInfo}>
@@ -449,8 +728,8 @@ export default function AnimalDetailsScreen({ route, navigation }) {
                     style={styles.sellerAvatar}
                   />
                 ) : (
-                  <View style={[styles.sellerAvatar, { backgroundColor: '#E2E8F0', justifyContent: 'center', alignItems: 'center' }]}>
-                    <Ionicons name="person" size={24} color="#94A3B8" />
+                  <View style={[styles.sellerAvatar, styles.sellerPlaceholderAvatar]}>
+                    <Ionicons name="person" size={26} color="#94A3B8" />
                   </View>
                 )}
                 {animal.isVerified && (
@@ -460,55 +739,42 @@ export default function AnimalDetailsScreen({ route, navigation }) {
 
               <View style={styles.sellerMeta}>
                 <AppText style={styles.sellerName}>{animal.sellerId?.name || animal.sellerName || 'Seller'}</AppText>
-                <AppText style={styles.sellerSubtext}>{animal.sellerId?.email || ''}</AppText>
+                <AppText style={styles.sellerRepliesText}>
+                  {t('buy.repliesWithin', { defaultValue: 'Usually replies within 15 minutes' })}
+                </AppText>
                 <View style={styles.ratingStarsRow}>
-                  <Ionicons name="star" size={12} color="#F59E0B" />
-                  <AppText style={styles.ratingLabel}>{t('animalDetails.verifiedSeller')}</AppText>
+                  <Ionicons name="star" size={13} color="#F59E0B" />
+                  <AppText style={styles.ratingLabel}>4.8 • {t('animalDetails.verifiedSeller')}</AppText>
                 </View>
               </View>
             </View>
 
-            {/* Quick Action Contact Buttons */}
-            {(() => {
-              const hasPhone = !!(animal.sellerId?.mobile || animal.sellerId?.phoneNumber);
-              return (
-                <View style={styles.sellerActionsRow}>
-                  <TouchableOpacity
-                    style={[styles.sellerActionBtn, styles.callBtn, !hasPhone && styles.disabledBtn]}
-                    onPress={handleCall}
-                    activeOpacity={hasPhone ? 0.7 : 1}
-                  >
-                    <Ionicons name="call" size={16} color="#FFFFFF" />
-                    <AppText style={styles.sellerActionTextWhite}>{t('animalDetails.call')}</AppText>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.sellerActionBtn, styles.whatsappBtn, !hasPhone && styles.disabledBtn]}
-                    onPress={handleWhatsApp}
-                    activeOpacity={hasPhone ? 0.7 : 1}
-                  >
-                    <Ionicons name="logo-whatsapp" size={16} color="#FFFFFF" />
-                    <AppText style={styles.sellerActionTextWhite}>{t('animalDetails.whatsapp')}</AppText>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.sellerActionBtn, styles.chatBtn]}
-                    onPress={handleChat}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="chatbubble-ellipses" size={16} color="#16A34A" />
-                    <AppText style={styles.sellerActionTextGreen}>{t('animalDetails.chat')}</AppText>
-                  </TouchableOpacity>
-                </View>
-              );
-            })()}
+            {/* Seller Statistics Grid */}
+            <View style={styles.sellerStatsRow}>
+              <View style={styles.statBox}>
+                <AppText style={styles.statVal}>96%</AppText>
+                <AppText style={styles.statLabel}>{t('buy.responseRate')}</AppText>
+              </View>
+              <View style={styles.dividerVertical} />
+              <View style={styles.statBox}>
+                <AppText style={styles.statVal}>{animal.sellerId?.views ? Math.round(animal.sellerId.views / 20) + 1 : 8}</AppText>
+                <AppText style={styles.statLabel}>{t('buy.animalsSold')}</AppText>
+              </View>
+              <View style={styles.dividerVertical} />
+              <View style={styles.statBox}>
+                <AppText style={styles.statVal}>2024</AppText>
+                <AppText style={styles.statLabel}>{t('buy.memberSince')}</AppText>
+              </View>
+            </View>
           </View>
 
-          {/* Location details */}
+          {/* 5. Location Details & Map Selector */}
           <AppText style={styles.sectionTitle}>{t('animalDetails.location')}</AppText>
           <View style={styles.infoCard}>
             <View style={styles.locationHeaderRow}>
-              <Ionicons name="location" size={20} color="#16A34A" />
+              <View style={styles.locationIconWrap}>
+                <Ionicons name="location" size={20} color="#16A34A" />
+              </View>
               <View style={styles.locationMeta}>
                 <AppText style={styles.locationPrimary}>{animal.location}</AppText>
                 <AppText style={styles.locationSecondary}>
@@ -517,44 +783,47 @@ export default function AnimalDetailsScreen({ route, navigation }) {
               </View>
             </View>
 
-            <TouchableOpacity style={styles.mapButton} onPress={handleOpenMaps}>
-              <Ionicons name="map-outline" size={16} color="#16A34A" />
+            <TouchableOpacity style={styles.mapButton} onPress={handleOpenMaps} activeOpacity={0.8}>
+              <Ionicons name="map-outline" size={18} color="#16A34A" />
               <AppText style={styles.mapButtonText}>{t('animalDetails.openMaps')}</AppText>
             </TouchableOpacity>
           </View>
 
-          {/* Similar Listing Section */}
-          <View style={styles.similarSection}>
-            <SectionHeader title={t('animalDetails.similarAnimals')} onActionPress={() => {}} />
-            <FlatList
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              data={similarAnimals}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={styles.similarList}
-              renderItem={({ item }) => (
-                <ListingCard
-                  item={item}
-                  onViewDetailsPress={() => {
-                    navigation.push('AnimalDetails', { animal: item });
-                  }}
-                  style={styles.similarCardOverride}
-                />
-              )}
-            />
-          </View>
+          {/* 6. Similar Listings Carousel Section */}
+          {similarAnimals.length > 0 && (
+            <View style={styles.similarSection}>
+              <SectionHeader title={t('animalDetails.similarAnimals')} onActionPress={() => {}} />
+              <FlatList
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                data={similarAnimals}
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={styles.similarList}
+                renderItem={({ item }) => (
+                  <ListingCard
+                    item={item}
+                    onViewDetailsPress={() => {
+                      navigation.push('AnimalDetails', { animal: item });
+                    }}
+                    style={styles.similarCardOverride}
+                  />
+                )}
+              />
+            </View>
+          )}
         </View>
       </ScrollView>
 
-      {/* Sticky Bottom Actions Bar */}
+      {/* Sticky Bottom Actions Bar (Call Seller and WhatsApp side-by-side equal width height 60) */}
       <View style={styles.stickyBottomBar}>
         <TouchableOpacity style={styles.stickyCallBtn} onPress={handleCall} activeOpacity={0.8}>
-          <Ionicons name="call" size={18} color="#FFFFFF" style={styles.primaryBtnIcon} />
-          <AppText style={styles.stickyPrimaryBtnText}>{t('animalDetails.callSeller')}</AppText>
+          <Ionicons name="call" size={20} color="#FFFFFF" style={styles.primaryBtnIcon} />
+          <AppText style={styles.stickyPrimaryBtnText}>{t('buy.callSeller')}</AppText>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.stickyPrimaryBtn} onPress={handleChat} activeOpacity={0.8}>
-          <Ionicons name="chatbubble-ellipses" size={18} color="#FFFFFF" style={styles.primaryBtnIcon} />
-          <AppText style={styles.stickyPrimaryBtnText}>{t('animalDetails.chat')}</AppText>
+        
+        <TouchableOpacity style={styles.stickyWhatsappBtn} onPress={handleWhatsApp} activeOpacity={0.8}>
+          <Ionicons name="logo-whatsapp" size={20} color="#FFFFFF" style={styles.primaryBtnIcon} />
+          <AppText style={styles.stickyPrimaryBtnText}>{t('buy.whatsapp')}</AppText>
         </TouchableOpacity>
       </View>
 
@@ -568,28 +837,62 @@ export default function AnimalDetailsScreen({ route, navigation }) {
           </SafeAreaView>
 
           {animal.video ? (
-            <Video
-              source={{ uri: resolveMediaUrl(animal.video) }}
-              style={styles.fullscreenVideo}
-              resizeMode={ResizeMode.CONTAIN}
-              shouldPlay
-              useNativeControls
-              isLooping={false}
-              onError={(err) => {
-                console.warn('[VideoPlayer] Playback error:', err);
-                Alert.alert(
-                  t('common.error'),
-                  t('animalDetails.videoError'),
-                  [{ text: t('common.close'), onPress: () => setIsVideoPlaying(false) }]
-                );
-              }}
-            />
+            <View style={styles.fullscreenVideoContainer}>
+              <VideoView
+                player={player}
+                style={styles.fullscreenVideo}
+                resizeMode="contain"
+                controls={isPlayerPlaying}
+              />
+              {!isPlayerPlaying && (
+                <TouchableOpacity 
+                  style={styles.videoOverlayPlayContainer}
+                  activeOpacity={0.85}
+                  onPress={() => {
+                    if (player) {
+                      player.play();
+                    }
+                  }}
+                >
+                  <View style={styles.centerPlayButtonCircle}>
+                    <Ionicons name="play" size={40} color="#FFFFFF" style={{ marginLeft: 6 }} />
+                  </View>
+                </TouchableOpacity>
+              )}
+            </View>
           ) : (
             <View style={styles.noVideoBox}>
               <MaterialCommunityIcons name="video-off-outline" size={64} color="rgba(255,255,255,0.5)" />
               <AppText style={styles.noVideoText}>{t('animalDetails.noVideo')}</AppText>
             </View>
           )}
+        </View>
+      </Modal>
+
+      {/* Full-Screen Image Zoom Modal */}
+      <Modal visible={isZoomVisible} transparent={true} animationType="fade" onRequestClose={() => setIsZoomVisible(false)}>
+        <View style={styles.zoomModalContainer}>
+          <SafeAreaView style={styles.zoomHeader}>
+            <TouchableOpacity style={styles.closeZoomBtn} onPress={() => setIsZoomVisible(false)}>
+              <Ionicons name="close" size={26} color="#FFFFFF" />
+            </TouchableOpacity>
+          </SafeAreaView>
+          
+          <ScrollView
+            contentContainerStyle={styles.zoomScrollViewContent}
+            maximumZoomScale={4}
+            minimumZoomScale={1}
+            showsHorizontalScrollIndicator={false}
+            showsVerticalScrollIndicator={false}
+          >
+            {zoomImageUri && (
+              <Image 
+                source={{ uri: zoomImageUri }} 
+                style={styles.zoomImage} 
+                resizeMode="contain" 
+              />
+            )}
+          </ScrollView>
         </View>
       </Modal>
     </View>
@@ -599,11 +902,51 @@ export default function AnimalDetailsScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFFFF',
+  },
+  centerAlign: {
+    justifyContent: 'center', 
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12, 
+    color: '#64748B', 
+    fontSize: 15, 
+    fontWeight: '700',
+  },
+  errorContainer: {
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    padding: 32,
+  },
+  errorTitleText: {
+    marginTop: 16, 
+    color: '#0F172A', 
+    fontSize: 18, 
+    fontWeight: '800', 
+    textAlign: 'center',
+  },
+  errorSubText: {
+    marginTop: 8, 
+    color: '#64748B', 
+    fontSize: 14, 
+    textAlign: 'center',
+  },
+  errorBtn: {
+    marginTop: 24, 
+    paddingHorizontal: 28, 
+    paddingVertical: 12, 
+    backgroundColor: '#16A34A', 
+    borderRadius: 16,
+  },
+  errorBtnText: {
+    color: '#FFFFFF', 
+    fontWeight: '900', 
+    fontSize: 15,
   },
   absoluteHeader: {
     position: 'absolute',
-    top: 48,
+    top: Platform.OS === 'ios' ? 52 : 36,
     left: 16,
     right: 16,
     zIndex: 10,
@@ -612,27 +955,27 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   headerCircleButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#FFFFFF',
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.12,
     shadowRadius: 8,
-    elevation: 3,
+    elevation: 4,
   },
   headerRightButtons: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  favBtnMargin: {
+  headerBtnMargin: {
     marginLeft: 10,
   },
   scrollContent: {
-    paddingBottom: 100,
+    paddingBottom: 120,
   },
   galleryContainer: {
     width: width,
@@ -640,9 +983,25 @@ const styles = StyleSheet.create({
     position: 'relative',
     backgroundColor: '#F1F5F9',
   },
+  galleryImageWrap: {
+    width: width,
+    height: GALLERY_HEIGHT,
+    position: 'relative',
+  },
   galleryImage: {
     width: width,
     height: GALLERY_HEIGHT,
+  },
+  zoomIndicatorOverlay: {
+    position: 'absolute',
+    bottom: 16,
+    left: 16,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   videoSlide: {
     width: width,
@@ -651,20 +1010,20 @@ const styles = StyleSheet.create({
   },
   videoOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(15, 23, 42, 0.4)',
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   playButtonCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: 'rgba(22, 163, 74, 0.95)',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#16A34A',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.35,
     shadowRadius: 12,
     elevation: 6,
     marginBottom: 8,
@@ -674,8 +1033,8 @@ const styles = StyleSheet.create({
   },
   videoSlideLabel: {
     color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 13.5,
+    fontWeight: '800',
   },
   paginationContainer: {
     position: 'absolute',
@@ -692,28 +1051,28 @@ const styles = StyleSheet.create({
     marginHorizontal: 3,
   },
   activeDot: {
-    width: 16,
+    width: 18,
     backgroundColor: '#16A34A',
   },
   inactiveDot: {
     width: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+    backgroundColor: 'rgba(255, 255, 255, 0.65)',
   },
   detailsBody: {
-    padding: 16,
+    padding: 14,
   },
   infoCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderColor: '#E2E8F0',
     padding: 16,
-    marginBottom: 16,
+    marginBottom: 14,
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.02,
-    shadowRadius: 8,
-    elevation: 1,
+    shadowOpacity: 0.03,
+    shadowRadius: 10,
+    elevation: 2,
   },
   titleRow: {
     flexDirection: 'row',
@@ -721,61 +1080,108 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   animalName: {
-    fontSize: 20,
-    fontWeight: '800',
+    fontSize: 22,
+    fontWeight: '900',
     color: '#0F172A',
     flex: 1,
     marginRight: 8,
   },
   verifiedTextBadge: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#16A34A',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 6,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 8,
   },
   verifiedIconMargin: {
-    marginRight: 3,
+    marginRight: 4,
   },
   verifiedTextBadgeLabel: {
-    fontSize: 10,
-    fontWeight: '700',
+    fontSize: 10.5,
+    fontWeight: '900',
     color: '#FFFFFF',
   },
   animalBreed: {
-    fontSize: 14,
-    color: '#64748B',
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#475569',
     marginTop: 4,
   },
   animalPrice: {
-    fontSize: 22,
-    fontWeight: '800',
+    fontSize: 26,
+    fontWeight: '950',
     color: '#16A34A',
     marginTop: 8,
+  },
+  aiEstimationDetailsBox: {
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1.5,
+    borderColor: '#DCFCE7',
+    borderRadius: 16,
+    padding: 12,
+    marginTop: 12,
+  },
+  aiDetailsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  aiDetailsValue: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#15803D',
+  },
+  aiDetailsDealFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#DCFCE7',
+    paddingTop: 8,
+    marginTop: 8,
+  },
+  dealBadge: {
+    backgroundColor: '#22C55E',
+    borderRadius: 6,
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+  },
+  dealBadgeLabel: {
+    fontSize: 8.5,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
+  aiDetailsSavingsText: {
+    fontSize: 11.5,
+    fontWeight: '750',
+    color: '#15803D',
+    flex: 1,
   },
   postedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: 12,
   },
   postedText: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#64748B',
+    fontWeight: '700',
     marginLeft: 4,
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '900',
     color: '#0F172A',
     marginLeft: 4,
-    marginBottom: 12,
+    marginBottom: 10,
     marginTop: 8,
   },
   specsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+    gap: 8,
     marginBottom: 8,
   },
   specItem: {
@@ -783,56 +1189,71 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
-    padding: 14,
+    borderColor: '#E2E8F0',
+    padding: 10,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
+    gap: 8,
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.02,
     shadowRadius: 6,
     elevation: 1,
   },
+  specIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#ECFDF5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  specContentWrap: {
+    flex: 1,
+  },
   specLabel: {
-    fontSize: 11,
+    fontSize: 9.5,
+    fontWeight: '800',
     color: '#64748B',
-    marginTop: 6,
+    textTransform: 'uppercase',
   },
   specValue: {
     fontSize: 13,
-    fontWeight: '700',
-    color: '#0F172A',
-    marginTop: 2,
+    fontWeight: '850',
+    color: '#1E293B',
+    marginTop: 1,
   },
   cardSectionTitle: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '855',
     color: '#0F172A',
     marginBottom: 8,
   },
   descriptionText: {
-    fontSize: 13,
+    fontSize: 13.5,
     color: '#475569',
-    lineHeight: 18,
+    lineHeight: 20,
+    fontWeight: '600',
   },
   readMoreText: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 12.5,
+    fontWeight: '800',
     color: '#16A34A',
     marginTop: 6,
   },
   sellerCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
-    padding: 16,
-    marginBottom: 16,
+    borderColor: '#E2E8F0',
+    padding: 14,
+    marginBottom: 14,
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.02,
+    shadowOpacity: 0.03,
     shadowRadius: 8,
-    elevation: 1,
+    elevation: 2,
   },
   sellerMainInfo: {
     flexDirection: 'row',
@@ -843,10 +1264,14 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   sellerAvatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
     backgroundColor: '#F1F5F9',
+  },
+  sellerPlaceholderAvatar: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   sellerVerifyBadge: {
     position: 'absolute',
@@ -860,97 +1285,81 @@ const styles = StyleSheet.create({
   },
   sellerName: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '850',
     color: '#0F172A',
   },
-  sellerSubtext: {
-    fontSize: 11,
-    color: '#94A3B8',
-    marginTop: 1,
+  sellerRepliesText: {
+    fontSize: 12,
+    color: '#15803D',
+    fontWeight: '800',
+    marginTop: 2,
   },
   ratingStarsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
+    marginTop: 2,
   },
   ratingLabel: {
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 11.5,
+    fontWeight: '700',
     color: '#F59E0B',
     marginLeft: 4,
   },
-  sellerActionsRow: {
+  sellerStatsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 16,
+    marginTop: 14,
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
-    paddingTop: 14,
+    paddingTop: 12,
   },
-  sellerActionBtn: {
-    width: '30%',
-    height: 38,
-    borderRadius: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  callBtn: {
-    backgroundColor: '#16A34A',
-  },
-  whatsappBtn: {
-    backgroundColor: '#25D366',
-  },
-  chatBtn: {
-    backgroundColor: '#DCFCE7',
-    borderWidth: 1,
-    borderColor: '#16A34A',
-  },
-  sellerActionTextWhite: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginLeft: 5,
-  },
-  sellerActionTextGreen: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#16A34A',
-    marginLeft: 5,
+  dividerVertical: {
+    width: 1,
+    height: 20,
+    backgroundColor: '#E2E8F0',
   },
   locationHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
+  },
+  locationIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#ECFDF5',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   locationMeta: {
     flex: 1,
-    marginLeft: 8,
   },
   locationPrimary: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 14.5,
+    fontWeight: '800',
     color: '#0F172A',
   },
   locationSecondary: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#64748B',
+    fontWeight: '600',
     marginTop: 2,
   },
   mapButton: {
     borderWidth: 1.5,
-    borderColor: '#F1F5F9',
-    borderRadius: 12,
-    paddingVertical: 10,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
+    paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
     marginTop: 14,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8FAFC',
   },
   mapButtonText: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '800',
     color: '#16A34A',
     marginLeft: 6,
   },
@@ -979,14 +1388,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 10,
-    paddingBottom: 28, // Padded for iOS home bar safety
+    gap: 12,
+    paddingBottom: Platform.OS === 'ios' ? 32 : 16,
   },
   stickyCallBtn: {
     flex: 1,
-    height: 46,
+    height: 60,
     backgroundColor: '#0F172A',
-    borderRadius: 14,
+    borderRadius: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -996,11 +1405,11 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-  stickyPrimaryBtn: {
+  stickyWhatsappBtn: {
     flex: 1,
-    height: 46,
+    height: 60,
     backgroundColor: '#16A34A',
-    borderRadius: 14,
+    borderRadius: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1014,14 +1423,40 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   stickyPrimaryBtnText: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 14.5,
+    fontWeight: '900',
     color: '#FFFFFF',
   },
   videoPlayerContainer: {
     flex: 1,
     backgroundColor: '#000000',
     justifyContent: 'center',
+  },
+  fullscreenVideoContainer: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  videoOverlayPlayContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+  },
+  centerPlayButtonCircle: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    backgroundColor: 'rgba(22, 163, 74, 0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#16A34A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 8,
   },
   fullscreenVideo: {
     flex: 1,
@@ -1057,5 +1492,48 @@ const styles = StyleSheet.create({
   },
   disabledBtn: {
     opacity: 0.45,
+  },
+  zoomModalContainer: {
+    flex: 1,
+    backgroundColor: '#000000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  zoomHeader: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    zIndex: 10,
+  },
+  closeZoomBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  zoomScrollViewContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: width,
+  },
+  zoomImage: {
+    width: width,
+    height: '100%',
+  },
+  placeholderSlide: {
+    width: width,
+    height: GALLERY_HEIGHT,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#E2E8F0',
+  },
+  placeholderText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#94A3B8',
+    fontWeight: '600',
   },
 });

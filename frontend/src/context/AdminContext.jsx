@@ -5,6 +5,7 @@ import { sellerApi } from '../api/sellerApi';
 import { buyerApi } from '../api/buyerApi';
 import { animalApi } from '../api/animalApi';
 import { categoryApi } from '../api/categoryApi';
+import { verificationApi } from '../api/verificationApi';
 
 // AdminContext (plain context object) lives in its own file so this file
 // only exports the AdminProvider component, satisfying Vite Fast Refresh.
@@ -49,6 +50,8 @@ export const AdminProvider = ({ children }) => {
 
   // Global Lists State
   const [animals, setAnimals] = useState([]);
+  const [verificationRequests, setVerificationRequests] = useState([]);
+  const [pendingVerificationCount, setPendingVerificationCount] = useState(0);
   const [sellers, setSellers] = useState([]);
   const [buyers, setBuyers] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -77,6 +80,7 @@ export const AdminProvider = ({ children }) => {
   // Column Resizing mouse-drag hook
   const [columnWidths, setColumnWidths] = useState({ title: 200, category: 100, breed: 100, price: 90, status: 110, actions: 120 });
   const resizingRef = useRef(null);
+  const isFetchingRef = useRef(false);
 
   const [dashboardStats, setDashboardStats] = useState(null);
   const [serverStatus, setServerStatus] = useState('Connected');
@@ -205,6 +209,9 @@ export const AdminProvider = ({ children }) => {
    * request and silently filter out all pending/rejected listings.
    */
   const loadDashboardData = useCallback(async () => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+
     setIsLoading(true);
     setApiError(null);
     try {
@@ -242,6 +249,27 @@ export const AdminProvider = ({ children }) => {
       const buyersList = await buyerApi.getAll();
       setBuyers(buyersList);
 
+      // 6b. Fetch Verification Requests
+      try {
+        const verificationsList = await verificationApi.getRequests();
+        setVerificationRequests(verificationsList || []);
+      } catch (err) {
+        console.warn('Failed to load verification requests:', err.message);
+      }
+
+      // 6c. Fetch Pending Verification Count
+      try {
+        const verificationCountRes = await axios.get('/verification/pending-count');
+        if (verificationCountRes && verificationCountRes.data && verificationCountRes.data.data) {
+          const val = Number(verificationCountRes.data.data.pendingVerificationCount);
+          if (!isNaN(val) && val >= 0) {
+            setPendingVerificationCount(val);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to load pending verification count:', err.message);
+      }
+
       // 7. Fetch Breeds
       const breedsRes = await axios.get('/breeds');
       if (breedsRes && breedsRes.data && breedsRes.data.breeds) {
@@ -266,11 +294,11 @@ export const AdminProvider = ({ children }) => {
         talukas: (talukasRes?.data?.talukas || []).map((t) => ({ id: t._id, districtId: t.districtId, name: t.name, isActive: t.isActive })),
         villages: (villagesRes?.data?.villages || []).map((v) => ({ id: v._id, talukaId: v.talukaId, name: v.name, isActive: v.isActive }))
       });
-
     } catch (e) {
       setApiError(e.message || 'Connection to backend failed.');
     } finally {
       setIsLoading(false);
+      isFetchingRef.current = false;
     }
   }, [ensureAdminAuth]);
 
@@ -297,6 +325,8 @@ export const AdminProvider = ({ children }) => {
       loadDashboardData();
     }
   }, [isAuthReady, loadDashboardData]);
+
+
 
   const showToast = (message, type = 'success') => {
     const id = Date.now();
@@ -337,7 +367,6 @@ export const AdminProvider = ({ children }) => {
       await animalApi.approve(animal.id);
       showToast(`"${animal.title}" approved and is now live!`, 'success');
       logAudit(`Approved Animal Listing: ${animal.title}`, 'Animals');
-      // Refresh from server to confirm MongoDB write
       await loadDashboardData();
     } catch (e) {
       showToast(`Approval failed: ${e.message}`, 'error');
@@ -356,7 +385,6 @@ export const AdminProvider = ({ children }) => {
       await animalApi.reject(animal.id, reason);
       showToast(`"${animal.title}" rejected.`, 'error');
       logAudit(`Rejected Animal Listing: ${animal.title} (Reason: ${reason})`, 'Animals');
-      // Refresh from server to confirm MongoDB write
       await loadDashboardData();
     } catch (e) {
       showToast(`Rejection failed: ${e.message}`, 'error');
@@ -382,8 +410,11 @@ export const AdminProvider = ({ children }) => {
     const nextStatus = seller.status === 'Blocked' ? 'Active' : 'Blocked';
     try {
       await sellerApi.toggleBlock(seller.id);
-    } catch (err) {}
-    setSellers((prev) => prev.map((s) => s.id === seller.id ? { ...s, status: nextStatus } : s));
+      setSellers((prev) => prev.map((s) => s.id === seller.id ? { ...s, status: nextStatus } : s));
+      await loadDashboardData();
+    } catch (err) {
+      showToast(`Failed to update status: ${err.message}`, 'error');
+    }
   };
 
   const handleSoftDeleteSeller = (seller) => {
@@ -398,8 +429,11 @@ export const AdminProvider = ({ children }) => {
     const nextStatus = buyer.status === 'Blocked' ? 'Active' : 'Blocked';
     try {
       await buyerApi.toggleBlock(buyer.id);
-    } catch (err) {}
-    setBuyers((prev) => prev.map((b) => b.id === buyer.id ? { ...b, status: nextStatus } : b));
+      setBuyers((prev) => prev.map((b) => b.id === buyer.id ? { ...b, status: nextStatus } : b));
+      await loadDashboardData();
+    } catch (err) {
+      showToast(`Failed to update status: ${err.message}`, 'error');
+    }
   };
 
   const handleSoftDeleteBuyer = (buyer) => {
@@ -408,6 +442,26 @@ export const AdminProvider = ({ children }) => {
 
   const handleRestoreBuyer = (buyer) => {
     setBuyers((prev) => prev.map((b) => b.id === buyer.id ? { ...b, isDeleted: false } : b));
+  };
+
+  const handleTogglePremiumSeller = async (seller) => {
+    try {
+      await sellerApi.togglePremium(seller.id);
+      showToast(`Premium status updated for ${seller.name}!`, 'success');
+      await loadDashboardData();
+    } catch (err) {
+      showToast(`Failed to update premium: ${err.message}`, 'error');
+    }
+  };
+
+  const handleTogglePremiumBuyer = async (buyer) => {
+    try {
+      await buyerApi.togglePremium(buyer.id);
+      showToast(`Premium status updated for ${buyer.name}!`, 'success');
+      await loadDashboardData();
+    } catch (err) {
+      showToast(`Failed to update premium: ${err.message}`, 'error');
+    }
   };
 
   const handleToggleWidget = (id) => {
@@ -459,6 +513,10 @@ export const AdminProvider = ({ children }) => {
         isAuthReady,
         animals,
         setAnimals,
+        verificationRequests,
+        setVerificationRequests,
+        pendingVerificationCount,
+        setPendingVerificationCount,
         sellers,
         setSellers,
         buyers,
@@ -504,6 +562,8 @@ export const AdminProvider = ({ children }) => {
         handleToggleBlockBuyer,
         handleSoftDeleteBuyer,
         handleRestoreBuyer,
+        handleTogglePremiumSeller,
+        handleTogglePremiumBuyer,
         handleToggleWidget,
         handleMoveWidgetUp,
         handleMouseDownResize,

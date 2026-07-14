@@ -7,6 +7,7 @@ export default function SellersPage() {
     sellers,
     setSellers,
     handleToggleBlockSeller,
+    handleTogglePremiumSeller,
     triggerConfirm,
     handleSoftDeleteSeller,
     isLoading,
@@ -179,9 +180,17 @@ export default function SellersPage() {
                   <h3 style={{ margin: '0 0 2px', fontSize: 14, fontWeight: '800', color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{seller.name}</h3>
                   <span style={{ fontSize: 12, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{seller.email}</span>
                 </div>
+                {seller.isPremium && (
+                  <span
+                    className="badge"
+                    style={{ backgroundColor: '#FEF3C7', color: '#D97706', border: '1px solid #FDE68A', fontWeight: '800', marginLeft: 'auto' }}
+                  >
+                    👑 Premium
+                  </span>
+                )}
                 <span
                   className={`badge ${seller.status === 'Blocked' ? 'badge-rejected' : 'badge-approved'}`}
-                  style={{ marginLeft: 'auto', flexShrink: 0 }}
+                  style={{ marginLeft: seller.isPremium ? 6 : 'auto', flexShrink: 0 }}
                 >
                   {seller.status}
                 </span>
@@ -206,6 +215,18 @@ export default function SellersPage() {
                   onClick={() => startEditSeller(seller)}
                 >
                   <Edit2 size={13} /> Edit
+                </button>
+                <button
+                  className={`btn btn-sm ${seller.isPremium ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ 
+                    backgroundColor: seller.isPremium ? '#F59E0B' : undefined, 
+                    color: seller.isPremium ? '#FFFFFF' : undefined,
+                    border: seller.isPremium ? '1px solid #D97706' : undefined
+                  }}
+                  onClick={() => handleTogglePremiumSeller(seller)}
+                  title="Toggle Premium Status"
+                >
+                  👑
                 </button>
                 <button
                   className={`btn btn-sm ${seller.status === 'Blocked' ? 'btn-secondary' : 'btn-danger-soft'}`}

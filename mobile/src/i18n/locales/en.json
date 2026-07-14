@@ -6,11 +6,12 @@
     "edit": "Edit",
     "delete": "Delete",
     "viewAll": "View All",
-    "loading": "Loading...",
+    "loading": "Typing...",
     "error": "Error",
     "success": "Success",
     "retry": "Retry",
     "back": "Back",
+    "next": "Next",
     "close": "Close",
     "continue": "Continue",
     "logout": "Log Out",
@@ -23,13 +24,17 @@
     "search": "Search",
     "noData": "No data available",
     "share": "Share",
-    "permissionDenied": "Permission Denied"
+    "permissionDenied": "Permission Denied",
+    "today": "TODAY",
+    "online": "Online"
   },
   "tabs": {
     "buy": "Buy",
     "sell": "Sell",
     "bid": "Bid",
-    "post": "Post"
+    "post": "Post",
+    "marketPrice": "Market Price",
+    "feedPlanner": "Feed Planner"
   },
   "auth": {
     "title": "PashuSetu Auth Portal",
@@ -123,8 +128,70 @@
     "goat": "Goat",
     "sheep": "Sheep",
     "horse": "Horse",
-    "other": "Other",
-    "marketplaceCare": "Marketplace & Care"
+    "other": "Other 🐾",
+    "marketplaceCare": "Marketplace & Care",
+    "nearbyAnimals": "Nearby Animals",
+    "aiRecommended": "AI Recommended",
+    "premiumListings": "Premium Listings",
+    "verifiedSellers": "Verified Sellers",
+    "recentlyViewed": "Recently Viewed",
+    "trendingAnimals": "Trending Animals",
+    "bestDeals": "Best Deals",
+    "searchAnimals": "Search Animals...",
+    "aiSmartSearch": "AI Smart Search",
+    "voiceSearch": "Voice Search",
+    "recentSearches": "Recent Searches",
+    "trendingSearches": "Trending Searches",
+    "suggestedBreeds": "Suggested Breeds",
+    "checkAiPrice": "Check AI Price →",
+    "knowAiValue": "Know Exact AI Market Value",
+    "aiAnalyzes": "AI analyzes breed, age, milk yield, weight, health to calculate dynamic value.",
+    "goodDeal": "GOOD DEAL",
+    "belowMarket": "Below Market",
+    "negotiable": "Negotiable",
+    "urgentSale": "Urgent Sale",
+    "pregnantText": "Pregnant",
+    "lactation": "Lactation",
+    "calves": "Calves",
+    "horns": "Horns",
+    "earTag": "Ear Tag",
+    "memberSince": "Member Since",
+    "responseRate": "Response Rate",
+    "animalsSold": "Animals Sold",
+    "distanceKm": "{{distance}} km away",
+    "callSeller": "Call Seller",
+    "whatsapp": "WhatsApp",
+    "directions": "Directions",
+    "save": "Save",
+    "share": "Share",
+    "report": "Report",
+    "activeListings": "Active Listings",
+    "bull": "Bull 🐂",
+    "calf": "Calf 🍼",
+    "bullock": "Bullock 🐂",
+    "newestFirst": "Newest First",
+    "oldestFirst": "Oldest First",
+    "lowestPrice": "Lowest Price",
+    "highestPrice": "Highest Price",
+    "nearest": "Nearest First",
+    "highestMilk": "Highest Milk Yield",
+    "bestDeal": "Best AI Deals",
+    "recentlyUpdated": "Recently Updated",
+    "reset": "Reset",
+    "noAnimalsFound": "No animals found matching your search.",
+    "viewDetails": "View Details",
+    "nearbyOn": "Nearby ON",
+    "showAll": "Show All",
+    "breedLabel": "Breed",
+    "ageLabel": "Age",
+    "milkLabel": "Milk",
+    "weightLabel": "Weight",
+    "healthLabel": "Health",
+    "vaccinatedLabel": "Vaccinated",
+    "pregnantLabel": "Pregnant",
+    "aiEstimatedValue": "AI Est. Value",
+    "viewCompleteDetails": "View Details →",
+    "calvingLabel": "Calving"
   },
   "sell": {
     "title": "Sell Your Animal",
@@ -133,7 +200,6 @@
     "myListings": "My Listings",
     "activeListing": "Active",
     "pendingListing": "Pending",
-    "soldListing": "Sold",
     "noListings": "No listings yet",
     "noListingsSub": "Tap below to list your first animal",
     "postAnimal": "Post an Animal",
@@ -147,11 +213,6 @@
     "addAnimal": "Add Animal",
     "messages": "Messages",
     "analytics": "Analytics",
-    "monthlyOverview": "Monthly Overview",
-    "juneSummary": "June Summary",
-    "revenue": "Revenue",
-    "views": "Views",
-    "enquiries": "Enquiries",
     "recentListings": "Recent Listings",
     "viewAll": "View All",
     "edit": "Edit",
@@ -646,10 +707,528 @@
     "blockWhatsApp": "WhatsApp",
     "pendingReview": "Pending Review",
     "btnGoToHome": "Go to Home",
-    "btnViewStatus": "View Verification Status"
+    "btnViewStatus": "View Verification Status",
+    "ocrLowConfidence": "OCR scan confidence is low. Please check and fill in the details manually."
   },
   "app": {
     "name": "PashuSetu",
     "tagline": "Marketplace & Care"
+  },
+  "premiumAdvisor": {
+    "lockScreen": {
+      "title": "Premium AI Advisor",
+      "subtitle": "Get expert answers for your dairy farm 24/7",
+      "featureMilkTitle": "Increase Milk Production",
+      "featureMilkDesc": "Get feeding plans to increase milk yield",
+      "featureHealthTitle": "Cattle Health Check",
+      "featureHealthDesc": "Identify illnesses early and save doctor fees",
+      "featureLimitlessTitle": "Unlimited AI Consulting",
+      "featureLimitlessDesc": "Ask any question anytime without limits",
+      "unlockBtn": "Unlock Premium Advisor",
+      "alreadyMember": "Already a member? Tap to restore"
+    },
+    "paymentScreen": {
+      "title": "Choose Premium Plan",
+      "subtitle": "Select a plan to unlock all premium AI features",
+      "monthlyPlanTitle": "Monthly Plan",
+      "monthlyPlanPrice": "₹99 / Month",
+      "monthlyPlanDesc": "Best to try out",
+      "yearlyPlanTitle": "Yearly Plan",
+      "yearlyPlanPrice": "₹499 / Year",
+      "yearlyPlanDesc": "Best Value (Save 50%)",
+      "payBtn": "Proceed to Payment",
+      "secureNote": "Secure payment via UPI, Cards or Net Banking",
+      "processing": "Processing your payment... Please wait",
+      "successTitle": "Payment Successful!",
+      "successDesc": "Thank you! Your Premium AI Advisor is now active.",
+      "errorTitle": "Payment Failed",
+      "errorDesc": "Your transaction could not be completed. Please try again.",
+      "validationError": "Please select a plan to continue.",
+      "confirmTitle": "Confirm Purchase",
+      "confirmDesc": "Are you sure you want to subscribe to the {{plan}} for {{price}}?",
+      "confirmYes": "Yes, Pay",
+      "confirmNo": "Cancel"
+    },
+    "chatbot": {
+      "title": "AI Pashu Advisor",
+      "subtitle": "Ask anything about cattle health, feed & milk",
+      "placeholder": "Ask anything about your dairy farm.",
+      "sendBtn": "Send",
+      "thinkingText": "AI Advisor is writing...",
+      "typingText": "Typing...",
+      "emptyTitle": "Ask Your First Question!",
+      "emptyDesc": "Get instant advice on cow/buffalo health, milk yield, and fodder.",
+      "errorText": "Something went wrong. Please ask your question again.",
+      "retryBtn": "Retry",
+      "offlineText": "You are offline. Please check your internet connection."
+    },
+    "suggestions": {
+      "title": "Common Questions",
+      "suggest1": "How to increase daily milk production?",
+      "suggest2": "What is the best feed mix for milking cows?",
+      "suggest3": "How to cure mastitis disease in cows?",
+      "suggest4": "Best green fodder planning for summer",
+      "suggest5": "How to take care of a newborn calf?"
+    },
+    "templates": {
+      "greeting": "Welcome to PashuSetu AI Advisor! I can help you manage your dairy farm, improve milk yield, plan fodder, and guide you on cattle diseases. What would you like to ask today?",
+      "fodderGuide": "To get the best milk production, a cow needs a balance of green fodder, dry fodder, and concentrated feed (like cattle feed or grains). Clean drinking water should be available 24/7.",
+      "healthWarning": "Important: If your animal has a high fever, stopped eating, or shows severe symptoms, please contact a registered veterinarian immediately.",
+      "premiumPitch": "Upgrade to PashuSetu Premium to get unlimited AI consulting, custom feed charts, and direct contact with doctors.",
+      "fallback": "I'm sorry, I couldn't find specific details for that. Can you rephrase it or ask about cattle health, milk, or feed?"
+    },
+    "membership": {
+      "activeStatus": "Premium Active",
+      "validUntil": "Valid until: {{date}}",
+      "renewBtn": "Renew Plan",
+      "freeLimitAlert": "You have used your 3 free questions for today. Upgrade to Premium for unlimited access.",
+      "upgradePrompt": "Unlock Premium AI Advisor for unlimited farm advice.",
+      "goPremiumBtn": "Go Premium"
+    },
+    "guidedChat": {
+      "selectTopic": "Select guided topic to begin:",
+      "summaryTitle": "Cattle Details Summary",
+      "restartBtn": "Restart Advisor",
+      "premiumRequired": "Premium Advisor Required",
+      "premiumRequiredDesc": "Upgrade to premium membership to unlock your generated report and suggestions.",
+      "questions": {
+        "animal": "Select Animal",
+        "breed": "Select Breed",
+        "age": "Select Age",
+        "milk": "Daily Milk Production",
+        "weight": "Cattle Weight",
+        "pregnant": "Is the animal pregnant?",
+        "pregnancyMonth": "Month of Pregnancy",
+        "goal": "Feeding Goal",
+        "feed": "Current Feed Type",
+        "water": "Water Availability",
+        "symptom": "Select Symptoms",
+        "insemination": "Select Insemination Type",
+        "lastVaccine": "Select Last Vaccine Received"
+      },
+      "options": {
+        "cow": "Cow",
+        "buffalo": "Buffalo",
+        "goat": "Goat",
+        "gir": "Gir",
+        "sahiwal": "Sahiwal",
+        "hf": "HF",
+        "jersey": "Jersey",
+        "murrah": "Murrah",
+        "jaffarabadi": "Jaffarabadi",
+        "mehsana": "Mehsana",
+        "osmanabadi": "Osmanabadi",
+        "boer": "Boer",
+        "sirohi": "Sirohi",
+        "age1_2": "1-2 Years",
+        "age3_5": "3-5 Years",
+        "ageAbove5": "Above 5 Years",
+        "milkUnder10": "Under 10 L/day",
+        "milk10_15": "10-15 L/day",
+        "milkAbove15": "Above 15 L/day",
+        "weightUnder300": "Under 300 kg",
+        "weight300_400": "300-400 kg",
+        "weightAbove400": "Above 400 kg",
+        "weightAbove300": "Above 300 kg",
+        "preg1_3": "1-3 Months",
+        "preg3_6": "3-6 Months",
+        "preg6_9": "6-9 Months",
+        "goalIncrease": "Increase Milk Production",
+        "goalMaintenance": "Maintenance",
+        "goalGrowth": "Growth",
+        "feedGreen": "Green Fodder",
+        "feedDry": "Dry Fodder",
+        "feedConcentrate": "Concentrates",
+        "feedMixed": "Mixed",
+        "waterConstant": "Constant",
+        "waterIntervals": "2-3 Times a Day",
+        "waterScarce": "Scarce",
+        "fever": "High Fever",
+        "noAppetite": "Loss of Appetite",
+        "limping": "Limping",
+        "natural": "Natural Service",
+        "artificial": "Artificial Insemination",
+        "fmd": "FMD Vaccine",
+        "hs": "HS Vaccine",
+        "none": "None"
+      },
+      "flows": {
+        "feedPlanner": {
+          "title": "Feed Planner Advisor",
+          "desc": "Optimize daily diet and nutrition for milk yield"
+        },
+        "marketPrice": {
+          "title": "Market Price Estimator",
+          "desc": "Calculate standard selling rates of your cattle"
+        },
+        "diseaseChecker": {
+          "title": "Disease Diagnostic Guide",
+          "desc": "Analyze symptoms and match common animal sicknesses"
+        },
+        "breedingAdvisor": {
+          "title": "Breeding Cycle Planner",
+          "desc": "Schedule AI/Natural service timelines safely"
+        },
+        "vaccinationPlanner": {
+          "title": "Vaccination & Medical Advisor",
+          "desc": "Track vaccine doses and schedules to avoid viruses"
+        }
+      },
+      "summary": {
+        "animal": "Animal Type",
+        "breed": "Breed",
+        "age": "Age",
+        "milk": "Milk Yield",
+        "weight": "Weight",
+        "pregnant": "Pregnant?",
+        "pregnancyMonth": "Pregnancy Stage",
+        "goal": "Feeding Goal",
+        "feed": "Current Feed",
+        "water": "Water Access",
+        "symptom": "Symptoms Shown",
+        "insemination": "Insemination Type",
+        "lastVaccine": "Last Vaccine Received"
+      }
+    }
+  },
+  "estimator": {
+    "title": "Cattle Price Estimator",
+    "subtitle": "Estimate the fair market price of your cattle",
+    "steps": {
+      "header": "Question {{current}} of 7",
+      "selectAnimal": "Select Animal",
+      "selectBreed": "Select Breed",
+      "age": "Age of Animal",
+      "weight": "Weight (in kg)",
+      "milkProduction": "Milk Production (Ltrs/day)",
+      "pregnancy": "Pregnancy Status",
+      "pregnancyMonth": "Pregnancy Month",
+      "health": "Health Condition",
+      "vaccination": "Vaccination Status",
+      "location": "Location Details",
+      "verification": "Verification Status"
+    },
+    "animal": {
+      "cow": "Cow 🐄",
+      "buffalo": "Buffalo 🐃",
+      "goat": "Goat 🐐"
+    },
+    "pregnant": {
+      "yes": "Yes",
+      "no": "No"
+    },
+    "verified": {
+      "yes": "Verified",
+      "no": "Non-Verified"
+    },
+    "actions": {
+      "calculate": "Calculate Estimated Price",
+      "recalculate": "Estimate Another Animal",
+      "next": "Next",
+      "back": "Back",
+      "gotoEstimator": "Go to Price Estimator",
+      "gotoBidding": "Go to Live Bids"
+    },
+    "result": {
+      "title": "Estimated Value",
+      "priceRange": "Price Range",
+      "marketDemand": "Market Demand",
+      "confidenceScore": "Confidence Score",
+      "confidenceHelp": "Based on details provided",
+      "sellingSuggestions": "Selling Suggestions",
+      "buyingSuggestions": "Buying Suggestions",
+      "reasoning": "Valuation Reasoning",
+      "expectedPrice": "Expected Market Price",
+      "minPrice": "Minimum Price",
+      "premiumPrice": "Premium Price"
+    },
+    "placeholders": {
+      "selectState": "Select State",
+      "selectDistrict": "Select District",
+      "selectTaluka": "Select Taluka",
+      "enterVillage": "Enter Village Name (Optional)",
+      "age": "Enter age in years",
+      "weight": "Enter weight in kg",
+      "milk": "Enter milk production in litres"
+    },
+    "input": {
+      "years": "Years",
+      "months": "Months"
+    },
+    "breeds": {
+      "cow": {
+        "gir": "Gir",
+        "sahiwal": "Sahiwal",
+        "hf": "Holstein Friesian (HF)",
+        "jersey": "Jersey",
+        "desi": "Desi / Local",
+        "other": "Other Breed"
+      },
+      "buffalo": {
+        "murrah": "Murrah",
+        "surti": "Surti",
+        "nili_ravi": "Nili Ravi",
+        "mehsana": "Mehsana",
+        "local": "Local / Desi",
+        "other": "Other Breed"
+      },
+      "goat": {
+        "sirohi": "Sirohi",
+        "barbari": "Barbari",
+        "jamnapari": "Jamnapari",
+        "osmanabadi": "Osmanabadi",
+        "local": "Local / Desi",
+        "other": "Other Breed"
+      }
+    },
+    "health": {
+      "excellent": "Excellent",
+      "good": "Good",
+      "average": "Average",
+      "needs_treatment": "Needs Treatment"
+    },
+    "vaccination": {
+      "complete": "Complete",
+      "partial": "Partial",
+      "unknown": "Unknown / None"
+    },
+    "demand": {
+      "veryHigh": "Very High Demand 🔥",
+      "high": "High Demand 📈",
+      "medium": "Moderate Demand ➡️",
+      "low": "Low Demand 📉"
+    },
+    "suggestions": {
+      "buy": {
+        "pregnantCheck": "Check historical calving details and pregnancy verification reports from a vet.",
+        "treatmentCost": "Factor in veterinary checkup and treatment costs (approx ₹1,000 - ₹2,000).",
+        "excellentPremium": "Excellent health animals are highly productive; paying a small premium is justified.",
+        "vaccinationRecord": "Request physical vaccination cards or digital records before purchasing.",
+        "vaccinationCheck": "Check if FMD and Brucellosis vaccines are due and schedule them immediately.",
+        "verifiedSecure": "Verified listings have checked location and owner details, lowering purchase risks.",
+        "unverifiedInspection": "Schedule a physical visit to inspect the animal since it is not verified.",
+        "localTransport": "Ensure transport permissions and check state boundary rules for livestock."
+      },
+      "sell": {
+        "pregnantValue": "Advertise the expected delivery date; pregnant cattle command a ₹5,000+ premium.",
+        "treatmentDisclose": "Be transparent about treatment needs to maintain trust and prevent disputes.",
+        "excellentHighlight": "Emphasize high activity and shiny coat in listings to justify premium pricing.",
+        "vaccinationHighlight": "Highlight 'Complete Vaccination' in listing title to attract quick buyers.",
+        "vaccinationSchedule": "Complete pending vaccinations to raise the market value by 5% to 8%.",
+        "verifiedPremium": "Get a verified tag on PashuSetu to sell up to 15% faster at better prices.",
+        "unverifiedTips": "Request verification through the App to get the green verified badge.",
+        "localMarket": "List location details accurately to get queries from nearby premium buyers."
+      },
+      "ai": {
+        "vaccination": "Complete vaccinations can increase the animal's value by 8%.",
+        "weight": "Better weight and body condition score can improve selling price.",
+        "verification": "Verified profiles and video uploads increase buyer trust and speed up sales.",
+        "season": "Monsoon/Winter festival season increases local market demand.",
+        "milk": "High milk production yield dramatically improves overall valuation."
+      }
+    },
+    "reasoning": {
+      "premiumBreed": "Premium breed adjustment applied based on high market demand.",
+      "primeAge": "Prime milking/production age range adds valuation premium.",
+      "depreciatedAge": "Age curve adjustment applied due to early stage or advanced age.",
+      "milkYieldBonus": "High milk yield significantly increases market price.",
+      "pregnantBonus": "Pregnancy adds substantial valuation bonus for upcoming offspring.",
+      "healthExcellent": "Excellent health condition commands a premium over average cattle.",
+      "healthPoor": "Health condition requires medical treatment, resulting in discounted pricing.",
+      "verifiedPremium": "Verified status adds 15% trust premium to pricing.",
+      "unverifiedDiscount": "Unverified listings carry higher risk, resulting in baseline valuation discount.",
+      "standardCattle": "Standard market baseline valuation parameters applied."
+    },
+    "chat": {
+      "qAnimal": "Which animal do you want to estimate?",
+      "qBreed": "What is the breed of your {{animal}}?",
+      "qAge": "How old is your {{animal}}?",
+      "qWeight": "What is the approximate weight of your {{animal}}?",
+      "qMilk": "What is the daily milk production of your {{animal}}?",
+      "qHealth": "What is the health condition of your {{animal}}?",
+      "qDistrict": "Select your district or nearest market:",
+      "summaryCard": "Valuation Input Summary",
+      "analyzing": "Analyzing livestock market values...",
+      "ageOptions": {
+        "lt_6m": "< 6 Months",
+        "6_12m": "6-12 Months",
+        "1_2y": "1-2 Years",
+        "2_3y": "2-3 Years",
+        "3_5y": "3-5 Years",
+        "5_7y": "5-7 Years",
+        "gt_3y": "3+ Years",
+        "gt_7y": "7+ Years"
+      },
+      "weightOptions": {
+        "w10_20": "10-20 kg",
+        "w20_30": "20-30 kg",
+        "w30_40": "30-40 kg",
+        "w40_50": "40-50 kg",
+        "w50_plus": "50+ kg",
+        "w150_250": "150-250 kg",
+        "w250_350": "250-350 kg",
+        "w350_450": "350-450 kg",
+        "w450_plus": "450+ kg",
+        "w450_550": "450-550 kg",
+        "w550_plus": "550+ kg"
+      },
+      "milkOptions": {
+        "m0": "0 Litres (Dry/Male)",
+        "m1_5": "1-5 L/day",
+        "m5_10": "5-10 L/day",
+        "m10_15": "10-15 L/day",
+        "m15_20": "15-20 L/day",
+        "m20_plus": "20+ L/day"
+      },
+      "districtOptions": {
+        "pune": "Pune (MH)",
+        "satara": "Satara (MH)",
+        "ahmednagar": "Ahmednagar (MH)",
+        "anand": "Anand (GJ)",
+        "jaipur": "Jaipur (RJ)",
+        "lucknow": "Lucknow (UP)",
+        "other": "Other Region"
+      },
+      "restartTitle": "Restart Market Price Assistant?",
+      "restartMessage": "All answers, chat history, summary, valuation and progress will be cleared.",
+      "completedNotice": "Valuation completed. Tap Restart to create a new valuation."
+    },
+    "premium": {
+      "title": "AI Market Price Assistant",
+      "subtitle": "Unlock lifetime access to our advanced livestock valuation engine",
+      "unlockBtn": "Unlock for ₹1",
+      "benefitValuationTitle": "Accurate Valuation",
+      "benefitValuationDesc": "Uses 10+ advanced animal physiological and environmental factors.",
+      "benefitInsightsTitle": "AI Insights",
+      "benefitInsightsDesc": "Dynamic rules generate targeted actions to maximize selling price.",
+      "benefitDemandTitle": "Market Demand",
+      "benefitDemandDesc": "Analyzes district-specific trends and seasonality index.",
+      "benefitRecommendationTitle": "Selling Recommendation",
+      "benefitRecommendationDesc": "Actionable tips regarding health, verification, and timing."
+    }
+  },
+  "feedPlanner": {
+    "title": "AI Feed Planner",
+    "chat": {
+      "qAnimal": "Which animal do you want to create a feed plan for?",
+      "qBreed": "Which breed is your {{animal}}?",
+      "qWeight": "What is the estimated weight of your {{animal}}?",
+      "qMilk": "What is the daily milk production of your {{animal}}?",
+      "qPregnant": "Is the {{animal}} pregnant?",
+      "qGoal": "What is the primary feeding goal?",
+      "qGreen": "Is green fodder available on your farm?",
+      "confirmInfo": "Please review the summary. Is this information correct?",
+      "generating": "AI is calculating optimum feed recipe...",
+      "completedNotice": "Feeding plan generated. Tap Restart to create a new plan.",
+      "summaryCard": "Cattle Summary",
+      "unlockTitle": "Unlock AI Feed Planner",
+      "unlockSubtitle": "Get custom feeding recommendations for ₹1 only",
+      "lockDesc": "🔒 Lifetime AI Feed Planner access is locked. Unlock now for just ₹1.",
+      "benefitTitle1": "Balanced Feed Ratios",
+      "benefitDesc1": "Get exact weight recommendations for dry fodder, green fodder, and concentrates.",
+      "benefitTitle2": "Increase Milk Yield",
+      "benefitDesc2": "Scientifically proven concentrate mixes to boost milk production.",
+      "benefitTitle3": "Cost Optimization",
+      "benefitDesc3": "Avoid expensive feed waste by utilizing local farm residues.",
+      "resultsTitle": "AI Suggested Feed Plan",
+      "greenFodder": "Green Fodder",
+      "dryFodder": "Dry Fodder",
+      "concentrate": "Concentrate Feed",
+      "cottonSeedCake": "Cotton Seed Cake",
+      "mineralMixture": "Mineral Mixture",
+      "salt": "Salt",
+      "water": "Daily Water Need",
+      "dailyCost": "Est. Daily Feed Cost",
+      "monthlyCost": "Est. Monthly Cost",
+      "milkImprovement": "Expected Milk Gain",
+      "tipsTitle": "Advisory Tips",
+      "warningsTitle": "Health Warnings",
+      "maharashtraNote": "✔ Suitable for Maharashtra climate and livestock"
+    },
+    "actions": {
+      "generate": "Generate Feed Plan",
+      "edit": "Edit Information"
+    },
+    "animal": {
+      "cow": "Cow 🐄",
+      "buffalo": "Buffalo 🐃"
+    },
+    "breeds": {
+      "cow": {
+        "jersey": "Jersey",
+        "hf": "HF (Holstein Friesian)",
+        "gir": "Gir",
+        "sahiwal": "Sahiwal",
+        "desi": "Desi (Local)",
+        "other": "Other"
+      },
+      "buffalo": {
+        "murrah": "Murrah",
+        "mehsana": "Mehsana",
+        "surti": "Surti",
+        "pandharpuri": "Pandharpuri",
+        "local": "Local / Desi",
+        "other": "Other"
+      }
+    },
+    "options": {
+      "weight": {
+        "lt_300": "Below 300 kg",
+        "w300_400": "300–400 kg",
+        "w400_500": "400–500 kg",
+        "gt_500": "Above 500 kg"
+      },
+      "milk": {
+        "dry": "Dry Animal (0 L)",
+        "m5_10": "5–10 L",
+        "m10_15": "10–15 L",
+        "m15_20": "15–20 L",
+        "gt_20": "Above 20 L"
+      },
+      "pregnant": {
+        "yes": "Yes",
+        "no": "No"
+      },
+      "goal": {
+        "inc_milk": "Increase Milk",
+        "gain_wt": "Weight Gain",
+        "maintenance": "Maintenance",
+        "preg_support": "Pregnancy Support"
+      },
+      "green": {
+        "yes": "Yes, Available",
+        "no": "No, Not Available"
+      }
+    },
+    "tips": {
+      "cow": {
+        "jersey": "Jersey cows need good fiber. Keep a 60:40 ratio of green fodder to dry fodder.",
+        "hf": "HF cows are highly sensitive to heat stress. Ensure cool, shaded housing and ventilation.",
+        "gir": "Gir is highly resilient. Indigenous breeds benefit from natural grazing plus basic concentrate.",
+        "sahiwal": "Sahiwal cows have high fat yield. Feed balanced cotton seed cake to maintain milk quality.",
+        "desi": "Desi cows require low maintenance. Feed dry fodder mixed with mustard/cotton oil cake.",
+        "other": "Ensure basic balanced feed consisting of homegrown fodder and feed supplement."
+      },
+      "buffalo": {
+        "murrah": "Murrah buffaloes need high energy. Feed extra sirka and cotton seed cake for fat yield.",
+        "mehsana": "Mehsana buffaloes are good milkers. Keep concentrate levels high during lactation peak.",
+        "surti": "Surti buffaloes are compact. Manage feed carefully to avoid obesity and foot problems.",
+        "pandharpuri": "Pandharpuri breed is highly adapted to dry climates. Keep hydration levels high.",
+        "local": "Local buffaloes thrive on natural grasses. Add 30g daily mineral mixture.",
+        "other": "Keep clean drinking water and green grasses available continuously."
+      },
+      "goal": {
+        "inc_milk": "Increase concentrate feed gradually over 10 days to avoid rumen acidosis.",
+        "gain_wt": "Feed energy-dense bypass fats or grains to support healthy muscle growth.",
+        "maintenance": "Maintenance feeding requires moderate fiber. Minimize expensive concentrates.",
+        "preg_support": "Provide additional calcium and phosphorus in the last trimester of pregnancy."
+      },
+      "water": "Clean drinking water should be available 24/7. Dairy cattle drink up to 80-100L daily."
+    },
+    "warnings": {
+      "pregnant": "Avoid feeding moldy straw or rotten silage to prevent pregnancy complications.",
+      "no_green": "Lack of green fodder causes Vitamin A deficiency. Feed mineral mixtures regularly.",
+      "high_milk": "High milk yielders are at risk of milk fever. Ensure calcium supplement administration."
+    }
   }
 }

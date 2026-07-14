@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Platform,
   Image,
+  TextInput,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -29,6 +30,19 @@ export default function VerificationScreen({ navigation }) {
   const [selectedFile, setSelectedFile] = useState(null); // { uri, name, type, size }
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isSubmittedSuccess, setIsSubmittedSuccess] = useState(false);
+
+  const [farmerName, setFarmerName] = useState('');
+  const [dairyName, setDairyName] = useState('');
+  const [receiptDate, setReceiptDate] = useState('');
+  const [confidence, setConfidence] = useState(null);
+  const [showOcrForm, setShowOcrForm] = useState(false);
+  const [uploadedReceiptUrl, setUploadedReceiptUrl] = useState('');
+
+  const farmerNameRef = useRef('');
+  const dairyNameRef = useRef('');
+  const receiptDateRef = useRef('');
+
+
 
   // Auto compress helper
   const compressImage = async (uri) => {
@@ -123,8 +137,12 @@ export default function VerificationScreen({ navigation }) {
   };
 
   const handleSubmit = async () => {
-    if (!selectedFile) return;
+    if (!selectedFile) {
+      console.warn('[VerificationScreen] No file selected.');
+      return;
+    }
 
+    console.log('[VerificationScreen] Document upload initiated. Selected file details:', selectedFile);
     setLoading(true);
     setUploadProgress(0);
     try {
@@ -132,7 +150,9 @@ export default function VerificationScreen({ navigation }) {
 
       // 1. Silent Image Compression
       if (selectedFile.isImage) {
+        console.log('[VerificationScreen] Compressing receipt image silently...');
         finalUri = await compressImage(selectedFile.uri);
+        console.log('[VerificationScreen] Compression complete. Final URI:', finalUri);
       }
 
       // 2. Build FormData Payload
@@ -151,26 +171,135 @@ export default function VerificationScreen({ navigation }) {
       }
 
       // 3. Upload File via animalApi.uploadFile
+      console.log('[VerificationScreen] Dispatching file upload request...');
       const uploadRes = await animalApi.uploadFile(formData, (percent) => {
         setUploadProgress(percent);
       });
+      console.log('[VerificationScreen] File upload response:', uploadRes);
 
       if (uploadRes && uploadRes.data && uploadRes.data.fileUrl) {
         const receiptUrl = uploadRes.data.fileUrl;
+        setUploadedReceiptUrl(receiptUrl);
 
-        // 4. Submit Verification request
-        await verificationApi.submitVerification(receiptUrl);
+        // Call OCR analysis
+        console.log('[VerificationScreen] Dispatching OCR analysis request...');
+        setStatusText(t('verification.analyzingReceipt', { defaultValue: 'Analyzing receipt...' }));
+        const ocrRes = await verificationApi.extractReceiptDetails(receiptUrl);
+        console.log('[VerificationScreen] OCR response:', ocrRes);
 
-        // 5. Sync profile details
-        await refreshProfileData();
+        if (ocrRes && ocrRes.status === 'success' && ocrRes.data) {
+          const { farmerName: fName, dairyName: dName, receiptDate: rDate, confidence: conf } = ocrRes.data;
+          setFarmerName(fName || '');
+          farmerNameRef.current = fName || '';
+          setDairyName(dName || '');
+          dairyNameRef.current = dName || '';
+          setReceiptDate(rDate || '');
+          receiptDateRef.current = rDate || '';
+          setConfidence(conf || 'low');
+        } else {
+          console.warn('[VerificationScreen] OCR response failed or was low confidence');
+          setFarmerName('');
+          farmerNameRef.current = '';
+          setDairyName('');
+          dairyNameRef.current = '';
+          setReceiptDate('');
+          receiptDateRef.current = '';
+          setConfidence('low');
+        }
 
-        // 6. Set success screen state
-        setIsSubmittedSuccess(true);
+        setShowOcrForm(true);
       } else {
         throw new Error('Upload response did not return a valid file URL.');
       }
     } catch (err) {
+      console.error('[VerificationScreen] Submit/OCR processing failed:', err);
       Alert.alert(t('common.error'), err.message || t('verification.errorMsg'));
+    } finally {
+      setLoading(false);
+      setStatusText('');
+    }
+  };
+
+  const handleFinalSubmit = async () => {
+    console.log('[VerificationScreen] handleFinalSubmit triggered');
+
+    const currentFarmerName = farmerNameRef.current;
+    const currentDairyName = dairyNameRef.current;
+    const currentReceiptDate = receiptDateRef.current;
+
+    console.log('[VerificationScreen] State and Refs before validation:', {
+      state: {
+        farmerName,
+        dairyName,
+        receiptDate,
+        uploadedReceiptUrl
+      },
+      refs: {
+        farmerName: currentFarmerName,
+        dairyName: currentDairyName,
+        receiptDate: currentReceiptDate
+      }
+    });
+
+    // Prevent multiple button clicks
+    if (loading) {
+      console.log('[VerificationScreen] Submission already in progress, ignoring click.');
+      return;
+    }
+
+    // 1. Validation check
+    console.log('[VerificationScreen] Performing client-side validation...');
+    if (!currentFarmerName || !currentFarmerName.trim()) {
+      console.warn('[VerificationScreen] Validation failed: farmerName is empty');
+      Alert.alert(t('common.error'), t('verification.farmerNameRequired', { defaultValue: 'Farmer name is required.' }));
+      return;
+    }
+    if (!currentDairyName || !currentDairyName.trim()) {
+      console.warn('[VerificationScreen] Validation failed: dairyName is empty');
+      Alert.alert(t('common.error'), t('verification.dairyNameRequired', { defaultValue: 'Dairy name is required.' }));
+      return;
+    }
+    if (!currentReceiptDate || !currentReceiptDate.trim()) {
+      console.warn('[VerificationScreen] Validation failed: receiptDate is empty');
+      Alert.alert(t('common.error'), t('verification.receiptDateRequired', { defaultValue: 'Receipt date is required.' }));
+      return;
+    }
+
+    console.log('[VerificationScreen] Validations passed. Required fields:', {
+      uploadedReceiptUrl,
+      farmerName: currentFarmerName.trim(),
+      dairyName: currentDairyName.trim(),
+      receiptDate: currentReceiptDate.trim()
+    });
+
+    setLoading(true);
+    setStatusText(t('verification.submitting', { defaultValue: 'Submitting verification...' }));
+
+    try {
+      console.log('[VerificationScreen] Dispatching submitVerification API request...');
+      const response = await verificationApi.submitVerification({
+        receiptUrl: uploadedReceiptUrl,
+        farmerName: currentFarmerName.trim(),
+        dairyName: currentDairyName.trim(),
+        receiptDate: currentReceiptDate.trim()
+      });
+      console.log('[VerificationScreen] API response received successfully:', response);
+
+      console.log('[VerificationScreen] Triggering profile data refresh...');
+      if (refreshProfileData) {
+        await refreshProfileData(true); // silent refresh
+        console.log('[VerificationScreen] Profile data refreshed successfully');
+      }
+
+      console.log('[VerificationScreen] Setting isSubmittedSuccess state to true...');
+      setIsSubmittedSuccess(true);
+    } catch (err) {
+      console.error('[VerificationScreen] Final submission failed with error:', err);
+      // Display proper user-facing error message
+      Alert.alert(
+        t('common.error'),
+        err.message || t('verification.errorMsg', { defaultValue: 'Submission failed. Please try again.' })
+      );
     } finally {
       setLoading(false);
       setStatusText('');
@@ -253,7 +382,13 @@ export default function VerificationScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={styles.backButton} onPress={() => {
+          if (showOcrForm) {
+            setShowOcrForm(false);
+          } else {
+            navigation.goBack();
+          }
+        }}>
           <Ionicons name="arrow-back" size={24} color="#1E293B" />
         </TouchableOpacity>
         <AppText style={styles.headerTitle}>{t('verification.title')}</AppText>
@@ -261,77 +396,172 @@ export default function VerificationScreen({ navigation }) {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Info Card */}
-        <View style={styles.infoCard}>
-          <MaterialCommunityIcons name="information" size={20} color="#15803D" style={styles.infoIcon} />
-          <View style={{ flex: 1 }}>
-            <AppText style={styles.infoTitle}>{t('verification.instructionsTitle')}</AppText>
-            <AppText style={styles.infoText}>{t('verification.instructionsText')}</AppText>
-          </View>
-        </View>
-
-        {/* Selection Box / Preview */}
-        {selectedFile ? (
-          <View style={styles.previewContainer}>
-            {selectedFile.isImage ? (
-              <Image source={{ uri: selectedFile.uri }} style={styles.previewImage} resizeMode="contain" />
-            ) : (
-              <View style={styles.pdfPreviewBox}>
-                <MaterialCommunityIcons name="file-pdf-box" size={64} color="#EF4444" />
-                <AppText style={styles.pdfName} numberOfLines={1}>{selectedFile.name}</AppText>
-                <AppText style={styles.pdfSize}>
-                  {selectedFile.size ? `${(selectedFile.size / 1024 / 1024).toFixed(2)} MB` : ''}
-                </AppText>
+        {showOcrForm ? (
+          <View style={styles.formContainer}>
+            <AppText style={styles.formSectionTitle}>{t('verification.chooseDocument', { defaultValue: 'Review OCR Details' })}</AppText>
+            
+            {/* Selection Box / Preview */}
+            {selectedFile && (
+              <View style={[styles.previewContainer, { height: 160 }]}>
+                {selectedFile.isImage ? (
+                  <Image source={{ uri: selectedFile.uri }} style={styles.previewImage} resizeMode="contain" />
+                ) : (
+                  <View style={styles.pdfPreviewBox}>
+                    <MaterialCommunityIcons name="file-pdf-box" size={48} color="#EF4444" />
+                    <AppText style={styles.pdfName} numberOfLines={1}>{selectedFile.name}</AppText>
+                  </View>
+                )}
               </View>
             )}
-            <TouchableOpacity style={styles.clearButton} onPress={() => setSelectedFile(null)}>
-              <Ionicons name="close-circle" size={28} color="#EF4444" />
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View style={styles.uploadBoxPlaceholder}>
-            <MaterialCommunityIcons name="cloud-upload-outline" size={48} color="#64748B" />
-            <AppText style={styles.uploadBoxText}>{t('verification.noReceiptSelected')}</AppText>
-            <AppText style={styles.uploadBoxSubtext}>{t('verification.pdfNote')}</AppText>
-          </View>
-        )}
 
-        {/* Source Action Buttons */}
-        {!selectedFile && (
-          <View style={styles.actionButtonsRow}>
-            <TouchableOpacity style={styles.actionButton} onPress={handleCameraLaunch}>
-              <MaterialCommunityIcons name="camera" size={24} color="#16A34A" />
-              <AppText style={styles.actionButtonText}>{t('verification.camera')}</AppText>
-            </TouchableOpacity>
+            {confidence === 'low' && (
+              <View style={styles.warningCard}>
+                <MaterialCommunityIcons name="alert-outline" size={20} color="#D97706" style={{ marginRight: 8 }} />
+                <AppText style={styles.warningText}>{t('verification.ocrLowConfidence')}</AppText>
+              </View>
+            )}
 
-            <TouchableOpacity style={styles.actionButton} onPress={handleGalleryLaunch}>
-              <MaterialCommunityIcons name="image" size={24} color="#16A34A" />
-              <AppText style={styles.actionButtonText}>{t('verification.gallery')}</AppText>
-            </TouchableOpacity>
+            <View style={styles.inputGroup}>
+              <AppText style={styles.inputLabel}>{t('verification.farmerName')}</AppText>
+              <TextInput
+                style={styles.textInput}
+                value={farmerName}
+                onChangeText={(text) => {
+                  console.log('farmerName changed:', text);
+                  setFarmerName(text);
+                  farmerNameRef.current = text;
+                }}
+                placeholder={t('verification.farmerName')}
+              />
+            </View>
 
-            <TouchableOpacity style={styles.actionButton} onPress={handlePdfLaunch}>
-              <MaterialCommunityIcons name="file-pdf-box" size={24} color="#16A34A" />
-              <AppText style={styles.actionButtonText}>{t('verification.pdf')}</AppText>
-            </TouchableOpacity>
-          </View>
-        )}
+            <View style={styles.inputGroup}>
+              <AppText style={styles.inputLabel}>{t('verification.dairyName')}</AppText>
+              <TextInput
+                style={styles.textInput}
+                value={dairyName}
+                onChangeText={(text) => {
+                  console.log('dairyName changed:', text);
+                  setDairyName(text);
+                  dairyNameRef.current = text;
+                }}
+                placeholder={t('verification.dairyName')}
+              />
+            </View>
 
-        {/* Loading / Progress Indicator */}
-        {loading && (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#16A34A" />
-            <AppText style={styles.loadingText}>{statusText}</AppText>
-            {uploadProgress > 0 && (
-              <AppText style={styles.progressText}>{uploadProgress}%</AppText>
+            <View style={styles.inputGroup}>
+              <AppText style={styles.inputLabel}>{t('verification.receiptDate')}</AppText>
+              <TextInput
+                style={styles.textInput}
+                value={receiptDate}
+                onChangeText={(text) => {
+                  console.log('receiptDate changed:', text);
+                  setReceiptDate(text);
+                  receiptDateRef.current = text;
+                }}
+                placeholder="YYYY-MM-DD"
+              />
+            </View>
+
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#16A34A" />
+                <AppText style={styles.loadingText}>{statusText}</AppText>
+              </View>
+            ) : (
+              <View style={{ marginTop: 10 }}>
+                <TouchableOpacity style={styles.submitButton} onPress={handleFinalSubmit}>
+                  <AppText style={styles.submitButtonText}>{t('common.confirm')}</AppText>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={[styles.secondaryActionBtn, { marginTop: 10, marginBottom: 20 }]} 
+                  onPress={() => {
+                    setShowOcrForm(false);
+                    setSelectedFile(null);
+                    setUploadedReceiptUrl('');
+                  }}
+                >
+                  <AppText style={styles.secondaryActionBtnText}>{t('common.cancel')}</AppText>
+                </TouchableOpacity>
+              </View>
             )}
           </View>
-        )}
+        ) : (
+          <>
+            {/* Info Card */}
+            <View style={styles.infoCard}>
+              <MaterialCommunityIcons name="information" size={20} color="#15803D" style={styles.infoIcon} />
+              <View style={{ flex: 1 }}>
+                <AppText style={styles.infoTitle}>{t('verification.instructionsTitle')}</AppText>
+                <AppText style={styles.infoText}>{t('verification.instructionsText')}</AppText>
+              </View>
+            </View>
 
-        {/* Submit Action Button */}
-        {selectedFile && !loading && (
-          <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-            <AppText style={styles.submitButtonText}>{t('verification.submitBtn')}</AppText>
-          </TouchableOpacity>
+            {/* Selection Box / Preview */}
+            {selectedFile ? (
+              <View style={styles.previewContainer}>
+                {selectedFile.isImage ? (
+                  <Image source={{ uri: selectedFile.uri }} style={styles.previewImage} resizeMode="contain" />
+                ) : (
+                  <View style={styles.pdfPreviewBox}>
+                    <MaterialCommunityIcons name="file-pdf-box" size={64} color="#EF4444" />
+                    <AppText style={styles.pdfName} numberOfLines={1}>{selectedFile.name}</AppText>
+                    <AppText style={styles.pdfSize}>
+                      {selectedFile.size ? `${(selectedFile.size / 1024 / 1024).toFixed(2)} MB` : ''}
+                    </AppText>
+                  </View>
+                )}
+                <TouchableOpacity style={styles.clearButton} onPress={() => setSelectedFile(null)}>
+                  <Ionicons name="close-circle" size={28} color="#EF4444" />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.uploadBoxPlaceholder}>
+                <MaterialCommunityIcons name="cloud-upload-outline" size={48} color="#64748B" />
+                <AppText style={styles.uploadBoxText}>{t('verification.noReceiptSelected')}</AppText>
+                <AppText style={styles.uploadBoxSubtext}>{t('verification.pdfNote')}</AppText>
+              </View>
+            )}
+
+            {/* Source Action Buttons */}
+            {!selectedFile && (
+              <View style={styles.actionButtonsRow}>
+                <TouchableOpacity style={styles.actionButton} onPress={handleCameraLaunch}>
+                  <MaterialCommunityIcons name="camera" size={24} color="#16A34A" />
+                  <AppText style={styles.actionButtonText}>{t('verification.camera')}</AppText>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.actionButton} onPress={handleGalleryLaunch}>
+                  <MaterialCommunityIcons name="image" size={24} color="#16A34A" />
+                  <AppText style={styles.actionButtonText}>{t('verification.gallery')}</AppText>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.actionButton} onPress={handlePdfLaunch}>
+                  <MaterialCommunityIcons name="file-pdf-box" size={24} color="#16A34A" />
+                  <AppText style={styles.actionButtonText}>{t('verification.pdf')}</AppText>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Loading / Progress Indicator */}
+            {loading && (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#16A34A" />
+                <AppText style={styles.loadingText}>{statusText}</AppText>
+                {uploadProgress > 0 && (
+                  <AppText style={styles.progressText}>{uploadProgress}%</AppText>
+                )}
+              </View>
+            )}
+
+            {/* Submit Action Button */}
+            {selectedFile && !loading && (
+              <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+                <AppText style={styles.submitButtonText}>{t('verification.submitBtn')}</AppText>
+              </TouchableOpacity>
+            )}
+          </>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -645,5 +875,57 @@ const styles = StyleSheet.create({
     color: '#475569',
     fontSize: 15,
     fontWeight: '700',
+  },
+  formContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginTop: 10,
+    marginBottom: 20,
+  },
+  formSectionTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#1E293B',
+    marginBottom: 14,
+  },
+  warningCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    borderColor: '#FDE68A',
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 16,
+  },
+  warningText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#92400E',
+    flex: 1,
+    lineHeight: 18,
+  },
+  inputGroup: {
+    marginBottom: 14,
+  },
+  inputLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#475569',
+    marginBottom: 6,
+  },
+  textInput: {
+    height: 48,
+    borderColor: '#CBD5E1',
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    fontSize: 14,
+    color: '#1E293B',
+    backgroundColor: '#F8FAFC',
+    fontWeight: '600',
   },
 });

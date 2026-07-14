@@ -13,6 +13,14 @@ const settingSchema = new mongoose.Schema({
   allowedFileTypes: {
     type: [String],
     default: ['jpeg', 'jpg', 'png', 'webp', 'pdf']
+  },
+  marketPriceGlobalUnlock: {
+    type: Boolean,
+    default: false
+  },
+  feedPlannerGlobalUnlock: {
+    type: Boolean,
+    default: false
   }
 }, { timestamps: true });
 

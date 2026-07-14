@@ -30,6 +30,7 @@ export const sellerApi = {
             approvedListings: sellerAnimals.filter(a => a.status === 'approved').length,
             pendingListings: sellerAnimals.filter(a => a.status === 'pending').length,
             status: u.isBlocked ? 'Blocked' : 'Active',
+            isPremium: u.isPremium || false,
             isDeleted: false,
             photo: u.profilePhoto || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=120&q=80'
           };
@@ -42,5 +43,8 @@ export const sellerApi = {
   },
   toggleBlock: async (id) => {
     return axios.patch(`/admin/manage-user/${id}`, { action: 'toggleBlock' });
+  },
+  togglePremium: async (id) => {
+    return axios.patch(`/admin/manage-premium/${id}`);
   }
 };

@@ -87,12 +87,12 @@ instance.interceptors.response.use(
     let message = 'API request failed';
     if (!error.response) {
       message = 'Network error. Please check your internet connection.';
+    } else if (error.response.data && error.response.data.message) {
+      message = error.response.data.message;
     } else if (status === 500) {
       message = 'Internal server error. Please try again later.';
     } else if (status === 404) {
       message = 'Requested resources not found.';
-    } else if (error.response.data && error.response.data.message) {
-      message = error.response.data.message;
     }
 
     return Promise.reject(new Error(message));
@@ -174,6 +174,10 @@ export const api = {
 
   markAsRead: async (id) => {
     return instance.patch(`/notifications/${id}/read`);
+  },
+
+  markAllAsRead: async () => {
+    return instance.patch('/notifications/read-all');
   },
 
   deleteNotification: async (id) => {

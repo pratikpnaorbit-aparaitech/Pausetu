@@ -68,6 +68,7 @@ export default function NotificationsScreen({ navigation }) {
   const { t } = useTranslation();
 
   const fetchNotifications = async () => {
+    setLoading(true);
     try {
       const res = await api.getMyNotifications();
       if (res.status === 'success') {
@@ -106,8 +107,7 @@ export default function NotificationsScreen({ navigation }) {
 
   const handleMarkAllAsRead = async () => {
     try {
-      const unread = notifications.filter(n => !n.isRead);
-      await Promise.all(unread.map(n => api.markAsRead(n.id)));
+      await api.markAllAsRead();
       setNotifications(
         notifications.map((item) => ({ ...item, isRead: true }))
       );

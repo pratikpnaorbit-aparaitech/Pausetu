@@ -1,10 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import { verificationApi } from '../api/verificationApi';
+import { AdminContext } from '../context/AdminContext';
 import {
   Check, X, Eye, Search, AlertCircle, RefreshCw, Loader2, ShieldAlert
 } from 'lucide-react';
 
 export default function VerificationRequestsPage() {
+  const { loadDashboardData } = useContext(AdminContext);
   const resolveMediaUrl = (path) => {
     if (!path) return '';
     if (path.startsWith('http://') || path.startsWith('https://')) {
@@ -54,6 +56,9 @@ export default function VerificationRequestsPage() {
       const success = await verificationApi.updateStatus(id, 'approved');
       if (success) {
         loadRequests(activeTab);
+        if (loadDashboardData) {
+          loadDashboardData(true);
+        }
       } else {
         alert('Failed to approve request.');
       }
@@ -77,6 +82,9 @@ export default function VerificationRequestsPage() {
         setRejectRequest(null);
         setRejectReason('');
         loadRequests(activeTab);
+        if (loadDashboardData) {
+          loadDashboardData(true);
+        }
       } else {
         alert('Failed to reject request.');
       }
@@ -173,6 +181,9 @@ export default function VerificationRequestsPage() {
                 <div style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 6, color: 'var(--text-muted)', marginBottom: 14 }}>
                   <div><strong>Mobile:</strong> {req.phone}</div>
                   <div><strong>Submitted:</strong> {req.submittedAt}</div>
+                  {req.farmerName && <div><strong>OCR Farmer Name:</strong> {req.farmerName}</div>}
+                  {req.dairyName && <div><strong>OCR Dairy Name:</strong> {req.dairyName}</div>}
+                  {req.receiptDate && <div><strong>OCR Receipt Date:</strong> {req.receiptDate}</div>}
                   {req.status === 'rejected' && (
                     <div style={{ color: 'var(--color-danger)' }}>
                       <strong>Reason:</strong> {req.rejectedReason}

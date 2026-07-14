@@ -17,6 +17,7 @@ export default function ListingCard({ item, onViewDetailsPress, style }) {
           <Image 
             source={{ uri: imageUrl }} 
             style={styles.cardImage} 
+            resizeMode="cover"
             onError={(e) => console.log('[Image Load Error] ListingCard:', e.nativeEvent.error, 'URL:', imageUrl)}
           />
         ) : (
@@ -231,7 +232,6 @@ const styles = StyleSheet.create({
   },
   cardImage: {
     width: '100%',
-    height: '100%',
-    resizeMode: 'cover'
+    height: '100%'
   }
 });

@@ -200,6 +200,7 @@ export default function MyListingsScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
+
       {/* Top Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.headerBackBtn} onPress={() => navigation.goBack()}>
@@ -703,4 +704,5 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     marginTop: 6,
   },
+
 });

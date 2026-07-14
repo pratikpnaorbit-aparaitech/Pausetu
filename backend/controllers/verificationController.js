@@ -10,17 +10,35 @@ const getSettingsHelper = async () => {
     settings = await Setting.create({
       verificationMode: 'manual',
       maxUploadSize: 5,
-      allowedFileTypes: ['jpeg', 'jpg', 'png', 'webp', 'pdf']
+      allowedFileTypes: ['jpeg', 'jpg', 'png', 'webp', 'pdf'],
+      marketPriceGlobalUnlock: false,
+      feedPlannerGlobalUnlock: false
     });
   }
   return settings;
+};
+
+const notifyAdmins = async (title, message, type = 'info') => {
+  try {
+    const admins = await User.find({ role: 'admin' });
+    for (const admin of admins) {
+      await Notification.create({
+        recipient: admin._id,
+        title,
+        message,
+        type
+      });
+    }
+  } catch (err) {
+    console.warn('Failed to notify admins:', err.message);
+  }
 };
 
 /**
  * Submit Milk Dairy Receipt for verification
  */
 exports.submitVerification = asyncHandler(async (req, res, next) => {
-  const { receiptUrl } = req.body;
+  const { receiptUrl, farmerName, dairyName, receiptDate } = req.body;
 
   if (!receiptUrl) {
     return next(new AppError('Please provide a receipt URL', 400));
@@ -41,6 +59,9 @@ exports.submitVerification = asyncHandler(async (req, res, next) => {
   user.verification = {
     status: isAuto ? 'approved' : 'pending',
     receiptUrl,
+    farmerName,
+    dairyName,
+    receiptDate: receiptDate ? new Date(receiptDate) : undefined,
     submittedAt: new Date(),
     approvedAt: isAuto ? new Date() : undefined,
     rejectedReason: undefined
@@ -49,12 +70,47 @@ exports.submitVerification = asyncHandler(async (req, res, next) => {
   await user.save();
 
   if (isAuto) {
+    await Notification.create([
+      {
+        recipient: user._id,
+        title: 'डेअरी पावती पडताळणी यशस्वी / Verification Approved',
+        message: 'अभिनंदन! तुमची दुग्धशाळा पावती यशस्वीरित्या मंजूर झाली आहे. आता तुम्ही सर्व वैशिष्ट्ये वापरू शकता. / Congratulations! Your dairy receipt has been approved. You can now use all features.',
+        type: 'success'
+      },
+      {
+        recipient: user._id,
+        title: 'सदस्यत्व सक्रिय झाले / Membership Activated',
+        message: 'तुमचे सत्यापित सदस्यत्व यशस्वीरित्या सक्रिय झाले आहे. / Your verified membership has been successfully activated.',
+        type: 'success'
+      }
+    ]);
+
+    await notifyAdmins(
+      'पडताळणी पूर्ण झाली / Verification Completed',
+      `वापरकर्ता ${user.fullName || user.name} ची पावती स्वयंचलितपणे मंजूर झाली. / User ${user.fullName || user.name}'s receipt was approved automatically.`,
+      'success'
+    );
+  } else {
     await Notification.create({
       recipient: user._id,
-      title: 'डेअरी पावती पडताळणी यशस्वी',
-      message: 'अभिनंदन! तुमची दुग्धशाळा पावती यशस्वीरित्या मंजूर झाली आहे. आता तुम्ही सर्व वैशिष्ट्ये वापरू शकता.',
-      type: 'success'
+      title: 'पडताळणी सबमिट केली / Verification Submitted',
+      message: 'तुमची दुग्धशाळा पावती यशस्वीरित्या सबमिट केली आहे. पडताळणी प्रलंबित आहे. / Your dairy receipt has been submitted. Review is pending.',
+      type: 'info'
     });
+
+    await notifyAdmins(
+      'नवीन पडताळणी विनंती / New Verification Request',
+      `वापरकर्ता ${user.fullName || user.name} ने नवीन पावती सबमिट केली आहे. / User ${user.fullName || user.name} has submitted a new receipt.`,
+      'info'
+    );
+
+    if (farmerName || dairyName) {
+      await notifyAdmins(
+        'नवीन ओसीआर सबमिशन / New OCR Submission',
+        `वापरकर्ता ${user.fullName || user.name} साठी ओसीआर तपशील काढले गेले आहेत. / OCR details extracted for user ${user.fullName || user.name}.`,
+        'info'
+      );
+    }
   }
 
   res.status(200).json({
@@ -62,6 +118,67 @@ exports.submitVerification = asyncHandler(async (req, res, next) => {
     message: isAuto ? 'Verification approved automatically' : 'Verification receipt submitted successfully',
     data: {
       verification: user.verification
+    }
+  });
+});
+
+/**
+ * Extract receipt details after upload (OCR simulation)
+ */
+exports.extractReceiptDetails = asyncHandler(async (req, res, next) => {
+  const { receiptUrl } = req.body;
+
+  if (!receiptUrl) {
+    return next(new AppError('Please provide a receipt URL', 400));
+  }
+
+  const filename = receiptUrl.split('/').pop().toLowerCase();
+  
+  let farmerName = '';
+  let dairyName = '';
+  let receiptDate = '';
+  let confidence = 'low';
+
+  // Heuristic patterns for OCR simulation
+  if (filename.includes('ramdas') || filename.includes('farmer')) {
+    farmerName = 'Ramdas Patil';
+    confidence = 'high';
+  } else if (filename.includes('john')) {
+    farmerName = 'John Doe';
+    confidence = 'high';
+  }
+
+  if (filename.includes('gokul') || filename.includes('dairy')) {
+    dairyName = 'Gokul Milk Dairy';
+    confidence = 'high';
+  } else if (filename.includes('mahindra')) {
+    dairyName = 'Mahindra Dairy';
+    confidence = 'high';
+  }
+
+  const dateMatch = filename.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (dateMatch) {
+    receiptDate = dateMatch[0];
+    confidence = 'high';
+  } else {
+    const today = new Date();
+    receiptDate = today.toISOString().split('T')[0];
+  }
+
+  if (confidence === 'low') {
+    farmerName = '';
+    dairyName = '';
+    const today = new Date();
+    receiptDate = today.toISOString().split('T')[0];
+  }
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      farmerName,
+      dairyName,
+      receiptDate,
+      confidence
     }
   });
 });
@@ -154,16 +271,30 @@ exports.updateVerificationStatus = asyncHandler(async (req, res, next) => {
     user.verification.approvedAt = new Date();
     user.verification.rejectedReason = undefined;
     
-    notificationTitle = 'डेअरी पावती पडताळणी यशस्वी';
-    notificationMessage = 'अभिनंदन! तुमची दुग्धशाळा पावती यशस्वीरित्या मंजूर झाली आहे. आता तुम्ही सर्व वैशिष्ट्ये वापरू शकता.';
+    notificationTitle = 'डेअरी पावती पडताळणी यशस्वी / Verification Approved';
+    notificationMessage = 'अभिनंदन! तुमची दुग्धशाळा पावती यशस्वीरित्या मंजूर झाली आहे. आता तुम्ही सर्व वैशिष्ट्ये वापरू शकता. / Congratulations! Your dairy receipt has been approved. You can now use all features.';
     notificationType = 'success';
+
+    await Notification.create({
+      recipient: user._id,
+      title: 'सदस्यत्व सक्रिय झाले / Membership Activated',
+      message: 'तुमचे सत्यापित सदस्यत्व यशस्वीरित्या सक्रिय झाले आहे. / Your verified membership has been successfully activated.',
+      type: 'success'
+    });
   } else if (status === 'rejected') {
     user.verification.rejectedReason = rejectedReason;
     user.verification.approvedAt = undefined;
     
-    notificationTitle = 'डेअरी पावती पडताळणी नाकारली';
-    notificationMessage = `दिलगीर आहोत, तुमची दुग्धशाळा पावती नाकारण्यात आली आहे. कारण: ${rejectedReason}. कृपया पुन्हा प्रयत्न करा.`;
+    notificationTitle = 'डेअरी पावती पडताळणी नाकारली / Verification Rejected';
+    notificationMessage = `दिलगीर आहोत, तुमची दुग्धशाळा पावती नाकारण्यात आली आहे. कारण: ${rejectedReason}. कृपया पुन्हा प्रयत्न करा. / Sorry, your dairy receipt was rejected. Reason: ${rejectedReason}. Please try again.`;
     notificationType = 'alert';
+
+    await Notification.create({
+      recipient: user._id,
+      title: 'पुन्हा अपलोड करणे आवश्यक आहे / Re-upload Required',
+      message: 'कृपया वैध पावती दस्तऐवज पुन्हा अपलोड करा. / Please re-upload a valid receipt document.',
+      type: 'alert'
+    });
   }
 
   await user.save();
@@ -174,6 +305,12 @@ exports.updateVerificationStatus = asyncHandler(async (req, res, next) => {
     message: notificationMessage,
     type: notificationType
   });
+
+  await notifyAdmins(
+    'पडताळणी पूर्ण झाली / Verification Completed',
+    `वापरकर्ता ${user.fullName || user.name} ची पडताळणी स्थिती ${status === 'approved' ? 'मंजूर' : 'नाकारली'} केली आहे. / User ${user.fullName || user.name}'s status was updated to ${status}.`,
+    status === 'approved' ? 'success' : 'alert'
+  );
 
   res.status(200).json({
     status: 'success',
@@ -201,7 +338,7 @@ exports.getSettings = asyncHandler(async (req, res, next) => {
  * Update verification settings (Admin only)
  */
 exports.updateSettings = asyncHandler(async (req, res, next) => {
-  const { verificationMode, maxUploadSize, allowedFileTypes } = req.body;
+  const { verificationMode, maxUploadSize, allowedFileTypes, marketPriceGlobalUnlock, feedPlannerGlobalUnlock } = req.body;
 
   let settings = await Setting.findOne();
   if (!settings) {
@@ -230,6 +367,14 @@ exports.updateSettings = asyncHandler(async (req, res, next) => {
     settings.allowedFileTypes = allowedFileTypes;
   }
 
+  if (marketPriceGlobalUnlock !== undefined) {
+    settings.marketPriceGlobalUnlock = !!marketPriceGlobalUnlock;
+  }
+
+  if (feedPlannerGlobalUnlock !== undefined) {
+    settings.feedPlannerGlobalUnlock = !!feedPlannerGlobalUnlock;
+  }
+
   await settings.save();
 
   res.status(200).json({
@@ -237,6 +382,20 @@ exports.updateSettings = asyncHandler(async (req, res, next) => {
     message: 'Verification settings updated successfully',
     data: {
       settings
+    }
+  });
+});
+
+/**
+ * Get pending verification count (Admin only)
+ */
+exports.getPendingVerificationsCount = asyncHandler(async (req, res, next) => {
+  const count = await User.countDocuments({ 'verification.status': 'pending' });
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      pendingVerificationCount: count
     }
   });
 });

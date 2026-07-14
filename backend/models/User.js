@@ -65,12 +65,54 @@ const userSchema = new mongoose.Schema(
         default: 'unverified'
       },
       receiptUrl: String,
+      farmerName: String,
+      dairyName: String,
+      receiptDate: Date,
       submittedAt: Date,
       approvedAt: Date,
       rejectedReason: String,
       verifiedBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Admin'
+      }
+    },
+    isPremium: {
+      type: Boolean,
+      default: false
+    },
+    premiumExpiresAt: {
+      type: Date
+    },
+    marketPriceAccess: {
+      hasAccess: {
+        type: Boolean,
+        default: false
+      },
+      source: {
+        type: String,
+        default: 'none'
+      },
+      unlockedAt: {
+        type: Date
+      },
+      paymentId: {
+        type: String
+      }
+    },
+    feedPlannerAccess: {
+      hasAccess: {
+        type: Boolean,
+        default: false
+      },
+      source: {
+        type: String,
+        default: 'none'
+      },
+      unlockedAt: {
+        type: Date
+      },
+      paymentId: {
+        type: String
       }
     },
     createdAt: {

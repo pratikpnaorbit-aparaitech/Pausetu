@@ -1,10 +1,14 @@
-import React, { useContext } from 'react';
+import React, { useContext, useState } from 'react';
 import { StyleSheet, View, SafeAreaView, ScrollView, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppContext } from '../context/AppContext';
 import { useTranslation } from 'react-i18next';
 import AppText from '../components/AppText';
+import { usePremium } from '../hooks/usePremium';
+import DashboardPremiumCard from '../components/PremiumAdvisor/DashboardPremiumCard';
+import PremiumBadge from '../components/PremiumAdvisor/PremiumBadge';
+import PremiumAdvisorContainer from './PremiumAdvisor/PremiumAdvisorContainer';
 
 export default function HomeScreen() {
   const { userProfile, userToken } = useContext(AppContext);
@@ -13,22 +17,33 @@ export default function HomeScreen() {
   const name = isGuest ? t('profile.guestUser') : userProfile?.name || 'User';
   const role = isGuest ? t('profile.guestMode') : userProfile?.role || t('profile.farmer');
 
+  const { isPremium } = usePremium();
+  const [showPremiumAdvisor, setShowPremiumAdvisor] = useState(false);
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Welcome Header Card */}
-        <LinearGradient colors={['#11998e', '#38ef7d']} style={styles.headerCard}>
+        <LinearGradient colors={isPremium ? ['#7F00FF', '#E100FF'] : ['#11998e', '#38ef7d']} style={styles.headerCard}>
           <View style={styles.profileRow}>
             <View style={styles.avatarCircle}>
               <AppText style={styles.avatarText}>{name.charAt(0).toUpperCase()}</AppText>
             </View>
             <View style={styles.profileDetails}>
               <AppText style={styles.welcomeText}>{t('home.welcomeBack')}</AppText>
-              <AppText style={styles.nameText}>{name}</AppText>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <AppText style={styles.nameText}>{name}</AppText>
+                {isPremium && <PremiumBadge style={{ marginLeft: 6 }} />}
+              </View>
               <AppText style={styles.roleBadge}>{role}</AppText>
             </View>
           </View>
         </LinearGradient>
+
+        <DashboardPremiumCard
+          isPremium={isPremium}
+          onPress={() => setShowPremiumAdvisor(true)}
+        />
 
         {/* Dashboard Title */}
         <AppText style={styles.sectionTitle}>{t('home.quickActions')}</AppText>
@@ -74,6 +89,11 @@ export default function HomeScreen() {
           <AppText style={styles.updateTime}>{t('home.hoursAgo5')}</AppText>
         </View>
       </ScrollView>
+
+      <PremiumAdvisorContainer
+        visible={showPremiumAdvisor}
+        onClose={() => setShowPremiumAdvisor(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -131,17 +151,17 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   roleBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    fontSize: 11,
+    fontWeight: '700',
+    color: 'rgba(255, 255, 255, 0.95)',
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
     paddingVertical: 3,
     paddingHorizontal: 8,
-    borderRadius: 6,
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
+    borderRadius: 8,
+    alignSelf: 'flex-start',
     marginTop: 6,
-    overflow: 'hidden',
   },
+
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',

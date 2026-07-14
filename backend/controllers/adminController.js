@@ -127,3 +127,29 @@ exports.manageUserStatus = asyncHandler(async (req, res, next) => {
     }
   });
 });
+
+/**
+ * Toggle Premium status for a user
+ */
+exports.togglePremiumStatus = asyncHandler(async (req, res, next) => {
+  const user = await User.findById(req.params.id);
+  if (!user) {
+    return next(new AppError('User not found', 404));
+  }
+  
+  user.isPremium = !user.isPremium;
+  if (user.isPremium) {
+    user.premiumExpiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // 1 year expiration
+  } else {
+    user.premiumExpiresAt = undefined;
+  }
+  
+  await user.save();
+  
+  res.status(200).json({
+    status: 'success',
+    data: {
+      user
+    }
+  });
+});

@@ -10,6 +10,9 @@ import { AppContext } from '../context/AppContext';
 import { api } from '../api/api';
 import { useTranslation } from 'react-i18next';
 import AppText from '../components/AppText';
+import { usePremium } from '../hooks/usePremium';
+import PremiumAdvisorContainer from './PremiumAdvisor/PremiumAdvisorContainer';
+import PremiumBadge from '../components/PremiumAdvisor/PremiumBadge';
 
 // ── App store deep links ───────────────────────────────────────────────────
 const ANDROID_PACKAGE = 'com.pashusetu.mobile';
@@ -101,6 +104,9 @@ export default function SettingsScreen({ navigation }) {
     userProfile,
   } = useContext(AppContext);
   const { t } = useTranslation();
+
+  const { isPremium } = usePremium();
+  const [showPremiumAdvisor, setShowPremiumAdvisor] = useState(false);
 
   // ── Modal visibility state ─────────────────────────────────────────────
   const [showLangModal, setShowLangModal] = useState(false);
@@ -419,6 +425,14 @@ export default function SettingsScreen({ navigation }) {
             iconName: 'lock-closed-outline', iconBg: '#E2E8F0', iconColor: '#475569',
             title: t('settings.privacySettings'),
             onPress: () => setShowPrivacySettingsModal(true),
+          })}
+          <View style={[styles.divider, { backgroundColor: T.border }]} />
+
+          {renderMenuRow({
+            iconName: 'sparkles-outline', iconBg: '#F5F3FF', iconColor: '#8B5CF6',
+            title: t('premiumAdvisor.lockScreen.title'),
+            rightElement: isPremium ? <PremiumBadge /> : undefined,
+            onPress: () => setShowPremiumAdvisor(true),
           })}
         </View>
 
@@ -910,6 +924,11 @@ export default function SettingsScreen({ navigation }) {
           </View>
         </View>
       </Modal>
+
+      <PremiumAdvisorContainer
+        visible={showPremiumAdvisor}
+        onClose={() => setShowPremiumAdvisor(false)}
+      />
 
     </SafeAreaView>
   );

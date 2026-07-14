@@ -16,7 +16,6 @@ export const AppProvider = ({ children }) => {
   const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [hasLocationPermission, setHasLocationPermission] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
-  // Global appearance preferences
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [fontSize, setFontSize] = useState('Medium'); // 'Small' | 'Medium' | 'Large'
 

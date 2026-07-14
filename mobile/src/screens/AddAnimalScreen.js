@@ -5,6 +5,7 @@ import {
   SafeAreaView,
   ScrollView,
   TextInput,
+  Text,
   TouchableOpacity,
   Switch,
   Alert,
@@ -1568,7 +1569,7 @@ export default function AddAnimalScreen({ navigation }) {
 
             <View style={styles.inputGroup}>
               <AppText style={styles.largeFieldLabel}>जाहिरातीचे नाव / Listing Title *</AppText>
-              <AppTextInput
+              <TextInput
                 style={styles.largeInput}
                 placeholder="उदा. २ वर्षांची जर्सी गाय (e.g. 2 Yr Jersey Cow)"
                 value={title}
@@ -1598,7 +1599,7 @@ export default function AddAnimalScreen({ navigation }) {
             <View style={styles.rowInputs}>
               <View style={[styles.inputGroup, { width: '48%' }]}>
                 <AppText style={styles.largeFieldLabel}>वय / Age (वर्ष) *</AppText>
-                <AppTextInput
+                <TextInput
                   style={styles.largeInput}
                   keyboardType="numeric"
                   placeholder="उदा. ३"
@@ -1608,7 +1609,7 @@ export default function AddAnimalScreen({ navigation }) {
               </View>
               <View style={[styles.inputGroup, { width: '48%' }]}>
                 <AppText style={styles.largeFieldLabel}>वजन / Weight (किलो)</AppText>
-                <AppTextInput
+                <TextInput
                   style={styles.largeInput}
                   keyboardType="numeric"
                   placeholder="उदा. ३५०"
@@ -1635,7 +1636,7 @@ export default function AddAnimalScreen({ navigation }) {
 
             <View style={styles.inputGroup}>
               <AppText style={styles.largeFieldLabel}>रंग / Color</AppText>
-              <AppTextInput
+              <TextInput
                 style={styles.largeInput}
                 placeholder="उदा. तांबडा / काळा (e.g. Red / Black)"
                 value={color}
@@ -1645,7 +1646,7 @@ export default function AddAnimalScreen({ navigation }) {
 
             <View style={styles.inputGroup}>
               <AppText style={styles.largeFieldLabel}>इतर माहिती / Description</AppText>
-              <AppTextInput
+              <TextInput
                 style={[styles.largeInput, { height: 70 }]}
                 multiline
                 placeholder="उदा. जनावर दूध देण्यास अतिशय शांत आहे."
@@ -1702,7 +1703,7 @@ export default function AddAnimalScreen({ navigation }) {
             {gender === 'Female' && (
               <View style={styles.inputGroup}>
                 <AppText style={styles.largeFieldLabel}>दूध देण्याची क्षमता / Milk Capacity (लिटर/दिवस)</AppText>
-                <AppTextInput
+                <TextInput
                   style={styles.largeInput}
                   keyboardType="numeric"
                   placeholder="उदा. १२ लिटर"
@@ -1721,7 +1722,7 @@ export default function AddAnimalScreen({ navigation }) {
 
             <View style={styles.inputGroup}>
               <AppText style={styles.largeFieldLabel}>अपेक्षित किंमत / Expected Price (₹) *</AppText>
-              <AppTextInput
+              <TextInput
                 style={[styles.largeInput, { fontSize: 24, fontWeight: '700' }]}
                 keyboardType="numeric"
                 placeholder="उदा. ५०,०००"
@@ -1795,7 +1796,7 @@ export default function AddAnimalScreen({ navigation }) {
                       <Ionicons name="close" size={24} color="#334155" />
                     </TouchableOpacity>
                   </View>
-                  <AppTextInput
+                  <TextInput
                     style={styles.modalSearchInput}
                     placeholder="शोधा / Search State..."
                     value={stateSearch}
@@ -1869,7 +1870,7 @@ export default function AddAnimalScreen({ navigation }) {
                       <Ionicons name="close" size={24} color="#334155" />
                     </TouchableOpacity>
                   </View>
-                  <AppTextInput
+                  <TextInput
                     style={styles.modalSearchInput}
                     placeholder="शोधा / Search District..."
                     value={districtSearch}
@@ -1941,7 +1942,7 @@ export default function AddAnimalScreen({ navigation }) {
                       <Ionicons name="close" size={24} color="#334155" />
                     </TouchableOpacity>
                   </View>
-                  <AppTextInput
+                  <TextInput
                     style={styles.modalSearchInput}
                     placeholder="शोधा / Search Taluka..."
                     value={talukaSearch}
@@ -1981,7 +1982,7 @@ export default function AddAnimalScreen({ navigation }) {
             {selectedTaluka && (
               <View style={styles.inputGroup}>
                 <AppText style={styles.largeFieldLabel}>{t('addAnimal.villageLabel')}</AppText>
-                <AppTextInput
+                <TextInput
                   style={[styles.largeInput, { marginBottom: 12 }]}
                   placeholder="Enter your village name / गावचे नाव टाका"
                   value={typeof selectedVillage === 'object' ? (selectedVillage?.name || '') : (selectedVillage || '')}
@@ -2061,15 +2062,15 @@ export default function AddAnimalScreen({ navigation }) {
 
             {/* Details panel */}
             <View style={styles.previewPanel}>
-              <AppText style={styles.previewItem}><strong>नाव / Title:</strong> {title}</AppText>
-              <AppText style={styles.previewItem}><strong>जात / Breed:</strong> {selectedBreed?.name}</AppText>
-              <AppText style={styles.previewItem}><strong>वय / Age:</strong> {age} Years</AppText>
-              {weight !== '' && <AppText style={styles.previewItem}><strong>वजन / Weight:</strong> {weight} kg</AppText>}
-              <AppText style={styles.previewItem}><strong>लिंग / Gender:</strong> {gender}</AppText>
-              <AppText style={styles.previewItem}><strong>लसीकरण / Vaccinated:</strong> {isVaccinated ? 'होय / Yes' : 'नाही / No'}</AppText>
-              {milkCapacity !== '' && <AppText style={styles.previewItem}><strong>दूध देण्याची क्षमता / Milk:</strong> {milkCapacity} L/day</AppText>}
-              <AppText style={styles.previewItem}><strong>अपेक्षित किंमत / Price:</strong> ₹{price} ({isNegotiable ? 'Negotiable' : 'Fixed'})</AppText>
-              <AppText style={styles.previewItem}><strong>पत्ता / Location:</strong> {typeof selectedVillage === 'object' ? selectedVillage?.name : selectedVillage}, {selectedTaluka?.name}, {selectedDistrict?.name}, {selectedState?.name}</AppText>
+              <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>नाव / Title:</Text> {title}</AppText>
+              <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>जात / Breed:</Text> {selectedBreed?.name}</AppText>
+              <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>वय / Age:</Text> {age} Years</AppText>
+              {weight !== '' && <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>वजन / Weight:</Text> {weight} kg</AppText>}
+              <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>लिंग / Gender:</Text> {gender}</AppText>
+              <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>लसीकरण / Vaccinated:</Text> {isVaccinated ? 'होय / Yes' : 'नाही / No'}</AppText>
+              {milkCapacity !== '' && <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>दूध देण्याची क्षमता / Milk:</Text> {milkCapacity} L/day</AppText>}
+              <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>अपेक्षित किंमत / Price:</Text> ₹{price} ({isNegotiable ? 'Negotiable' : 'Fixed'})</AppText>
+              <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>पत्ता / Location:</Text> {typeof selectedVillage === 'object' ? selectedVillage?.name : selectedVillage}, {selectedTaluka?.name}, {selectedDistrict?.name}, {selectedState?.name}</AppText>
             </View>
 
             <TouchableOpacity style={styles.editSectionBtn} onPress={() => setCurrentStep(4)}>
