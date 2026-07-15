@@ -7,17 +7,17 @@ const languages = ['en', 'hi', 'mr'];
 const newKeys = {
   en: {
     buy: {
-      marketplaceCare: "Marketplace & Care"
+      marketplaceCare: "Cattle Market"
     }
   },
   hi: {
     buy: {
-      marketplaceCare: "बाज़ार और देखभाल"
+      marketplaceCare: "पशु बाज़ार"
     }
   },
   mr: {
     buy: {
-      marketplaceCare: "बाजार आणि काळजी"
+      marketplaceCare: "जनावर बाजार"
     }
   }
 };

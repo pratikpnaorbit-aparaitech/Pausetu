@@ -51,7 +51,7 @@ const newData = {
       save: "Save",
       share: "Share",
       report: "Report",
-      activeListings: "Active Listings"
+      activeListings: "Available Animals"
     }
   },
   hi: {
@@ -61,10 +61,10 @@ const newData = {
       chicken: "मुर्गी 🐓",
       latestListings: "नवीनतम पशु",
       nearbyAnimals: "आस-पास के पशु",
-      featuredAnimals: "विशेष रुप से प्रदर्शित",
+      featuredAnimals: "चुनिंदा पशु",
       aiRecommended: "एआई अनुशंसित",
-      premiumListings: "प्रीमियम लिस्टिंग",
-      verifiedSellers: "सत्यापित विक्रेता",
+      premiumListings: "खास पशु",
+      verifiedSellers: "भरोसेमंद विक्रेता",
       recentlyViewed: "हाल ही में देखे गए",
       trendingAnimals: "लोकप्रिय पशु",
       bestDeals: "सर्वोत्तम सौदे",
@@ -97,7 +97,7 @@ const newData = {
       save: "सुरक्षित करें",
       share: "साझा करें",
       report: "रिपोर्ट करें",
-      activeListings: "सक्रिय लिस्टिंग"
+      activeListings: "उपलब्ध पशु"
     }
   },
   mr: {
@@ -107,10 +107,10 @@ const newData = {
       chicken: "कोंबडी 🐓",
       latestListings: "नवीनतम पशू",
       nearbyAnimals: "जवळपासचे पशू",
-      featuredAnimals: "विशेष पशू शिफारस",
+      featuredAnimals: "निवडक जनावरे",
       aiRecommended: "एआई शिफारस",
-      premiumListings: "प्रीमियम पशू",
-      verifiedSellers: "सत्यापित विक्रेते",
+      premiumListings: "खास पशू",
+      verifiedSellers: "खात्रीशीर विक्रेते",
       recentlyViewed: "नुकतेच पाहिलेले पशू",
       trendingAnimals: "लोकप्रिय पशू",
       bestDeals: "सर्वोत्तम सौदे",
@@ -143,7 +143,7 @@ const newData = {
       save: "सेव्ह करा",
       share: "शेअर करा",
       report: "तक्रार करा",
-      activeListings: "सक्रिय पशू"
+      activeListings: "उपलब्ध पशू"
     }
   }
 };

@@ -18,7 +18,7 @@
     "exit": "Exit",
     "call": "Call",
     "email": "Email",
-    "viewDetails": "View Details",
+    "viewDetails": "More Info",
     "featured": "Featured",
     "verified": "Verified",
     "search": "Search",
@@ -101,7 +101,7 @@
     "searchPlaceholder": "Search animals, breeds...",
     "searchCattle": "Search cattle, breed, seller or location...",
     "categories": "Categories",
-    "browseCategories": "Browse Categories",
+    "browseCategories": "Choose Animal",
     "featuredListings": "Featured Listings",
     "featuredAnimals": "Featured Animals",
     "latestListings": "Latest Listings",
@@ -129,7 +129,7 @@
     "sheep": "Sheep",
     "horse": "Horse",
     "other": "Other 🐾",
-    "marketplaceCare": "Marketplace & Care",
+    "marketplaceCare": "Cattle Market",
     "nearbyAnimals": "Nearby Animals",
     "aiRecommended": "AI Recommended",
     "premiumListings": "Premium Listings",
@@ -165,7 +165,7 @@
     "save": "Save",
     "share": "Share",
     "report": "Report",
-    "activeListings": "Active Listings",
+    "activeListings": "Available Animals",
     "bull": "Bull 🐂",
     "calf": "Calf 🍼",
     "bullock": "Bullock 🐂",
@@ -179,7 +179,7 @@
     "recentlyUpdated": "Recently Updated",
     "reset": "Reset",
     "noAnimalsFound": "No animals found matching your search.",
-    "viewDetails": "View Details",
+    "viewDetails": "More Info",
     "nearbyOn": "Nearby ON",
     "showAll": "Show All",
     "breedLabel": "Breed",
@@ -198,7 +198,7 @@
     "subtitle": "List your livestock and reach thousands of verified buyers",
     "startListing": "Start Listing",
     "myListings": "My Listings",
-    "activeListing": "Active",
+    "activeListing": "Available",
     "pendingListing": "Pending",
     "noListings": "No listings yet",
     "noListingsSub": "Tap below to list your first animal",
@@ -275,7 +275,7 @@
   "myListings": {
     "title": "My Listings",
     "all": "All",
-    "active": "Active",
+    "active": "Available",
     "pending": "Pending",
     "sold": "Sold",
     "rejected": "Rejected",
@@ -712,7 +712,7 @@
   },
   "app": {
     "name": "PashuSetu",
-    "tagline": "Marketplace & Care"
+    "tagline": "Cattle Market"
   },
   "premiumAdvisor": {
     "lockScreen": {
