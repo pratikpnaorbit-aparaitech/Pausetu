@@ -470,17 +470,55 @@ export default function AnimalDetailsScreen({ route, navigation }) {
   const priceDiff = aiEstPrice - numericPrice;
   const isGoodDeal = priceDiff > 0;
 
+  const getFormattedAge = (ageVal) => {
+    if (!ageVal) return '--';
+    const cleaned = String(ageVal).replace(/years|year|वर्षे|वर्ष/gi, '').trim();
+    if (!cleaned) return '--';
+    return t('animalDetails.ageValue', { count: cleaned, defaultValue: `${cleaned} Years` });
+  };
+
+  const getFormattedWeight = (weightVal) => {
+    if (!weightVal) return '--';
+    const cleaned = String(weightVal).replace(/kg|kilograms|kilogram|किलोग्राम|किलो/gi, '').trim();
+    if (!cleaned) return '--';
+    return t('animalDetails.weightValue', { count: cleaned, defaultValue: `${cleaned} kg` });
+  };
+
+  const getFormattedMilkYield = (milkVal) => {
+    if (!milkVal) return '--';
+    const cleaned = String(milkVal).replace(/l\/day|liters\/day|liters|liter|l|लिटर|लीटर/gi, '').trim();
+    if (!cleaned) return '--';
+    return t('animalDetails.milkValue', { count: cleaned, defaultValue: `${cleaned} L` });
+  };
+
+  const getFormattedColor = (colorVal) => {
+    if (!colorVal) return '--';
+    const normalized = colorVal.trim().toLowerCase();
+    const translationKey = `animalDetails.color_${normalized}`;
+    const translated = t(translationKey);
+    if (translated === translationKey) {
+      return colorVal.charAt(0).toUpperCase() + colorVal.slice(1);
+    }
+    return translated;
+  };
+
+  const getFormattedGender = (genderVal) => {
+    if (!genderVal) return t('animalDetails.female');
+    const normalized = genderVal.trim().toLowerCase();
+    return t(`animalDetails.${normalized}`, { defaultValue: genderVal });
+  };
+
   // Compilation of detailed specifications layout list (9-item specifications grid)
   const detailsItems = [
     { label: t('buy.breedLabel', { defaultValue: 'Breed' }), value: animal.breed || 'Unknown', icon: 'cow' },
-    { label: t('buy.ageLabel', { defaultValue: 'Age' }), value: `${animal.age} Years`, icon: 'calendar-clock' },
-    { label: t('buy.milkLabel', { defaultValue: 'Milk Yield' }), value: animal.milkYield ? `${animal.milkYield} L/Day` : '--', icon: 'water' },
-    { label: t('buy.weightLabel', { defaultValue: 'Weight' }), value: animal.weight ? `${animal.weight} kg` : '--', icon: 'scale' },
-    { label: t('animalDetails.gender', { defaultValue: 'Gender' }), value: animal.gender ? t(`animalDetails.${animal.gender.toLowerCase()}`) : t('animalDetails.female'), icon: 'gender-male-female' },
-    { label: t('animalDetails.color', { defaultValue: 'Color' }), value: animal.color || '--', icon: 'palette' },
+    { label: t('buy.ageLabel', { defaultValue: 'Age' }), value: getFormattedAge(animal.age), icon: 'calendar-clock' },
+    { label: t('buy.milkLabel', { defaultValue: 'Milk Yield' }), value: getFormattedMilkYield(animal.milkYield), icon: 'water' },
+    { label: t('buy.weightLabel', { defaultValue: 'Weight' }), value: getFormattedWeight(animal.weight), icon: 'scale' },
+    { label: t('animalDetails.gender', { defaultValue: 'Gender' }), value: getFormattedGender(animal.gender), icon: 'gender-male-female' },
+    { label: t('animalDetails.color', { defaultValue: 'Color' }), value: getFormattedColor(animal.color), icon: 'palette' },
     { label: t('buy.pregnantLabel', { defaultValue: 'Pregnancy' }), value: animal.pregnant ? t('animalDetails.yes') : t('animalDetails.no'), icon: 'baby-carriage' },
     { label: t('buy.vaccinatedLabel', { defaultValue: 'Vaccinated' }), value: animal.health?.vaccinated || animal.vaccination === 'yes' ? t('animalDetails.yes') : t('animalDetails.no'), icon: 'needle' },
-    { label: t('buy.healthLabel', { defaultValue: 'Health Status' }), value: animal.health?.healthy || animal.health === 'yes' || !animal.health?.sick ? t('animalDetails.healthy') : 'Treatment', icon: 'heart-pulse' },
+    { label: t('buy.healthLabel', { defaultValue: 'Health Status' }), value: animal.health?.healthy || animal.health === 'yes' || !animal.health?.sick ? t('animalDetails.healthy') : t('animalDetails.treatment', { defaultValue: 'Treatment' }), icon: 'heart-pulse' },
   ];
 
   if (loading) {
@@ -584,14 +622,15 @@ export default function AnimalDetailsScreen({ route, navigation }) {
               }
 
               if (slide.type === 'video') {
+                const firstImage = mediaSlides.find(s => s.type === 'image')?.uri;
                 return (
                   <View key={index} style={styles.videoSlide}>
                     <ImageWithLoader
-                      uri={slide.thumbnail || mediaSlides[0]?.uri || MOCK_IMAGES[0]}
+                      uri={slide.thumbnail || firstImage || resolveMediaUrl(null)}
                       style={styles.galleryImage}
                       resizeMode="cover"
                     />
-                    <View style={styles.videoOverlay}>
+                    <View style={styles.videoOverlay} pointerEvents="box-none">
                       <TouchableOpacity 
                         style={styles.playButtonCircle} 
                         onPress={() => {
@@ -600,9 +639,9 @@ export default function AnimalDetailsScreen({ route, navigation }) {
                           }
                           setIsVideoPlaying(true);
                         }} 
-                        activeOpacity={0.85}
+                        activeOpacity={0.7}
                       >
-                        <Ionicons name="play" size={32} color="#FFFFFF" style={styles.playIconOffset} />
+                        <Ionicons name="play" size={36} color="#FFFFFF" style={styles.playIconOffset} />
                       </TouchableOpacity>
                       <AppText style={styles.videoSlideLabel}>{t('animalDetails.watchVideo')}</AppText>
                     </View>
@@ -654,7 +693,7 @@ export default function AnimalDetailsScreen({ route, navigation }) {
               )}
             </View>
             
-            <AppText style={styles.animalBreed}>{animal.breed} • {animal.age} Years</AppText>
+            <AppText style={styles.animalBreed}>{animal.breed} • {getFormattedAge(animal.age)}</AppText>
             
             {/* Price dominating display */}
             <AppText style={styles.animalPrice}>{animal.price}</AppText>
@@ -676,7 +715,7 @@ export default function AnimalDetailsScreen({ route, navigation }) {
                     <AppText style={styles.dealBadgeLabel}>{t('buy.goodDeal', { defaultValue: 'GOOD DEAL' })}</AppText>
                   </View>
                   <AppText style={styles.aiDetailsSavingsText}>
-                    Price is ₹{priceDiff.toLocaleString()} lower than estimated market value
+                    {t('buy.aiSavingsText', { price: priceDiff.toLocaleString(), defaultValue: `Price is ₹${priceDiff.toLocaleString()} lower than estimated market value` })}
                   </AppText>
                 </View>
               )}
@@ -832,7 +871,7 @@ export default function AnimalDetailsScreen({ route, navigation }) {
             </TouchableOpacity>
           </SafeAreaView>
 
-          {animal.video ? (
+          {videoUri ? (
             <View style={styles.fullscreenVideoContainer}>
               <VideoView
                 player={player}
@@ -1005,32 +1044,42 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   videoOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: 'rgba(15, 23, 42, 0.45)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   playButtonCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
     backgroundColor: 'rgba(22, 163, 74, 0.95)',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#16A34A',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 6,
-    marginBottom: 8,
+    shadowRadius: 10,
+    elevation: 8,
+    marginBottom: 10,
   },
   playIconOffset: {
-    marginLeft: 4,
+    marginLeft: 6,
   },
   videoSlideLabel: {
     color: '#FFFFFF',
-    fontSize: 13.5,
-    fontWeight: '800',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: -1, height: 1 },
+    textShadowRadius: 8,
   },
   paginationContainer: {
     position: 'absolute',

@@ -1,5 +1,5 @@
 import React, { useContext, useState, useCallback, useEffect } from 'react';
-import { StyleSheet, View, SafeAreaView, TouchableOpacity, TextInput, FlatList, Image, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, SafeAreaView, TouchableOpacity, TextInput, FlatList, Image, ActivityIndicator, Alert, Animated } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppContext } from '../context/AppContext';
 import { api, resolveMediaUrl } from '../api/api';
@@ -9,8 +9,10 @@ import AppText from '../components/AppText';
 // Import Reusable Components
 import SectionHeader from '../components/SectionHeader';
 import ListingCard from '../components/ListingCard';
+import LocationPicker from '../components/LocationPicker';
 
 const CATEGORIES = [
+  { id: 'all', nameKey: 'buy.all', image: require('../../assets/icons/all.png') },
   { id: 'cow', nameKey: 'buy.cow', image: require('../../assets/icons/cow.png') },
   { id: 'buffalo', nameKey: 'buy.buffalo', image: require('../../assets/icons/buffalo.png') },
   { id: 'goat', nameKey: 'buy.goat', image: require('../../assets/icons/goat.png') },
@@ -131,21 +133,116 @@ const RECOMMENDED_ANIMALS = [
 ];
 
 // Standalone React.memo components to prevent unmounting/remounting of list headers and footers
-const ListHeader = React.memo(({ selectedCategory, setSelectedCategory, onViewDetails, featuredAnimals }) => {
+const CategoryCardItem = React.memo(({ item, isSelected, onPress, t }) => {
+  const scaleAnim = React.useRef(new Animated.Value(isSelected ? 1.04 : 1)).current;
+
+  React.useEffect(() => {
+    Animated.spring(scaleAnim, {
+      toValue: isSelected ? 1.04 : 1,
+      useNativeDriver: true,
+      friction: 8,
+      tension: 40,
+    }).start();
+  }, [isSelected]);
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.8}
+      onPress={onPress}
+    >
+      <Animated.View
+        style={[
+          styles.categoryCardWrapper,
+          isSelected ? styles.selectedCardWrapper : styles.unselectedCardWrapper,
+          { transform: [{ scale: scaleAnim }] }
+        ]}
+      >
+        {/* Selected Checkmark Indicator */}
+        {isSelected && (
+          <View style={styles.selectedCheckmark}>
+            <Ionicons name="checkmark-circle" size={14} color="#16A34A" />
+          </View>
+        )}
+        <Image source={item.image} style={styles.categoryCardImage} resizeMode="contain" />
+        <AppText style={[
+          styles.categoryCardName,
+          isSelected ? styles.selectedCardName : styles.unselectedCardName
+        ]}>
+          {t(item.nameKey).replace(/[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]|➕|🐾/g, '').trim()}
+        </AppText>
+      </Animated.View>
+    </TouchableOpacity>
+  );
+});
+
+const ListHeader = React.memo(({ selectedCategory, setSelectedCategory, onViewDetails, featuredAnimals, userProfile, onChangeLocation }) => {
   const { t } = useTranslation();
+  const flatListRef = React.useRef(null);
+
+  const getDisplayLocation = () => {
+    if (userProfile?.village) {
+      return {
+        title: userProfile.village,
+        subtitle: [userProfile.taluka, userProfile.district, userProfile.state].filter(Boolean).join(', ')
+      };
+    }
+    if (userProfile?.taluka) {
+      return {
+        title: userProfile.taluka,
+        subtitle: [userProfile.district, userProfile.state].filter(Boolean).join(', ')
+      };
+    }
+    if (userProfile?.district) {
+      return {
+        title: userProfile.district,
+        subtitle: userProfile.state || 'Maharashtra'
+      };
+    }
+    return {
+      title: 'Pune',
+      subtitle: 'Maharashtra'
+    };
+  };
+
+  const locDisplay = getDisplayLocation();
+
+  // Auto-center the selected category when it changes
+  React.useEffect(() => {
+    const index = CATEGORIES.findIndex(cat => cat.id === selectedCategory);
+    if (index !== -1 && flatListRef.current) {
+      const timer = setTimeout(() => {
+        try {
+          flatListRef.current.scrollToIndex({
+            index,
+            animated: true,
+            viewPosition: 0.5
+          });
+        } catch (e) {
+          console.warn('Category scroll centering failed:', e.message);
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedCategory]);
 
   return (
     <View>
       {/* Location Card */}
       <View style={styles.locationCard}>
         <View style={styles.locationInfo}>
-          <Ionicons name="location-outline" size={20} color="#16A34A" style={styles.locationPinIcon} />
+          <View style={styles.locationPinIconWrapper}>
+            <Ionicons name="location" size={18} color="#16A34A" />
+          </View>
           <View style={styles.locationTextContainer}>
-            <AppText style={styles.locationCity}>Pune, Maharashtra</AppText>
-            <AppText style={styles.locationSubtitle}>{t('buy.showingNearby')}</AppText>
+            <AppText style={styles.locationCity} numberOfLines={1}>
+              {locDisplay.title}
+            </AppText>
+            <AppText style={styles.locationSubtitle} numberOfLines={1}>
+              {locDisplay.subtitle}
+            </AppText>
           </View>
         </View>
-        <TouchableOpacity style={styles.changeButton}>
+        <TouchableOpacity style={styles.changeButton} activeOpacity={0.6} onPress={onChangeLocation}>
           <AppText style={styles.changeButtonText}>{t('buy.change')}</AppText>
         </TouchableOpacity>
       </View>
@@ -170,32 +267,23 @@ const ListHeader = React.memo(({ selectedCategory, setSelectedCategory, onViewDe
       <View style={styles.categoriesSection}>
         <AppText style={styles.categoriesTitle}>{t('buy.browseCategories')}</AppText>
         <FlatList
+          ref={flatListRef}
           horizontal
           showsHorizontalScrollIndicator={false}
           data={CATEGORIES}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.categoriesList}
-          renderItem={({ item }) => {
-            const isSelected = selectedCategory === item.id;
-            return (
-              <TouchableOpacity
-                activeOpacity={0.9}
-                style={[
-                  styles.categoryCardWrapper,
-                  isSelected ? styles.selectedCardWrapper : styles.unselectedCardWrapper
-                ]}
-                onPress={() => setSelectedCategory(item.id)}
-              >
-                <Image source={item.image} style={styles.categoryCardImage} resizeMode="contain" />
-                <AppText style={[
-                  styles.categoryCardName,
-                  isSelected ? styles.selectedCardName : styles.unselectedCardName
-                ]}>
-                  {t(item.nameKey)}
-                </AppText>
-              </TouchableOpacity>
-            );
-          }}
+          getItemLayout={(data, index) => (
+            { length: 98, offset: 98 * index, index }
+          )}
+          renderItem={({ item }) => (
+            <CategoryCardItem
+              item={item}
+              isSelected={selectedCategory === item.id}
+              onPress={() => setSelectedCategory(item.id)}
+              t={t}
+            />
+          )}
         />
       </View>
 
@@ -240,14 +328,36 @@ const ListFooter = React.memo(({ onViewDetails, recommendedAnimals }) => {
 });
 
 export default function BuyScreen({ navigation }) {
-  const { userProfile, userToken } = useContext(AppContext);
+  const { userProfile, userToken, updateLocation } = useContext(AppContext);
+  const [isLocationPickerVisible, setIsLocationPickerVisible] = useState(false);
   const isGuest = userToken === 'guest';
   const name = isGuest ? 'Guest' : userProfile?.name || 'User';
   const { t } = useTranslation();
 
-  const [selectedCategory, setSelectedCategory] = useState('cow');
+  const [selectedCategory, setSelectedCategory] = useState('all');
   const [animalsList, setAnimalsList] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const getFilteredAnimals = () => {
+    if (!selectedCategory || selectedCategory === 'all') {
+      return animalsList;
+    }
+    
+    if (selectedCategory === 'other') {
+      const knownSlugs = ['cow', 'buffalo', 'goat', 'sheep', 'horse'];
+      return animalsList.filter((animal) => {
+        const slug = animal.categoryId?.slug?.toLowerCase();
+        return !slug || !knownSlugs.includes(slug);
+      });
+    }
+
+    return animalsList.filter((animal) => {
+      const slug = animal.categoryId?.slug?.toLowerCase();
+      return slug === selectedCategory.toLowerCase();
+    });
+  };
+
+  const filteredAnimals = getFilteredAnimals();
 
   const fetchLiveListings = async () => {
     setLoading(true);
@@ -266,7 +376,8 @@ export default function BuyScreen({ navigation }) {
           isVerified: a.status === 'approved',
           isFeatured: a.views > 200,
           postedTime: 'Active',
-          photos: a.photos
+          photos: a.photos,
+          video: a.video
         }));
         setAnimalsList(mappedList);
       }
@@ -280,7 +391,7 @@ export default function BuyScreen({ navigation }) {
 
   useEffect(() => {
     fetchLiveListings();
-  }, []);
+  }, [userProfile?.district]);
 
   const handleNavigateToSell = useCallback(() => {
     navigation.navigate('Sell');
@@ -289,6 +400,17 @@ export default function BuyScreen({ navigation }) {
   const handleViewDetails = useCallback((item) => {
     navigation.navigate('AnimalDetails', { animal: item });
   }, [navigation]);
+
+  const handleLocationChange = useCallback(() => {
+    setIsLocationPickerVisible(true);
+  }, []);
+
+  const handleSelectLocation = useCallback(async (locationData) => {
+    setIsLocationPickerVisible(false);
+    if (updateLocation) {
+      await updateLocation(locationData);
+    }
+  }, [updateLocation]);
 
   return (
     <View style={styles.container}>
@@ -333,20 +455,22 @@ export default function BuyScreen({ navigation }) {
             </View>
           ) : (
             <FlatList
-              data={animalsList}
+              data={filteredAnimals}
               keyExtractor={(item) => item.id}
               ListHeaderComponent={
                 <ListHeader
                   selectedCategory={selectedCategory}
                   setSelectedCategory={setSelectedCategory}
                   onViewDetails={handleViewDetails}
-                  featuredAnimals={animalsList.slice(0, 3)}
+                  featuredAnimals={filteredAnimals.slice(0, 3)}
+                  userProfile={userProfile}
+                  onChangeLocation={handleLocationChange}
                 />
               }
               ListFooterComponent={
                 <ListFooter
                   onViewDetails={handleViewDetails}
-                  recommendedAnimals={animalsList.slice(2, 5)}
+                  recommendedAnimals={filteredAnimals.slice(2, 5)}
                 />
               }
               contentContainerStyle={styles.scrollContent}
@@ -367,6 +491,11 @@ export default function BuyScreen({ navigation }) {
           </TouchableOpacity>
         </View>
       </SafeAreaView>
+      <LocationPicker
+        visible={isLocationPickerVisible}
+        onClose={() => setIsLocationPickerVisible(false)}
+        onSelectLocation={handleSelectLocation}
+      />
     </View>
   );
 }
@@ -492,26 +621,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: '#FFFFFF',
-    borderRadius: 20, // Consistent border radius
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#F1F5F9', // Softer borders
-    padding: 16,
+    borderColor: '#E2E8F0',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     marginHorizontal: 16,
-    marginTop: 16,
+    marginTop: 14,
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 6 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.03,
-    shadowRadius: 10,
+    shadowRadius: 6,
     elevation: 2,
   },
   locationInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    marginRight: 12,
+    marginRight: 10,
   },
-  locationPinIcon: {
-    marginRight: 8,
+  locationPinIconWrapper: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F0FDF4',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
   },
   locationTextContainer: {
     flex: 1,
@@ -519,20 +655,20 @@ const styles = StyleSheet.create({
   locationCity: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#0F172A',
+    color: '#1E293B',
   },
   locationSubtitle: {
     fontSize: 12,
     color: '#64748B',
-    marginTop: 2,
+    marginTop: 1,
   },
   changeButton: {
-    borderWidth: 1.5,
-    borderColor: '#F1F5F9',
-    borderRadius: 12,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#16A34A',
+    borderRadius: 16,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    backgroundColor: '#F0FDF4',
   },
   changeButtonText: {
     fontSize: 12,
@@ -602,18 +738,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   categoryCardWrapper: {
-    width: 78, // Width 78
-    height: 96, // Height 96
-    borderRadius: 20,
+    width: 84, // Premium width
+    height: 112, // Premium height
+    borderRadius: 20, // Rounded corners 20px
     justifyContent: 'center',
     alignItems: 'center',
     padding: 8,
-    marginHorizontal: 7, // 14px horizontal spacing between cards (7 on left, 7 on right)
+    marginHorizontal: 7, // 14px equal spacing between card elements
     backgroundColor: '#FFFFFF',
+    position: 'relative', // Necessary for absolute positioning of checkmark
   },
   unselectedCardWrapper: {
     borderWidth: 1,
-    borderColor: '#E5E7EB', // Light grey border
+    borderColor: '#E5E7EB', // Light gray border
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.03,
@@ -622,28 +759,47 @@ const styles = StyleSheet.create({
   },
   selectedCardWrapper: {
     borderWidth: 2,
-    borderColor: '#16A34A', // Subtle green border
+    borderColor: '#16A34A', // Green border
+    backgroundColor: '#F0FDF4', // Soft light green background
     shadowColor: '#16A34A', // Soft green shadow
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.12,
     shadowRadius: 10,
     elevation: 4,
   },
+  selectedCheckmark: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 7,
+    width: 14,
+    height: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+    shadowColor: '#16A34A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
+  },
   categoryCardImage: {
-    width: 48, // Size 48x48
-    height: 48,
+    width: 52, // Centered animal image larger size (approx 60-65%)
+    height: 52,
     marginBottom: 6,
   },
   categoryCardName: {
     fontSize: 13,
-    fontWeight: '600',
     textAlign: 'center',
   },
   unselectedCardName: {
     color: '#475569', // Dark grey text
+    fontWeight: '500', // Regular unselected text
   },
   selectedCardName: {
     color: '#16A34A', // Green text
+    fontWeight: 'bold', // Bold selected category name
   },
   featuredSection: {
     marginTop: 24, // Consistent spacing 24px
@@ -797,5 +953,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
     marginLeft: 6,
+  },
+  scrollContent: {
+    paddingBottom: 160,
   },
 });

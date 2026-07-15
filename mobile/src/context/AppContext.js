@@ -280,6 +280,49 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const updateLocation = async (locData) => {
+    try {
+      const updated = {
+        name: userProfile?.name || 'Guest',
+        role: userProfile?.role || 'Farmer',
+        mobile: userProfile?.mobile || '',
+        language: userProfile?.language || language || 'en',
+        village: locData.village || '',
+        taluka: locData.taluka || '',
+        district: locData.district || '',
+        state: locData.state || '',
+      };
+      
+      if (userToken && userToken !== 'guest') {
+        const payload = {
+          fullName: updated.name,
+          role: updated.role === 'Farmer' ? 'seller' : (updated.role === 'Veterinary Doctor' ? 'doctor' : 'buyer'),
+          mobile: updated.mobile,
+          state: updated.state,
+          district: updated.district,
+          taluka: updated.taluka,
+          village: updated.village,
+          preferredLanguage: updated.language
+        };
+        await profileApi.updateProfile(payload);
+      }
+      
+      await AsyncStorage.setItem('userProfile', JSON.stringify(updated));
+      setUserProfile(updated);
+    } catch (e) {
+      console.error('[Context Error] updateLocation failed:', e);
+      // Local fallback
+      const fallback = {
+        ...userProfile,
+        village: locData.village || '',
+        taluka: locData.taluka || '',
+        district: locData.district || '',
+        state: locData.state || '',
+      };
+      setUserProfile(fallback);
+    }
+  };
+
   const grantLocation = async () => {
     try {
       await AsyncStorage.setItem('hasLocationPermission', 'true');
@@ -375,6 +418,7 @@ export const AppProvider = ({ children }) => {
         refreshProfileData,
         toggleDarkMode,
         setAppFontSize,
+        updateLocation,
       }}
     >
       {children}
