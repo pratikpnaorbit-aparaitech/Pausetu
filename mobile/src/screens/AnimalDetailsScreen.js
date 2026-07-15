@@ -793,22 +793,18 @@ export default function AnimalDetailsScreen({ route, navigation }) {
           {similarAnimals.length > 0 && (
             <View style={styles.similarSection}>
               <SectionHeader title={t('animalDetails.similarAnimals')} onActionPress={() => {}} />
-              <FlatList
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                data={similarAnimals}
-                keyExtractor={(item) => item.id}
-                contentContainerStyle={styles.similarList}
-                renderItem={({ item }) => (
+              <View style={styles.similarVerticalList}>
+                {similarAnimals.map((item) => (
                   <ListingCard
+                    key={item.id}
                     item={item}
                     onViewDetailsPress={() => {
                       navigation.push('AnimalDetails', { animal: item });
                     }}
-                    style={styles.similarCardOverride}
+                    style={styles.similarCardVerticalOverride}
                   />
-                )}
-              />
+                ))}
+              </View>
             </View>
           )}
         </View>
@@ -1366,14 +1362,12 @@ const styles = StyleSheet.create({
   similarSection: {
     marginTop: 16,
   },
-  similarList: {
-    paddingHorizontal: 8,
+  similarVerticalList: {
     paddingTop: 8,
   },
-  similarCardOverride: {
-    width: 230,
-    marginHorizontal: 8,
-    marginBottom: 0,
+  similarCardVerticalOverride: {
+    marginHorizontal: 0,
+    marginBottom: 16,
   },
   stickyBottomBar: {
     position: 'absolute',

@@ -130,36 +130,6 @@ const RECOMMENDED_ANIMALS = [
   },
 ];
 
-const NEARBY_SELLERS = [
-  {
-    id: 's1',
-    name: 'Balaji Dairy Farm',
-    isVerified: true,
-    location: 'Hadapsar, Pune',
-    distance: '3.2 km',
-    rating: '4.8 (24)',
-    animalsCount: 8,
-  },
-  {
-    id: 's2',
-    name: 'Shankar Patil',
-    isVerified: true,
-    location: 'Saswad, Pune',
-    distance: '8.5 km',
-    rating: '4.6 (12)',
-    animalsCount: 3,
-  },
-  {
-    id: 's3',
-    name: 'Vikas Livestock',
-    isVerified: false,
-    location: 'Khed, Pune',
-    distance: '12.0 km',
-    rating: '4.2 (8)',
-    animalsCount: 5,
-  },
-];
-
 // Standalone React.memo components to prevent unmounting/remounting of list headers and footers
 const ListHeader = React.memo(({ selectedCategory, setSelectedCategory, onViewDetails, featuredAnimals }) => {
   const { t } = useTranslation();
@@ -233,68 +203,15 @@ const ListHeader = React.memo(({ selectedCategory, setSelectedCategory, onViewDe
       <View style={styles.featuredSection}>
         <SectionHeader title={t('buy.featuredAnimals')} onActionPress={() => { }} />
 
-        <FlatList
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          data={featuredAnimals && featuredAnimals.length > 0 ? featuredAnimals : FEATURED_ANIMALS}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.featuredList}
-          renderItem={({ item }) => {
-            return (
-              <View style={styles.animalCard}>
-                {/* Image Block */}
-                <View style={styles.imagePlaceholder}>
-                  {item.photos && item.photos.length > 0 ? (
-                    <Image source={{ uri: resolveMediaUrl(item.photos[0]) }} style={{ width: '100%', height: '100%', borderRadius: 12 }} />
-                  ) : (
-                    <MaterialCommunityIcons name="image-outline" size={38} color="#94A3B8" />
-                  )}
-                  {/* Badges Overlay (Featured & Verified) */}
-                  <View style={styles.badgeOverlayContainer}>
-                    <View style={styles.featuredBadge}>
-                      <AppText style={styles.featuredBadgeText}>{t('common.featured')}</AppText>
-                    </View>
-                    {item.isVerified && (
-                      <View style={styles.verifiedBadge}>
-                        <MaterialCommunityIcons name="check-decagram" size={11} color="#FFFFFF" style={styles.badgeIcon} />
-                        <AppText style={styles.verifiedBadgeText}>{t('common.verified')}</AppText>
-                      </View>
-                    )}
-                  </View>
-                </View>
-
-                {/* Metadata Content */}
-                <View style={styles.cardDetails}>
-                  <View style={styles.titleRow}>
-                    <AppText style={styles.animalName} numberOfLines={1}>
-                      {item.name}
-                    </AppText>
-                    {item.isVerified && (
-                      <MaterialCommunityIcons name="check-decagram" size={15} color="#3B82F6" style={styles.verifiedIcon} />
-                    )}
-                  </View>
-                  <AppText style={styles.breedText} numberOfLines={1}>
-                    {item.breed} • {item.age}
-                  </AppText>
-                  <AppText style={styles.priceText}>{item.price}</AppText>
-
-                  {/* Location details */}
-                  <View style={styles.locationRow}>
-                    <Ionicons name="location" size={13} color="#64748B" />
-                    <AppText style={styles.locationText} numberOfLines={1}>
-                      {item.location}
-                    </AppText>
-                  </View>
-
-                  {/* Action Button */}
-                  <TouchableOpacity style={styles.detailsButton} onPress={() => onViewDetails(item)}>
-                    <AppText style={styles.detailsButtonText}>{t('common.viewDetails')}</AppText>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            );
-          }}
-        />
+        <View style={styles.featuredListVertical}>
+          {(featuredAnimals && featuredAnimals.length > 0 ? featuredAnimals : FEATURED_ANIMALS).map((item) => (
+            <ListingCard
+              key={item.id}
+              item={{ ...item, isFeatured: true }}
+              onViewDetailsPress={() => onViewDetails(item)}
+            />
+          ))}
+        </View>
       </View>
       {/* Latest Listings Header */}
       <SectionHeader title={t('buy.latestListings')} onActionPress={() => { }} />
@@ -309,68 +226,15 @@ const ListFooter = React.memo(({ onViewDetails, recommendedAnimals }) => {
     <View style={styles.footerSection}>
       {/* Recommended For You */}
       <SectionHeader title={t('buy.recommendedForYou')} onActionPress={() => { }} />
-      <FlatList
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        data={recommendedAnimals && recommendedAnimals.length > 0 ? recommendedAnimals : RECOMMENDED_ANIMALS}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.recommendedList}
-        renderItem={({ item }) => (
+      <View style={styles.recommendedVerticalList}>
+        {(recommendedAnimals && recommendedAnimals.length > 0 ? recommendedAnimals : RECOMMENDED_ANIMALS).map((item) => (
           <ListingCard
+            key={item.id}
             item={item}
             onViewDetailsPress={() => onViewDetails(item)}
-            style={styles.recommendedCardOverride}
           />
-        )}
-      />
-
-      {/* Nearby Sellers */}
-      <SectionHeader title={t('buy.nearbySellers')} onActionPress={() => { }} />
-      <FlatList
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        data={NEARBY_SELLERS}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.sellersList}
-        renderItem={({ item }) => (
-          <View style={styles.sellerCard}>
-            {/* Avatar Container */}
-            <View style={styles.sellerAvatarContainer}>
-              <Ionicons name="person" size={24} color="#94A3B8" />
-              {item.isVerified && (
-                <MaterialCommunityIcons name="check-decagram" size={13} color="#3B82F6" style={styles.sellerVerifiedIcon} />
-              )}
-            </View>
-
-            {/* Name */}
-            <AppText style={styles.sellerCardName} numberOfLines={1}>
-              {item.name}
-            </AppText>
-
-            {/* Location & Distance */}
-            <View style={styles.sellerLocationRow}>
-              <Ionicons name="location" size={11} color="#64748B" style={styles.sellerLocationPin} />
-              <AppText style={styles.sellerLocationText} numberOfLines={1}>
-                {item.location} ({item.distance})
-              </AppText>
-            </View>
-
-            {/* Rating */}
-            <View style={styles.ratingRow}>
-              <Ionicons name="star" size={12} color="#F59E0B" />
-              <AppText style={styles.ratingText}>{item.rating}</AppText>
-            </View>
-
-            {/* Stock Count */}
-            <AppText style={styles.animalsAvailableText}>{t('buy.animalsAvailable', { count: item.animalsCount })}</AppText>
-
-            {/* Action - Outline details button style */}
-            <TouchableOpacity style={styles.contactButton}>
-              <AppText style={styles.contactButtonText}>{t('buy.contact')}</AppText>
-            </TouchableOpacity>
-          </View>
-        )}
-      />
+        ))}
+      </View>
     </View>
   );
 });
@@ -906,106 +770,11 @@ const styles = StyleSheet.create({
     marginTop: 24, // Consistent spacing 24px
     marginBottom: 24,
   },
-  recommendedList: {
-    paddingHorizontal: 8,
-    marginBottom: 16,
+  featuredListVertical: {
+    marginBottom: 8,
   },
-  recommendedCardOverride: {
-    width: 240, // Increased recommended card width
-    marginHorizontal: 8,
-    marginBottom: 0,
-  },
-  sellersList: {
-    paddingHorizontal: 8,
-  },
-  sellerCard: {
-    width: 170,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20, // Consistent border radius
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-    padding: 14,
-    marginHorizontal: 8,
-    alignItems: 'center',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.04,
-    shadowRadius: 12,
-    elevation: 2,
-  },
-  sellerAvatarContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
-    position: 'relative',
-  },
-  sellerVerifiedIcon: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-  },
-  sellerCardName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#0F172A',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  sellerLocationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6,
-    width: '100%',
-  },
-  sellerLocationPin: {
-    marginRight: 2,
-  },
-  sellerLocationText: {
-    fontSize: 11,
-    color: '#64748B',
-    maxWidth: '85%',
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6,
-  },
-  ratingText: {
-    fontSize: 11,
-    color: '#F59E0B',
-    fontWeight: '700',
-    marginLeft: 4,
-  },
-  animalsAvailableText: {
-    fontSize: 11,
-    color: '#64748B',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  contactButton: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#16A34A',
-    borderRadius: 10,
-    paddingVertical: 6,
-    paddingHorizontal: 16,
-    width: '100%',
-    alignItems: 'center',
-  },
-  contactButtonText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#16A34A',
+  recommendedVerticalList: {
+    marginBottom: 8,
   },
   fab: {
     position: 'absolute',
