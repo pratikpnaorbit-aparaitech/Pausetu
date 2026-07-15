@@ -18,9 +18,16 @@ import { useTranslation } from 'react-i18next';
 import AppText from './AppText';
 
 export default function LocationPicker({ visible, onClose, onSelectLocation }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [pincode, setPincode] = useState('');
+
+  const getCloseAccessibilityLabel = () => {
+    const lang = i18n.language || 'en';
+    if (lang.startsWith('mr')) return 'बंद करा';
+    if (lang.startsWith('hi')) return 'बंद करें';
+    return 'Close';
+  };
 
   // Reset state when modal opens
   useEffect(() => {
@@ -181,15 +188,21 @@ export default function LocationPicker({ visible, onClose, onSelectLocation }) {
             <View style={styles.modalContent}>
               {/* Header */}
               <View style={styles.modalHeader}>
-                <View>
+                <View style={{ flex: 1, marginRight: 12 }}>
                   <View style={styles.titleRow}>
                     <Ionicons name="location" size={22} color="#16A34A" style={{ marginRight: 6 }} />
                     <AppText style={styles.modalTitle}>{t('locationPicker.title')}</AppText>
                   </View>
                   <AppText style={styles.modalSubtitle}>{t('locationPicker.subtitle')}</AppText>
                 </View>
-                <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                  <Ionicons name="close" size={24} color="#64748B" />
+                <TouchableOpacity 
+                  onPress={onClose} 
+                  style={styles.closeButton}
+                  accessibilityRole="button"
+                  accessibilityLabel={getCloseAccessibilityLabel()}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="close" size={20} color="#374151" />
                 </TouchableOpacity>
               </View>
 
@@ -286,7 +299,7 @@ const styles = StyleSheet.create({
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 20,
     paddingBottom: 16,
@@ -309,7 +322,17 @@ const styles = StyleSheet.create({
     paddingRight: 10
   },
   closeButton: {
-    padding: 4
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
+    elevation: 2
   },
   modalBody: {
     paddingHorizontal: 20,
