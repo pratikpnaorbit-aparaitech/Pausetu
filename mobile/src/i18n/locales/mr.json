@@ -194,7 +194,10 @@
     "pregnantLabel": "गाभण",
     "aiEstimatedValue": "AI बाजार भाव",
     "viewCompleteDetails": "संपूर्ण माहिती पहा →",
-    "calvingLabel": "वेत"
+    "calvingLabel": "वेत",
+    "noAnimalsCategoryTitle": "या श्रेणीत कोणतेही जनावरे उपलब्ध नाहीत.",
+    "noAnimalsCategorySubtitle": "कृपया दुसरी श्रेणी निवडा.",
+    "noAnimalsCategoryButton": "सर्व जनावरे"
   },
   "locationPicker": {
     "title": "स्थान निवडा",

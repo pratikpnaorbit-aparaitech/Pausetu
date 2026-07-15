@@ -194,7 +194,10 @@
     "pregnantLabel": "Pregnant",
     "aiEstimatedValue": "AI Est. Value",
     "viewCompleteDetails": "View Details →",
-    "calvingLabel": "Calving"
+    "calvingLabel": "Calving",
+    "noAnimalsCategoryTitle": "No animals available in this category.",
+    "noAnimalsCategorySubtitle": "Please select another category.",
+    "noAnimalsCategoryButton": "View All Animals"
   },
   "locationPicker": {
     "title": "Select Location",

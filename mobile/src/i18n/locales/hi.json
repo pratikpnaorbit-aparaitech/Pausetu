@@ -194,7 +194,10 @@
     "pregnantLabel": "गर्भवती",
     "aiEstimatedValue": "AI अनुमानित मूल्य",
     "viewCompleteDetails": "पूरी जानकारी देखें →",
-    "calvingLabel": "ब्यात"
+    "calvingLabel": "ब्यात",
+    "noAnimalsCategoryTitle": "इस श्रेणी में कोई पशु उपलब्ध नहीं है।",
+    "noAnimalsCategorySubtitle": "कृपया दूसरी श्रेणी चुनें।",
+    "noAnimalsCategoryButton": "सभी पशु"
   },
   "locationPicker": {
     "title": "स्थान चुनें",

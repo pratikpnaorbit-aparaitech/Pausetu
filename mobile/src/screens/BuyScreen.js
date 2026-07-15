@@ -31,6 +31,7 @@ const FEATURED_ANIMALS = [
     location: 'Baramati, Pune',
     isVerified: true,
     isFeatured: true,
+    categorySlug: 'cow',
   },
   {
     id: 'f2',
@@ -41,6 +42,7 @@ const FEATURED_ANIMALS = [
     location: 'Hassan, Karnataka',
     isVerified: true,
     isFeatured: true,
+    categorySlug: 'buffalo',
   },
   {
     id: 'f3',
@@ -51,6 +53,7 @@ const FEATURED_ANIMALS = [
     location: 'Sikar, Rajasthan',
     isVerified: false,
     isFeatured: true,
+    categorySlug: 'goat',
   },
 ];
 
@@ -66,6 +69,7 @@ const LATEST_LISTINGS = [
     isVerified: true,
     isFeatured: false,
     postedTime: '2 hours ago',
+    categorySlug: 'cow',
   },
   {
     id: 'l2',
@@ -78,6 +82,7 @@ const LATEST_LISTINGS = [
     isVerified: true,
     isFeatured: true,
     postedTime: '5 hours ago',
+    categorySlug: 'buffalo',
   },
   {
     id: 'l3',
@@ -90,6 +95,7 @@ const LATEST_LISTINGS = [
     isVerified: false,
     isFeatured: false,
     postedTime: '1 day ago',
+    categorySlug: 'goat',
   },
 ];
 
@@ -105,6 +111,7 @@ const RECOMMENDED_ANIMALS = [
     isVerified: true,
     isFeatured: true,
     postedTime: '3 hours ago',
+    categorySlug: 'cow',
   },
   {
     id: 'r2',
@@ -117,6 +124,7 @@ const RECOMMENDED_ANIMALS = [
     isVerified: false,
     isFeatured: false,
     postedTime: '6 hours ago',
+    categorySlug: 'buffalo',
   },
   {
     id: 'r3',
@@ -129,6 +137,7 @@ const RECOMMENDED_ANIMALS = [
     isVerified: true,
     isFeatured: true,
     postedTime: '1 day ago',
+    categorySlug: 'goat',
   },
 ];
 
@@ -175,7 +184,16 @@ const CategoryCardItem = React.memo(({ item, isSelected, onPress, t }) => {
   );
 });
 
-const ListHeader = React.memo(({ selectedCategory, setSelectedCategory, onViewDetails, featuredAnimals, userProfile, onChangeLocation }) => {
+const ListHeader = React.memo(({ 
+  selectedCategory, 
+  setSelectedCategory, 
+  onViewDetails, 
+  featuredAnimals, 
+  userProfile, 
+  onChangeLocation,
+  searchText,
+  setSearchText
+}) => {
   const { t } = useTranslation();
   const flatListRef = React.useRef(null);
 
@@ -225,6 +243,27 @@ const ListHeader = React.memo(({ selectedCategory, setSelectedCategory, onViewDe
     }
   }, [selectedCategory]);
 
+  const displayFeatured = (featuredAnimals && featuredAnimals.length > 0)
+    ? featuredAnimals
+    : FEATURED_ANIMALS.filter(animal => {
+        if (selectedCategory && selectedCategory !== 'all') {
+          if (selectedCategory === 'other') {
+            const knownSlugs = ['cow', 'buffalo', 'goat', 'sheep', 'horse'];
+            if (knownSlugs.includes(animal.categorySlug)) return false;
+          } else {
+            if (animal.categorySlug !== selectedCategory) return false;
+          }
+        }
+        if (searchText && searchText.trim() !== '') {
+          const query = searchText.toLowerCase().trim();
+          const nameMatch = animal.name?.toLowerCase().includes(query);
+          const breedMatch = animal.breed?.toLowerCase().includes(query);
+          const locationMatch = animal.location?.toLowerCase().includes(query);
+          return nameMatch || breedMatch || locationMatch;
+        }
+        return true;
+      });
+
   return (
     <View>
       {/* Location Card */}
@@ -256,6 +295,8 @@ const ListHeader = React.memo(({ selectedCategory, setSelectedCategory, onViewDe
             placeholder={t('buy.searchCattle')}
             placeholderTextColor="#94A3B8"
             editable={true}
+            value={searchText}
+            onChangeText={setSearchText}
           />
         </View>
         <TouchableOpacity style={styles.filterButton}>
@@ -288,34 +329,59 @@ const ListHeader = React.memo(({ selectedCategory, setSelectedCategory, onViewDe
       </View>
 
       {/* Featured Animals Section */}
-      <View style={styles.featuredSection}>
-        <SectionHeader title={t('buy.featuredAnimals')} onActionPress={() => { }} />
+      {displayFeatured.length > 0 && (
+        <View style={styles.featuredSection}>
+          <SectionHeader title={t('buy.featuredAnimals')} onActionPress={() => { }} />
 
-        <View style={styles.featuredListVertical}>
-          {(featuredAnimals && featuredAnimals.length > 0 ? featuredAnimals : FEATURED_ANIMALS).map((item) => (
-            <ListingCard
-              key={item.id}
-              item={{ ...item, isFeatured: true }}
-              onViewDetailsPress={() => onViewDetails(item)}
-            />
-          ))}
+          <View style={styles.featuredListVertical}>
+            {displayFeatured.map((item) => (
+              <ListingCard
+                key={item.id}
+                item={{ ...item, isFeatured: true }}
+                onViewDetailsPress={() => onViewDetails(item)}
+              />
+            ))}
+          </View>
         </View>
-      </View>
+      )}
       {/* Latest Listings Header */}
       <SectionHeader title={t('buy.latestListings')} onActionPress={() => { }} />
     </View>
   );
 });
 
-const ListFooter = React.memo(({ onViewDetails, recommendedAnimals }) => {
+const ListFooter = React.memo(({ onViewDetails, recommendedAnimals, selectedCategory, searchText }) => {
   const { t } = useTranslation();
+
+  const displayRecommended = (recommendedAnimals && recommendedAnimals.length > 0)
+    ? recommendedAnimals
+    : RECOMMENDED_ANIMALS.filter(animal => {
+        if (selectedCategory && selectedCategory !== 'all') {
+          if (selectedCategory === 'other') {
+            const knownSlugs = ['cow', 'buffalo', 'goat', 'sheep', 'horse'];
+            if (knownSlugs.includes(animal.categorySlug)) return false;
+          } else {
+            if (animal.categorySlug !== selectedCategory) return false;
+          }
+        }
+        if (searchText && searchText.trim() !== '') {
+          const query = searchText.toLowerCase().trim();
+          const nameMatch = animal.name?.toLowerCase().includes(query);
+          const breedMatch = animal.breed?.toLowerCase().includes(query);
+          const locationMatch = animal.location?.toLowerCase().includes(query);
+          return nameMatch || breedMatch || locationMatch;
+        }
+        return true;
+      });
+
+  if (displayRecommended.length === 0) return <View style={{ height: 24 }} />;
 
   return (
     <View style={styles.footerSection}>
       {/* Recommended For You */}
       <SectionHeader title={t('buy.recommendedForYou')} onActionPress={() => { }} />
       <View style={styles.recommendedVerticalList}>
-        {(recommendedAnimals && recommendedAnimals.length > 0 ? recommendedAnimals : RECOMMENDED_ANIMALS).map((item) => (
+        {displayRecommended.map((item) => (
           <ListingCard
             key={item.id}
             item={item}
@@ -335,32 +401,48 @@ export default function BuyScreen({ navigation }) {
   const { t } = useTranslation();
 
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [searchText, setSearchText] = useState('');
   const [animalsList, setAnimalsList] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const getFilteredAnimals = () => {
-    if (!selectedCategory || selectedCategory === 'all') {
-      return animalsList;
+    let list = animalsList;
+
+    // Filter by selected category
+    if (selectedCategory && selectedCategory !== 'all') {
+      if (selectedCategory === 'other') {
+        const knownSlugs = ['cow', 'buffalo', 'goat', 'sheep', 'horse'];
+        list = list.filter((animal) => {
+          const slug = animal.categoryId?.slug?.toLowerCase();
+          return !slug || !knownSlugs.includes(slug);
+        });
+      } else {
+        list = list.filter((animal) => {
+          const slug = animal.categoryId?.slug?.toLowerCase();
+          return slug === selectedCategory.toLowerCase();
+        });
+      }
     }
-    
-    if (selectedCategory === 'other') {
-      const knownSlugs = ['cow', 'buffalo', 'goat', 'sheep', 'horse'];
-      return animalsList.filter((animal) => {
-        const slug = animal.categoryId?.slug?.toLowerCase();
-        return !slug || !knownSlugs.includes(slug);
+
+    // Filter by search text
+    if (searchText && searchText.trim() !== '') {
+      const query = searchText.toLowerCase().trim();
+      list = list.filter((animal) => {
+        const nameMatch = animal.name?.toLowerCase().includes(query);
+        const breedMatch = animal.breed?.toLowerCase().includes(query);
+        const locationMatch = animal.location?.toLowerCase().includes(query);
+        const descriptionMatch = animal.description?.toLowerCase().includes(query);
+        return nameMatch || breedMatch || locationMatch || descriptionMatch;
       });
     }
 
-    return animalsList.filter((animal) => {
-      const slug = animal.categoryId?.slug?.toLowerCase();
-      return slug === selectedCategory.toLowerCase();
-    });
+    return list;
   };
 
   const filteredAnimals = getFilteredAnimals();
 
-  const fetchLiveListings = async () => {
-    setLoading(true);
+  const fetchLiveListings = async (showSpinner = true) => {
+    if (showSpinner) setLoading(true);
     try {
       const res = await api.getAnimals({ status: 'approved' });
       if (res.status === 'success') {
@@ -385,7 +467,7 @@ export default function BuyScreen({ navigation }) {
       console.warn('[BuyScreen API Warning] Offline or failed backend:', e.message);
       setAnimalsList([]);
     } finally {
-      setLoading(false);
+      if (showSpinner) setLoading(false);
     }
   };
 
@@ -411,6 +493,12 @@ export default function BuyScreen({ navigation }) {
       await updateLocation(locationData);
     }
   }, [updateLocation]);
+
+  const handleViewAllAnimals = useCallback(() => {
+    setSelectedCategory('all');
+    setSearchText('');
+    fetchLiveListings(false);
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -465,13 +553,33 @@ export default function BuyScreen({ navigation }) {
                   featuredAnimals={filteredAnimals.slice(0, 3)}
                   userProfile={userProfile}
                   onChangeLocation={handleLocationChange}
+                  searchText={searchText}
+                  setSearchText={setSearchText}
                 />
               }
               ListFooterComponent={
                 <ListFooter
                   onViewDetails={handleViewDetails}
                   recommendedAnimals={filteredAnimals.slice(2, 5)}
+                  selectedCategory={selectedCategory}
+                  searchText={searchText}
                 />
+              }
+              ListEmptyComponent={
+                <View style={styles.emptyStateContainer}>
+                  <View style={styles.emptyIconWrapper}>
+                    <Ionicons name="paw" size={48} color="#16A34A" />
+                  </View>
+                  <AppText style={styles.emptyStateTitle}>{t('buy.noAnimalsCategoryTitle')}</AppText>
+                  <AppText style={styles.emptyStateSubtitle}>{t('buy.noAnimalsCategorySubtitle')}</AppText>
+                  <TouchableOpacity
+                    style={styles.emptyStateButton}
+                    activeOpacity={0.8}
+                    onPress={handleViewAllAnimals}
+                  >
+                    <AppText style={styles.emptyStateButtonText}>{t('buy.noAnimalsCategoryButton')}</AppText>
+                  </TouchableOpacity>
+                </View>
               }
               contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={false}
@@ -736,6 +844,8 @@ const styles = StyleSheet.create({
   },
   categoriesList: {
     paddingHorizontal: 8,
+    paddingTop: 8,
+    paddingBottom: 8,
   },
   categoryCardWrapper: {
     width: 84, // Premium width
@@ -956,5 +1066,60 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 160,
+  },
+  emptyStateContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 24,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.02,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  emptyIconWrapper: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#F0FDF4',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  emptyStateTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0F172A',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  emptyStateSubtitle: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  emptyStateButton: {
+    backgroundColor: '#16A34A',
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    borderRadius: 20,
+    shadowColor: '#16A34A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  emptyStateButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
