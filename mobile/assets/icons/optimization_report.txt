@@ -1,0 +1,11 @@
+| File Name | Original Dimensions | Optimized Dimensions | Original Size | Optimized Size | Size Reduction | % Saved |
+| --- | --- | --- | --- | --- | --- | --- |
+| all.png | 1024x1024 | 512x512 | 608.8 KB | 192.7 KB | 416.1 KB | 68.3% |
+| buffalo.png | 1536x1024 | 512x341 | 2671.3 KB | 284.2 KB | 2387.1 KB | 89.4% |
+| cow.png | 1254x1254 | 512x512 | 2373.1 KB | 426.2 KB | 1946.9 KB | 82.0% |
+| goat.png | 1536x1024 | 512x341 | 2081.2 KB | 224.8 KB | 1856.4 KB | 89.2% |
+| horse.png | 1416x1111 | 512x402 | 2286.4 KB | 319.2 KB | 1967.2 KB | 86.0% |
+| other.png | 1536x1024 | 512x341 | 1511.3 KB | 153.3 KB | 1358.0 KB | 89.9% |
+| sheep.png | 1402x1122 | 512x410 | 2608.8 KB | 379.9 KB | 2228.9 KB | 85.4% |
+
+**Total Reduction:** 11.88 MB (86.0% saved)

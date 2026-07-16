@@ -17,7 +17,12 @@ const GALLERY_HEIGHT = 300;
 
 const ImageWithLoader = ({ uri, style, resizeMode, onPress }) => {
   const [loading, setLoading] = useState(false);
-  const source = useMemo(() => ({ uri }), [uri]);
+  const source = useMemo(() => {
+    if (!uri) {
+      return { uri: 'https://images.unsplash.com/photo-1546445317-29f4545e6d52?auto=format&fit=crop&w=300&q=80' };
+    }
+    return { uri };
+  }, [uri]);
 
   const handleLoadStart = useCallback(() => {
     setLoading(true);
@@ -29,6 +34,14 @@ const ImageWithLoader = ({ uri, style, resizeMode, onPress }) => {
 
   return (
     <TouchableOpacity activeOpacity={onPress ? 0.85 : 1} onPress={onPress} style={style}>
+      {/* Blurred background to prevent blank/letterbox areas */}
+      <Image
+        source={source}
+        style={[StyleSheet.absoluteFillObject, { opacity: 0.3 }]}
+        resizeMode="cover"
+        blurRadius={Platform.OS === 'ios' ? 20 : 10}
+      />
+      {/* Main image with aspect ratio preserved */}
       <Image
         source={source}
         style={StyleSheet.absoluteFillObject}
@@ -628,9 +641,9 @@ export default function AnimalDetailsScreen({ route, navigation }) {
                     <ImageWithLoader
                       uri={slide.thumbnail || firstImage || resolveMediaUrl(null)}
                       style={styles.galleryImage}
-                      resizeMode="cover"
+                      resizeMode="contain"
                     />
-                    <View style={styles.videoOverlay} pointerEvents="box-none">
+                    <View style={styles.playButtonAbsoluteContainer} pointerEvents="box-none">
                       <TouchableOpacity 
                         style={styles.playButtonCircle} 
                         onPress={() => {
@@ -643,6 +656,8 @@ export default function AnimalDetailsScreen({ route, navigation }) {
                       >
                         <Ionicons name="play" size={36} color="#FFFFFF" style={styles.playIconOffset} />
                       </TouchableOpacity>
+                    </View>
+                    <View style={styles.videoOverlay} pointerEvents="box-none">
                       <AppText style={styles.videoSlideLabel}>{t('animalDetails.watchVideo')}</AppText>
                     </View>
                   </View>
@@ -1017,6 +1032,9 @@ const styles = StyleSheet.create({
     height: GALLERY_HEIGHT,
     position: 'relative',
     backgroundColor: '#F1F5F9',
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    overflow: 'hidden',
   },
   galleryImageWrap: {
     width: width,
@@ -1050,8 +1068,15 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingBottom: 24,
+  },
+  playButtonAbsoluteContainer: {
+    ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 5,
   },
   playButtonCircle: {
     width: 72,
@@ -1067,10 +1092,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.35,
     shadowRadius: 10,
     elevation: 8,
-    marginBottom: 10,
   },
   playIconOffset: {
-    marginLeft: 6,
+    marginLeft: 4,
   },
   videoSlideLabel: {
     color: '#FFFFFF',
@@ -1578,5 +1602,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#94A3B8',
     fontWeight: '600',
+  },
+  loaderCenter: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
   },
 });

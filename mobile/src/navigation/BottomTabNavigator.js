@@ -83,7 +83,7 @@ export default function BottomTabNavigator() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        headerShown: true,
+        headerShown: false,
         headerStyle: {
           backgroundColor: '#FFFFFF',
           borderBottomWidth: 1,
