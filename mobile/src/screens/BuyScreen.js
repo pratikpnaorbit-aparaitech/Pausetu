@@ -4,6 +4,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppContext } from '../context/AppContext';
 import { api, resolveMediaUrl } from '../api/api';
 import { useTranslation } from 'react-i18next';
+import { LinearGradient } from 'expo-linear-gradient';
 import AppText from '../components/AppText';
 
 // Import Reusable Components
@@ -502,6 +503,14 @@ export default function BuyScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
+      <LinearGradient
+        colors={['#F8FCF7', '#F4FAEE', '#EEF8EC']}
+        style={StyleSheet.absoluteFillObject}
+      />
+      <Image
+        source={require('../../assets/farmer-bg.webp')}
+        style={[StyleSheet.absoluteFillObject, { opacity: 0.025, resizeMode: 'cover' }]}
+      />
       <SafeAreaView style={styles.safeArea}>
         {/* Main Body Wrap */}
         <View style={styles.contentWrapper}>
@@ -611,7 +620,7 @@ export default function BuyScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: 'transparent',
   },
   safeArea: {
     flex: 1,
@@ -729,17 +738,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     marginHorizontal: 16,
     marginTop: 14,
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
     elevation: 2,
   },
   locationInfo: {
@@ -795,16 +804,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
-    paddingHorizontal: 12,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 16,
     height: 48,
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.02,
-    shadowRadius: 8,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.04,
+    shadowRadius: 16,
+    elevation: 2,
   },
   searchIcon: {
     marginRight: 8,
@@ -819,17 +828,17 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderColor: '#E2E8F0',
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 12,
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.02,
-    shadowRadius: 8,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.04,
+    shadowRadius: 16,
+    elevation: 2,
   },
   categoriesSection: {
     marginTop: 24, // Consistent spacing 24px
