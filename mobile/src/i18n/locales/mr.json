@@ -283,6 +283,7 @@
     "verifiedSeller": "खात्रीशीर विक्रेता",
     "call": "कॉल",
     "whatsapp": "WhatsApp",
+    "whatsappShareMessage": "नमस्कार, मला तुमच्या पशूसेतूवरील {{animalName}} ({{breed}}) या जनावराच्या जाहिरातीमध्ये स्वारस्य आहे. किंमत ₹{{price}} आहे. कृपया अधिक माहिती द्या.",
     "chat": "चॅट",
     "similarAnimals": "समान प्राणी",
     "listedAgo": "5 तासांपूर्वी नोंदवले",

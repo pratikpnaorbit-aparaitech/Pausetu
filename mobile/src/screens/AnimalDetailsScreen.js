@@ -403,7 +403,13 @@ export default function AnimalDetailsScreen({ route, navigation }) {
     }
     const cleaned = phone.replace(/[^0-9]/g, '');
     const withCountry = cleaned.startsWith('91') ? cleaned : `91${cleaned}`;
-    const url = `https://wa.me/${withCountry}?text=${encodeURIComponent(`Hi, I am interested in your animal listing: ${animal.name} (${animal.breed}) priced at ${animal.price} on PashuSetu.`)}`;
+    const cleanPrice = animal.price ? animal.price.replace(/[^0-9,]/g, '') : '';
+    const messageText = t('animalDetails.whatsappShareMessage', {
+      animalName: animal.name,
+      breed: animal.breed,
+      price: cleanPrice
+    });
+    const url = `https://wa.me/${withCountry}?text=${encodeURIComponent(messageText)}`;
     const supported = await Linking.canOpenURL(url);
     if (supported) {
       Linking.openURL(url);

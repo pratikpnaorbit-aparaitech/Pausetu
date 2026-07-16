@@ -283,6 +283,7 @@
     "verifiedSeller": "Verified Seller",
     "call": "Call",
     "whatsapp": "WhatsApp",
+    "whatsappShareMessage": "Hi, I am interested in your animal listing on PashuSetu: {{animalName}} ({{breed}}) priced at ₹{{price}}. Please share more details.",
     "chat": "Chat",
     "similarAnimals": "Similar Animals",
     "listedAgo": "Listed 5 hours ago",

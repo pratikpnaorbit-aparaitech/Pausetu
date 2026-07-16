@@ -283,6 +283,7 @@
     "verifiedSeller": "भरोसेमंद विक्रेता",
     "call": "कॉल",
     "whatsapp": "WhatsApp",
+    "whatsappShareMessage": "नमस्ते, मुझे पशुसेतु पर आपके {{animalName}} ({{breed}}) के विज्ञापन में रुचि है। इसकी कीमत ₹{{price}} है। कृपया अधिक जानकारी साझा करें।",
     "chat": "चैट",
     "similarAnimals": "समान पशु",
     "listedAgo": "5 घंटे पहले सूचीबद्ध",
