@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { secureStorage, registerLogoutHandler } from '../api/api';
 import { profileApi } from '../api/profileApi';
 import i18n from '../i18n/i18n';
+import { Asset } from 'expo-asset';
 
 export const AppContext = createContext();
 
@@ -68,6 +69,12 @@ export const AppProvider = ({ children }) => {
       setIsProfileLoading(true);
 
       try {
+        // Preload essential logo assets for immediate crisp rendering
+        await Asset.loadAsync([
+          require('../../assets/logo-full.png'),
+          require('../../assets/logo-icon.png')
+        ]);
+
         const onboarded = await AsyncStorage.getItem('isOnboarded');
         const lang = await AsyncStorage.getItem('language') || 'en';
         const token = await secureStorage.getItem('userToken');

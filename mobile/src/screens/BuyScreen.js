@@ -571,9 +571,8 @@ export default function BuyScreen({ navigation }) {
           {/* Header Section */}
           <View style={styles.header}>
             <View style={styles.logoAndBrand}>
-              {/* App Logo */}
               <View style={styles.logoCircle}>
-                <AppText style={styles.logoText}>PS</AppText>
+                <Image source={require('../../assets/logo-icon.png')} style={styles.logoIconImage} resizeMode="contain" />
               </View>
               {/* Title and Tagline */}
               <View style={styles.brandTextContainer}>
@@ -706,20 +705,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logoCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#DCFCE7',
-    borderWidth: 1.5,
-    borderColor: '#16A34A',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 8,
+    marginRight: 12,
+    overflow: 'visible',
+    shadowColor: '#16A34A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  logoText: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#16A34A',
+  logoIconImage: {
+    width: 58,
+    height: 58,
+    overflow: 'visible',
   },
   brandTextContainer: {
     justifyContent: 'center',

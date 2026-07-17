@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useState } from 'react';
-import { StyleSheet, View, SafeAreaView, ScrollView, Image, TouchableOpacity, Dimensions, FlatList, Share, Alert, ActivityIndicator, Animated } from 'react-native';
+import { StyleSheet, View, SafeAreaView, ScrollView, Image, TouchableOpacity, Dimensions, FlatList, Share, Alert, ActivityIndicator, Animated, Platform } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppContext } from '../context/AppContext';
 import { api, resolveMediaUrl } from '../api/api';
@@ -16,7 +16,7 @@ const SellerCtaCard = React.memo(({ listingsCount, onPress, t }) => {
   const handlePressIn = () => {
     Animated.spring(scaleValue, {
       toValue: 0.98,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
       tension: 120,
       friction: 7,
     }).start();
@@ -25,7 +25,7 @@ const SellerCtaCard = React.memo(({ listingsCount, onPress, t }) => {
   const handlePressOut = () => {
     Animated.spring(scaleValue, {
       toValue: 1,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
       tension: 120,
       friction: 7,
     }).start();
@@ -327,8 +327,19 @@ export default function SellScreen({ navigation }) {
             listingsCount={listings.length}
             t={t}
             onPress={() => {
+              console.log("CTA Card Pressed");
+              console.log("Current listings:", listings.length);
+              
               if (listings.length > 0) {
-                Alert.alert(t('common.info', { defaultValue: 'Info' }), 'जाहिरात सुविधा लवकरच उपलब्ध होईल!');
+                if (Platform.OS === 'web') {
+                  window.alert('जाहिरात सुविधा लवकरच उपलब्ध होईल!');
+                } else {
+                  Alert.alert(
+                    t('common.info', { defaultValue: 'Info' }), 
+                    'जाहिरात सुविधा लवकरच उपलब्ध होईल!', 
+                    [{ text: 'OK' }]
+                  );
+                }
               } else {
                 navigation.navigate('AddAnimal');
               }

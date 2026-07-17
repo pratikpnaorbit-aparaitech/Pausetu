@@ -16,7 +16,6 @@ import {
   Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import { AppContext } from '../context/AppContext';
 import { api } from '../api/api';
 import { useTranslation } from 'react-i18next';
@@ -28,12 +27,8 @@ export default function AuthScreen({ navigation }) {
   const { t, i18n } = useTranslation();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
-  const [isFocused, setIsFocused] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
-
+  const [isEmailFocused, setIsEmailFocused] = useState(false);
   // Animation values
-  const bgScale = useRef(new Animated.Value(1.12)).current;
-  const bgOpacity = useRef(new Animated.Value(0)).current;
   
   const logoScale = useRef(new Animated.Value(0.8)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
@@ -88,22 +83,6 @@ export default function AuthScreen({ navigation }) {
       ]),
     ]).start();
   }, []);
-
-  const handleImageLoad = () => {
-    setImageLoaded(true);
-    Animated.parallel([
-      Animated.timing(bgScale, {
-        toValue: 1.0,
-        duration: 3000,
-        useNativeDriver: true,
-      }),
-      Animated.timing(bgOpacity, {
-        toValue: 1.0,
-        duration: 500,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  };
 
   const isValidEmail = (val) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -166,26 +145,10 @@ export default function AuthScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#0F172A" />
+      <StatusBar barStyle="dark-content" backgroundColor="#F4FBF7" />
       
-      {/* Background Image Sibling - sharp & unblurred */}
-      <Animated.Image
-        source={require('../../assets/farmer-bg.webp')}
-        style={[
-          styles.background,
-          {
-            opacity: bgOpacity,
-            transform: [{ scale: bgScale }],
-          },
-        ]}
-        onLoad={handleImageLoad}
-        resizeMode="cover"
-      />
-
-      {/* Premium Soft White Gradient Overlay */}
       <LinearGradient
-        colors={['transparent', 'rgba(255, 255, 255, 0.12)', 'rgba(255, 255, 255, 0.30)']}
-        locations={[0, 0.5, 1.0]}
+        colors={['#F4FBF7', '#FFFFFF']}
         style={StyleSheet.absoluteFillObject}
       />
 
@@ -198,7 +161,7 @@ export default function AuthScreen({ navigation }) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Header – Logo & Tagline */}
+          {/* Header – Logo */}
           <View style={styles.header}>
             <Animated.View
               style={[
@@ -209,15 +172,14 @@ export default function AuthScreen({ navigation }) {
                 },
               ]}
             >
-              <View style={styles.logoCircle}>
-                <AppText style={styles.logoText}>PS</AppText>
-              </View>
-              <View style={styles.logoDecoration} />
-            </Animated.View>
-            <Animated.View style={{ opacity: logoOpacity, alignItems: 'center', width: '100%' }}>
-              {renderTitle()}
-              <MaterialCommunityIcons name="leaf" size={24} color="#16A34A" style={styles.leafEmblem} />
-              <AppText style={styles.shortTagline}>{t('auth.subtitle')}</AppText>
+              <Image 
+                source={require('../../assets/logo-icon.png')}
+                style={styles.fullLogo}
+                resizeMode="contain"
+              />
+              <AppText style={styles.brandAppTitle}>पशुसेतू</AppText>
+              <AppText style={styles.brandTitle}>जनावर बाजार</AppText>
+              <AppText style={styles.brandSubtitle}>शेतकऱ्यांसाठी सुरक्षित जनावर खरेदी-विक्री</AppText>
             </Animated.View>
           </View>
 
@@ -245,13 +207,13 @@ export default function AuthScreen({ navigation }) {
               <View
                 style={[
                   styles.inputContainer,
-                  isFocused && styles.inputContainerFocused,
+                  isEmailFocused && styles.inputContainerFocused,
                 ]}
               >
                 <MaterialCommunityIcons
                   name="email-outline"
                   size={20}
-                  color={isFocused ? '#16A34A' : '#94A3B8'}
+                  color={isEmailFocused ? '#16A34A' : '#94A3B8'}
                   style={styles.inputIcon}
                 />
                 <TextInput
@@ -263,8 +225,8 @@ export default function AuthScreen({ navigation }) {
                   autoCorrect={false}
                   value={email}
                   onChangeText={setEmail}
-                  onFocus={() => setIsFocused(true)}
-                  onBlur={() => setIsFocused(false)}
+                  onFocus={() => setIsEmailFocused(true)}
+                  onBlur={() => setIsEmailFocused(false)}
                 />
               </View>
 
@@ -346,7 +308,7 @@ export default function AuthScreen({ navigation }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F4F8F5',
+    backgroundColor: '#F4FBF7',
   },
   background: {
     ...StyleSheet.absoluteFillObject,
@@ -363,83 +325,46 @@ const styles = StyleSheet.create({
     paddingVertical: Platform.OS === 'ios' ? 20 : 15,
   },
 
-  /* Header Section */
   header: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginTop: 40,
+    marginBottom: 28,
   },
   logoWrapper: {
-    position: 'relative',
-    marginBottom: 10,
-  },
-  logoCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#16A34A',
-    shadowColor: '#16A34A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
   },
-  logoDecoration: {
-    position: 'absolute',
-    top: 2,
-    right: 2,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#16A34A',
-    borderWidth: 2.5,
-    borderColor: '#FFFFFF',
+  fullLogo: {
+    width: 120,
+    height: 120,
+    marginBottom: 8,
   },
-  logoText: {
-    fontSize: 32,
-    fontWeight: '900',
-    color: '#16A34A',
-    letterSpacing: 1,
-  },
-  titleContainer: {
-    fontSize: 26,
-    textAlign: 'center',
-    lineHeight: 32,
+  brandAppTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#0F172A',
     marginBottom: 4,
   },
-  titleBrand: {
-    fontWeight: '900',
-    color: '#1E293B',
+  brandTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#64748B',
+    marginBottom: 4,
   },
-  titleSuffix: {
-    fontWeight: '900',
-    color: '#16A34A',
-  },
-  leafEmblem: {
-    marginVertical: 4,
-  },
-  shortTagline: {
-    fontSize: 14,
-    color: '#334155',
+  brandSubtitle: {
+    fontSize: 12,
+    color: '#94A3B8',
+    fontWeight: '400',
     textAlign: 'center',
-    lineHeight: 20,
-    maxWidth: 320,
-    fontWeight: '700',
-    opacity: 0.9,
   },
 
   /* Floating Card Shadow */
   cardShadow: {
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.05,
-    shadowRadius: 20,
-    elevation: 8,
-    marginBottom: 10,
-    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.04,
+    shadowRadius: 24,
+    elevation: 6,
+    marginBottom: 24,
     backgroundColor: 'transparent',
     maxWidth: 440,
     width: '100%',
@@ -447,10 +372,8 @@ const styles = StyleSheet.create({
   },
   loginCard: {
     backgroundColor: '#FFFFFF',
-    borderColor: '#E2E8F0',
-    borderWidth: 1,
-    borderRadius: 20,
-    padding: 20,
+    borderRadius: 24,
+    padding: 24,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -476,28 +399,17 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 48,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
+    height: 56,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    marginBottom: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.02,
-    shadowRadius: 2,
-    elevation: 1,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    marginBottom: 16,
   },
   inputContainerFocused: {
     borderColor: '#16A34A',
-    borderWidth: 2,
     backgroundColor: '#FFFFFF',
-    shadowColor: '#16A34A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
   inputIcon: {
     marginRight: 8,
@@ -512,17 +424,17 @@ const styles = StyleSheet.create({
 
   /* Continue Button */
   sendButtonTouch: {
-    borderRadius: 12,
+    borderRadius: 16,
     shadowColor: '#16A34A',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
     elevation: 3,
-    marginBottom: 14,
+    marginBottom: 16,
   },
   sendButtonGradient: {
-    height: 48,
-    borderRadius: 12,
+    height: 56,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
     width: '100%',
@@ -571,9 +483,9 @@ const styles = StyleSheet.create({
   /* Guest Button */
   guestButton: {
     flexDirection: 'row',
-    height: 52,
-    borderRadius: 12,
-    borderWidth: 1.5,
+    height: 56,
+    borderRadius: 16,
+    borderWidth: 1,
     borderColor: '#16A34A',
     backgroundColor: '#FFFFFF',
     justifyContent: 'flex-start',
@@ -607,10 +519,8 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   footerText: {
-    fontSize: 11,
-    color: '#64748B',
-    fontWeight: '600',
-    opacity: 0.6,
+    fontSize: 12,
+    color: '#94A3B8',
     textAlign: 'center',
   },
 });

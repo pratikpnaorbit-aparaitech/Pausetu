@@ -2,7 +2,7 @@
 // Header component for the premium livestock marketplace with location tracking and premium indicators.
 
 import React, { useState } from 'react';
-import { StyleSheet, View, TouchableOpacity, Platform } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, Platform, Image } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import AppText from '../AppText';
@@ -17,7 +17,7 @@ export default function BuyerHeader({ name, onNavigateToSell, onNavigateToNotifi
         {/* Brand/Logo Group */}
         <View style={styles.brandGroup}>
           <View style={styles.logoCircle}>
-            <MaterialCommunityIcons name="cow" size={22} color="#FFFFFF" />
+            <Image source={require('../../../assets/logo-icon.png')} style={styles.logoIconImage} resizeMode="contain" />
           </View>
           <View style={styles.brandTextContainer}>
             <AppText style={styles.brandTitle}>{t('app.name')}</AppText>
@@ -114,18 +114,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logoCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#16A34A',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 10,
+    marginRight: 12,
+    overflow: 'visible',
     shadowColor: '#16A34A',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  logoIconImage: {
+    width: 58,
+    height: 58,
+    overflow: 'visible',
   },
   brandTextContainer: {
     justifyContent: 'center',
