@@ -49,8 +49,19 @@ exports.submitVerification = asyncHandler(async (req, res, next) => {
     return next(new AppError('User not found', 404));
   }
 
-  if (!user.isProfileCompleted) {
-    return next(new AppError('Please complete your profile before submitting verification', 400));
+  // ── Profile field validation ──────────────────────────────────────────────
+  // Only require the fields the app actually collects (fullName + mobile).
+  // village/taluka/district/state are optional address fields not shown in UI.
+  const missingFields = [];
+  if (!user.fullName || !user.fullName.trim()) missingFields.push('fullName');
+  if (!user.mobile  || !user.mobile.trim())   missingFields.push('mobile');
+
+  if (missingFields.length > 0) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Please complete your profile before submitting verification',
+      missingFields
+    });
   }
 
   const settings = await getSettingsHelper();
@@ -104,13 +115,6 @@ exports.submitVerification = asyncHandler(async (req, res, next) => {
       'info'
     );
 
-    if (farmerName || dairyName) {
-      await notifyAdmins(
-        'नवीन ओसीआर सबमिशन / New OCR Submission',
-        `वापरकर्ता ${user.fullName || user.name} साठी ओसीआर तपशील काढले गेले आहेत. / OCR details extracted for user ${user.fullName || user.name}.`,
-        'info'
-      );
-    }
   }
 
   res.status(200).json({
@@ -123,7 +127,10 @@ exports.submitVerification = asyncHandler(async (req, res, next) => {
 });
 
 /**
- * Extract receipt details after upload (OCR simulation)
+ * Confirm receipt URL after upload.
+ * OCR extraction has been removed. The admin will review the uploaded image manually.
+ * Endpoint: POST /api/verification/extract
+ * Body: { receiptUrl: "/uploads/filename.jpg" }
  */
 exports.extractReceiptDetails = asyncHandler(async (req, res, next) => {
   const { receiptUrl } = req.body;
@@ -132,53 +139,10 @@ exports.extractReceiptDetails = asyncHandler(async (req, res, next) => {
     return next(new AppError('Please provide a receipt URL', 400));
   }
 
-  const filename = receiptUrl.split('/').pop().toLowerCase();
-  
-  let farmerName = '';
-  let dairyName = '';
-  let receiptDate = '';
-  let confidence = 'low';
-
-  // Heuristic patterns for OCR simulation
-  if (filename.includes('ramdas') || filename.includes('farmer')) {
-    farmerName = 'Ramdas Patil';
-    confidence = 'high';
-  } else if (filename.includes('john')) {
-    farmerName = 'John Doe';
-    confidence = 'high';
-  }
-
-  if (filename.includes('gokul') || filename.includes('dairy')) {
-    dairyName = 'Gokul Milk Dairy';
-    confidence = 'high';
-  } else if (filename.includes('mahindra')) {
-    dairyName = 'Mahindra Dairy';
-    confidence = 'high';
-  }
-
-  const dateMatch = filename.match(/(\d{4})-(\d{2})-(\d{2})/);
-  if (dateMatch) {
-    receiptDate = dateMatch[0];
-    confidence = 'high';
-  } else {
-    const today = new Date();
-    receiptDate = today.toISOString().split('T')[0];
-  }
-
-  if (confidence === 'low') {
-    farmerName = '';
-    dairyName = '';
-    const today = new Date();
-    receiptDate = today.toISOString().split('T')[0];
-  }
-
   res.status(200).json({
     status: 'success',
     data: {
-      farmerName,
-      dairyName,
-      receiptDate,
-      confidence
+      receiptUrl
     }
   });
 });

@@ -1,4 +1,4 @@
-import React, { useState, useContext, useRef } from 'react';
+import React, { useState, useContext } from 'react';
 import {
   StyleSheet,
   View,
@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
   Platform,
   Image,
-  TextInput,
+  Modal,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -21,198 +21,288 @@ import { animalApi } from '../api/animalApi';
 import { verificationApi } from '../api/verificationApi';
 import AppText from '../components/AppText';
 
+// ─── Date Picker Helper ───────────────────────────────────────────────────────
+
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+
+function pad(n) {
+  return String(n).padStart(2, '0');
+}
+
+/** Format a Date object to YYYY-MM-DD */
+function formatDate(date) {
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/** Build the days array for a given month/year */
+function getDaysInMonth(year, month) {
+  return new Date(year, month + 1, 0).getDate();
+}
+
+// ─── Inline Date Picker Modal ─────────────────────────────────────────────────
+
+function DatePickerModal({ visible, onClose, onConfirm, initialDate }) {
+  const today = new Date();
+  const init   = initialDate ? new Date(initialDate) : today;
+
+  const [year,  setYear]  = useState(init.getFullYear());
+  const [month, setMonth] = useState(init.getMonth());
+  const [day,   setDay]   = useState(init.getDate());
+
+  const daysInMonth = getDaysInMonth(year, month);
+  // Clamp day if switching to a shorter month
+  const safeDay = Math.min(day, daysInMonth);
+
+  const years = [];
+  for (let y = today.getFullYear(); y >= 2000; y--) years.push(y);
+
+  const days = [];
+  for (let d = 1; d <= daysInMonth; d++) days.push(d);
+
+  const isFuture = new Date(year, month, safeDay) > today;
+
+  const handleConfirm = () => {
+    if (isFuture) {
+      Alert.alert('Invalid Date', 'Receipt date cannot be in the future.');
+      return;
+    }
+    onConfirm(formatDate(new Date(year, month, safeDay)));
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={dp.overlay}>
+        <View style={dp.sheet}>
+          <AppText style={dp.title}>Select Receipt Date</AppText>
+
+          {/* Scrollable columns */}
+          <View style={dp.columns}>
+            {/* Day */}
+            <View style={dp.col}>
+              <AppText style={dp.colLabel}>Day</AppText>
+              <ScrollView style={dp.scroll} showsVerticalScrollIndicator={false}>
+                {days.map(d => (
+                  <TouchableOpacity
+                    key={d}
+                    style={[dp.item, safeDay === d && dp.itemSelected]}
+                    onPress={() => setDay(d)}
+                  >
+                    <AppText style={[dp.itemText, safeDay === d && dp.itemTextSelected]}>
+                      {pad(d)}
+                    </AppText>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            {/* Month */}
+            <View style={[dp.col, { flex: 2 }]}>
+              <AppText style={dp.colLabel}>Month</AppText>
+              <ScrollView style={dp.scroll} showsVerticalScrollIndicator={false}>
+                {MONTHS.map((m, i) => (
+                  <TouchableOpacity
+                    key={m}
+                    style={[dp.item, month === i && dp.itemSelected]}
+                    onPress={() => setMonth(i)}
+                  >
+                    <AppText style={[dp.itemText, month === i && dp.itemTextSelected]}>
+                      {m}
+                    </AppText>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            {/* Year */}
+            <View style={dp.col}>
+              <AppText style={dp.colLabel}>Year</AppText>
+              <ScrollView style={dp.scroll} showsVerticalScrollIndicator={false}>
+                {years.map(y => (
+                  <TouchableOpacity
+                    key={y}
+                    style={[dp.item, year === y && dp.itemSelected]}
+                    onPress={() => setYear(y)}
+                  >
+                    <AppText style={[dp.itemText, year === y && dp.itemTextSelected]}>
+                      {y}
+                    </AppText>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+
+          {isFuture && (
+            <AppText style={dp.futureWarning}>
+              ⚠ Future dates are not allowed
+            </AppText>
+          )}
+
+          {/* Actions */}
+          <View style={dp.actions}>
+            <TouchableOpacity style={dp.cancelBtn} onPress={onClose}>
+              <AppText style={dp.cancelText}>Cancel</AppText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[dp.confirmBtn, isFuture && dp.confirmBtnDisabled]}
+              onPress={handleConfirm}
+              disabled={isFuture}
+            >
+              <AppText style={dp.confirmText}>Confirm</AppText>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
+
 export default function VerificationScreen({ navigation }) {
   const { t } = useTranslation();
   const { refreshProfileData } = useContext(AppContext);
 
-  const [loading, setLoading] = useState(false);
-  const [statusText, setStatusText] = useState('');
-  const [selectedFile, setSelectedFile] = useState(null); // { uri, name, type, size }
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [isSubmittedSuccess, setIsSubmittedSuccess] = useState(false);
+  const [loading,             setLoading]             = useState(false);
+  const [statusText,          setStatusText]          = useState('');
+  const [selectedFile,        setSelectedFile]        = useState(null);
+  const [uploadProgress,      setUploadProgress]      = useState(0);
+  const [isSubmittedSuccess,  setIsSubmittedSuccess]  = useState(false);
 
-  const [farmerName, setFarmerName] = useState('');
-  const [dairyName, setDairyName] = useState('');
-  const [receiptDate, setReceiptDate] = useState('');
-  const [confidence, setConfidence] = useState(null);
-  const [showOcrForm, setShowOcrForm] = useState(false);
-  const [uploadedReceiptUrl, setUploadedReceiptUrl] = useState('');
+  const [receiptDate,         setReceiptDate]         = useState('');
+  const [showDatePicker,      setShowDatePicker]      = useState(false);
+  const [showForm,            setShowForm]            = useState(false);
+  const [uploadedReceiptUrl,  setUploadedReceiptUrl]  = useState('');
 
-  const farmerNameRef = useRef('');
-  const dairyNameRef = useRef('');
-  const receiptDateRef = useRef('');
-
-
-
-  // Auto compress helper
+  // ── Image compression ───────────────────────────────────────────────────────
   const compressImage = async (uri) => {
     setStatusText(t('verification.optimizing'));
     try {
       const result = await ImageManipulator.manipulateAsync(
         uri,
-        [{ resize: { width: 1200 } }], // maintains aspect ratio automatically
+        [{ resize: { width: 1200 } }],
         { compress: 0.75, format: ImageManipulator.SaveFormat.JPEG }
       );
       return result.uri;
     } catch (err) {
       console.warn('[Image Compression Error]', err);
-      return uri; // fallback to original if compression fails
+      return uri;
     }
   };
 
+  // ── Camera ──────────────────────────────────────────────────────────────────
   const handleCameraLaunch = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert(t('common.permissionDenied'), t('verification.cameraPermission', { defaultValue: 'Camera permissions are required.' }));
+      Alert.alert(
+        t('common.permissionDenied'),
+        t('verification.cameraPermission', { defaultValue: 'Camera permissions are required.' })
+      );
       return;
     }
-
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       quality: 1,
     });
-
     if (!result.canceled && result.assets && result.assets.length > 0) {
       const asset = result.assets[0];
-      setSelectedFile({
-        uri: asset.uri,
-        name: 'receipt.jpg',
-        type: 'image/jpeg',
-        size: asset.fileSize || 0,
-        isImage: true
-      });
+      setSelectedFile({ uri: asset.uri, name: 'receipt.jpg', type: 'image/jpeg', size: asset.fileSize || 0, isImage: true });
     }
   };
 
+  // ── Gallery ─────────────────────────────────────────────────────────────────
   const handleGalleryLaunch = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert(t('common.permissionDenied'), t('verification.galleryPermission', { defaultValue: 'Gallery permissions are required.' }));
+      Alert.alert(
+        t('common.permissionDenied'),
+        t('verification.galleryPermission', { defaultValue: 'Gallery permissions are required.' })
+      );
       return;
     }
-
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       quality: 1,
     });
-
     if (!result.canceled && result.assets && result.assets.length > 0) {
       const asset = result.assets[0];
-      setSelectedFile({
-        uri: asset.uri,
-        name: asset.fileName || 'receipt.jpg',
-        type: 'image/jpeg',
-        size: asset.fileSize || 0,
-        isImage: true
-      });
+      setSelectedFile({ uri: asset.uri, name: asset.fileName || 'receipt.jpg', type: 'image/jpeg', size: asset.fileSize || 0, isImage: true });
     }
   };
 
+  // ── PDF ─────────────────────────────────────────────────────────────────────
   const handlePdfLaunch = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: 'application/pdf',
         copyToCacheDirectory: true,
       });
-
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
         if (asset.size && asset.size > 5 * 1024 * 1024) {
           Alert.alert(t('common.error'), t('verification.sizeLimitError'));
           return;
         }
-        setSelectedFile({
-          uri: asset.uri,
-          name: asset.name || 'receipt.pdf',
-          type: asset.mimeType || 'application/pdf',
-          size: asset.size || 0,
-          isImage: false
-        });
+        setSelectedFile({ uri: asset.uri, name: asset.name || 'receipt.pdf', type: asset.mimeType || 'application/pdf', size: asset.size || 0, isImage: false });
       }
     } catch (err) {
       console.warn('[PDF Selection Error]', err);
     }
   };
 
+  // ── Step 1: Upload receipt image ────────────────────────────────────────────
   const handleSubmit = async () => {
     if (!selectedFile) {
       console.warn('[VerificationScreen] No file selected.');
       return;
     }
 
-    console.log('[VerificationScreen] Document upload initiated. Selected file details:', selectedFile);
+    console.log('[VerificationScreen] Upload initiated. File:', selectedFile.name);
     setLoading(true);
     setUploadProgress(0);
+
     try {
       let finalUri = selectedFile.uri;
 
-      // 1. Silent Image Compression
       if (selectedFile.isImage) {
-        console.log('[VerificationScreen] Compressing receipt image silently...');
+        console.log('[VerificationScreen] Compressing image...');
         finalUri = await compressImage(selectedFile.uri);
-        console.log('[VerificationScreen] Compression complete. Final URI:', finalUri);
       }
 
-      // 2. Build FormData Payload
       setStatusText(t('verification.uploading'));
       const formData = new FormData();
+
       if (Platform.OS === 'web') {
         const resBlob = await fetch(finalUri);
-        const blob = await resBlob.blob();
+        const blob    = await resBlob.blob();
         formData.append('file', blob, selectedFile.name);
       } else {
         formData.append('file', {
-          uri: Platform.OS === 'android' ? finalUri : finalUri.replace('file://', ''),
+          uri:  Platform.OS === 'android' ? finalUri : finalUri.replace('file://', ''),
           name: selectedFile.isImage ? 'receipt.jpg' : selectedFile.name,
           type: selectedFile.isImage ? 'image/jpeg' : selectedFile.type,
         });
       }
 
-      // 3. Upload File via animalApi.uploadFile
-      console.log('[VerificationScreen] Dispatching file upload request...');
       const uploadRes = await animalApi.uploadFile(formData, (percent) => {
         setUploadProgress(percent);
       });
-      console.log('[VerificationScreen] File upload response:', uploadRes);
+      console.log('[VerificationScreen] Upload response:', uploadRes);
 
       if (uploadRes && uploadRes.data && uploadRes.data.fileUrl) {
-        const receiptUrl = uploadRes.data.fileUrl;
-        setUploadedReceiptUrl(receiptUrl);
-
-        // Call OCR analysis
-        console.log('[VerificationScreen] Dispatching OCR analysis request...');
-        setStatusText(t('verification.analyzingReceipt', { defaultValue: 'Analyzing receipt...' }));
-        const ocrRes = await verificationApi.extractReceiptDetails(receiptUrl);
-        console.log('[VerificationScreen] OCR response:', ocrRes);
-
-        if (ocrRes && ocrRes.status === 'success' && ocrRes.data) {
-          const { farmerName: fName, dairyName: dName, receiptDate: rDate, confidence: conf } = ocrRes.data;
-          setFarmerName(fName || '');
-          farmerNameRef.current = fName || '';
-          setDairyName(dName || '');
-          dairyNameRef.current = dName || '';
-          setReceiptDate(rDate || '');
-          receiptDateRef.current = rDate || '';
-          setConfidence(conf || 'low');
-        } else {
-          console.warn('[VerificationScreen] OCR response failed or was low confidence');
-          setFarmerName('');
-          farmerNameRef.current = '';
-          setDairyName('');
-          dairyNameRef.current = '';
-          setReceiptDate('');
-          receiptDateRef.current = '';
-          setConfidence('low');
-        }
-
-        setShowOcrForm(true);
+        setUploadedReceiptUrl(uploadRes.data.fileUrl);
+        setReceiptDate('');
+        setShowForm(true);
       } else {
         throw new Error('Upload response did not return a valid file URL.');
       }
     } catch (err) {
-      console.error('[VerificationScreen] Submit/OCR processing failed:', err);
+      console.error('[VerificationScreen] Upload failed:', err);
       Alert.alert(t('common.error'), err.message || t('verification.errorMsg'));
     } finally {
       setLoading(false);
@@ -220,82 +310,49 @@ export default function VerificationScreen({ navigation }) {
     }
   };
 
+  // ── Step 2: Submit verification with date ───────────────────────────────────
   const handleFinalSubmit = async () => {
     console.log('[VerificationScreen] handleFinalSubmit triggered');
 
-    const currentFarmerName = farmerNameRef.current;
-    const currentDairyName = dairyNameRef.current;
-    const currentReceiptDate = receiptDateRef.current;
+    if (loading) return;
 
-    console.log('[VerificationScreen] State and Refs before validation:', {
-      state: {
-        farmerName,
-        dairyName,
-        receiptDate,
-        uploadedReceiptUrl
-      },
-      refs: {
-        farmerName: currentFarmerName,
-        dairyName: currentDairyName,
-        receiptDate: currentReceiptDate
-      }
-    });
-
-    // Prevent multiple button clicks
-    if (loading) {
-      console.log('[VerificationScreen] Submission already in progress, ignoring click.');
+    // Validate receipt date
+    if (!receiptDate || !receiptDate.trim()) {
+      Alert.alert(
+        t('common.error'),
+        t('verification.receiptDateRequired', { defaultValue: 'Please select a receipt date.' })
+      );
       return;
     }
 
-    // 1. Validation check
-    console.log('[VerificationScreen] Performing client-side validation...');
-    if (!currentFarmerName || !currentFarmerName.trim()) {
-      console.warn('[VerificationScreen] Validation failed: farmerName is empty');
-      Alert.alert(t('common.error'), t('verification.farmerNameRequired', { defaultValue: 'Farmer name is required.' }));
-      return;
-    }
-    if (!currentDairyName || !currentDairyName.trim()) {
-      console.warn('[VerificationScreen] Validation failed: dairyName is empty');
-      Alert.alert(t('common.error'), t('verification.dairyNameRequired', { defaultValue: 'Dairy name is required.' }));
-      return;
-    }
-    if (!currentReceiptDate || !currentReceiptDate.trim()) {
-      console.warn('[VerificationScreen] Validation failed: receiptDate is empty');
-      Alert.alert(t('common.error'), t('verification.receiptDateRequired', { defaultValue: 'Receipt date is required.' }));
+    // Guard against future date (double-check server-side semantics)
+    const selected = new Date(receiptDate);
+    if (isNaN(selected.getTime()) || selected > new Date()) {
+      Alert.alert(
+        t('common.error'),
+        t('verification.invalidDate', { defaultValue: 'Receipt date cannot be in the future.' })
+      );
       return;
     }
 
-    console.log('[VerificationScreen] Validations passed. Required fields:', {
-      uploadedReceiptUrl,
-      farmerName: currentFarmerName.trim(),
-      dairyName: currentDairyName.trim(),
-      receiptDate: currentReceiptDate.trim()
-    });
-
+    console.log('[VerificationScreen] Submitting:', { receiptUrl: uploadedReceiptUrl, receiptDate });
     setLoading(true);
     setStatusText(t('verification.submitting', { defaultValue: 'Submitting verification...' }));
 
     try {
-      console.log('[VerificationScreen] Dispatching submitVerification API request...');
       const response = await verificationApi.submitVerification({
-        receiptUrl: uploadedReceiptUrl,
-        farmerName: currentFarmerName.trim(),
-        dairyName: currentDairyName.trim(),
-        receiptDate: currentReceiptDate.trim()
+        receiptUrl:  uploadedReceiptUrl,
+        receiptDate: receiptDate.trim(),
+        // farmerName and dairyName are intentionally omitted — backend treats them as optional
       });
-      console.log('[VerificationScreen] API response received successfully:', response);
+      console.log('[VerificationScreen] Submission successful:', response);
 
-      console.log('[VerificationScreen] Triggering profile data refresh...');
       if (refreshProfileData) {
-        await refreshProfileData(true); // silent refresh
-        console.log('[VerificationScreen] Profile data refreshed successfully');
+        await refreshProfileData(true);
       }
-
-      console.log('[VerificationScreen] Setting isSubmittedSuccess state to true...');
       setIsSubmittedSuccess(true);
     } catch (err) {
-      console.error('[VerificationScreen] Final submission failed with error:', err);
-      // Display proper user-facing error message
+      console.error('[VerificationScreen] Submission failed:', err);
       Alert.alert(
         t('common.error'),
         err.message || t('verification.errorMsg', { defaultValue: 'Submission failed. Please try again.' })
@@ -306,6 +363,7 @@ export default function VerificationScreen({ navigation }) {
     }
   };
 
+  // ── Success screen ──────────────────────────────────────────────────────────
   if (isSubmittedSuccess) {
     return (
       <SafeAreaView style={styles.successContainer}>
@@ -329,7 +387,6 @@ export default function VerificationScreen({ navigation }) {
           {/* Checklist */}
           <View style={styles.checklistCard}>
             <AppText style={styles.checklistTitle}>{t('verification.untilApproval')}</AppText>
-            
             <View style={styles.checkItem}>
               <Ionicons name="checkmark-circle-outline" size={18} color="#16A34A" style={{ marginRight: 8 }} />
               <AppText style={styles.checkTextAllowed}>{t('verification.allowBrowse')}</AppText>
@@ -360,16 +417,12 @@ export default function VerificationScreen({ navigation }) {
             </View>
           </View>
 
-          {/* Actions */}
-          <TouchableOpacity 
-            style={styles.primaryActionBtn} 
-            onPress={() => navigation.goBack()}
-          >
+          <TouchableOpacity style={styles.primaryActionBtn} onPress={() => navigation.goBack()}>
             <AppText style={styles.primaryActionBtnText}>{t('verification.btnViewStatus')}</AppText>
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={styles.secondaryActionBtn} 
+          <TouchableOpacity
+            style={styles.secondaryActionBtn}
             onPress={() => navigation.navigate('MainApp', { screen: 'Buy' })}
           >
             <AppText style={styles.secondaryActionBtnText}>{t('verification.btnGoToHome')}</AppText>
@@ -379,16 +432,20 @@ export default function VerificationScreen({ navigation }) {
     );
   }
 
+  // ── Main screen ─────────────────────────────────────────────────────────────
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => {
-          if (showOcrForm) {
-            setShowOcrForm(false);
-          } else {
-            navigation.goBack();
-          }
-        }}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => {
+            if (showForm) {
+              setShowForm(false);
+            } else {
+              navigation.goBack();
+            }
+          }}
+        >
           <Ionicons name="arrow-back" size={24} color="#1E293B" />
         </TouchableOpacity>
         <AppText style={styles.headerTitle}>{t('verification.title')}</AppText>
@@ -396,11 +453,15 @@ export default function VerificationScreen({ navigation }) {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {showOcrForm ? (
+
+        {/* ── STEP 2: Date + Submit form ──────────────────────────────────── */}
+        {showForm ? (
           <View style={styles.formContainer}>
-            <AppText style={styles.formSectionTitle}>{t('verification.chooseDocument', { defaultValue: 'Review OCR Details' })}</AppText>
-            
-            {/* Selection Box / Preview */}
+            <AppText style={styles.formSectionTitle}>
+              {t('verification.enterReceiptDetails', { defaultValue: 'Enter Receipt Details' })}
+            </AppText>
+
+            {/* Compact image / PDF preview */}
             {selectedFile && (
               <View style={[styles.previewContainer, { height: 160 }]}>
                 {selectedFile.isImage ? (
@@ -414,55 +475,30 @@ export default function VerificationScreen({ navigation }) {
               </View>
             )}
 
-            {confidence === 'low' && (
-              <View style={styles.warningCard}>
-                <MaterialCommunityIcons name="alert-outline" size={20} color="#D97706" style={{ marginRight: 8 }} />
-                <AppText style={styles.warningText}>{t('verification.ocrLowConfidence')}</AppText>
-              </View>
-            )}
-
+            {/* Receipt Date — tap to open picker */}
             <View style={styles.inputGroup}>
-              <AppText style={styles.inputLabel}>{t('verification.farmerName')}</AppText>
-              <TextInput
-                style={styles.textInput}
-                value={farmerName}
-                onChangeText={(text) => {
-                  console.log('farmerName changed:', text);
-                  setFarmerName(text);
-                  farmerNameRef.current = text;
-                }}
-                placeholder={t('verification.farmerName')}
-              />
+              <AppText style={styles.inputLabel}>
+                {t('verification.receiptDate', { defaultValue: 'Receipt Date' })}
+              </AppText>
+              <TouchableOpacity
+                style={styles.datePickerBtn}
+                onPress={() => setShowDatePicker(true)}
+                activeOpacity={0.75}
+              >
+                <MaterialCommunityIcons
+                  name="calendar-month-outline"
+                  size={20}
+                  color={receiptDate ? '#16A34A' : '#94A3B8'}
+                  style={{ marginRight: 10 }}
+                />
+                <AppText style={receiptDate ? styles.datePickerValueText : styles.datePickerPlaceholderText}>
+                  {receiptDate || t('verification.selectDate', { defaultValue: 'Tap to select date' })}
+                </AppText>
+                <Ionicons name="chevron-down" size={18} color="#94A3B8" style={{ marginLeft: 'auto' }} />
+              </TouchableOpacity>
             </View>
 
-            <View style={styles.inputGroup}>
-              <AppText style={styles.inputLabel}>{t('verification.dairyName')}</AppText>
-              <TextInput
-                style={styles.textInput}
-                value={dairyName}
-                onChangeText={(text) => {
-                  console.log('dairyName changed:', text);
-                  setDairyName(text);
-                  dairyNameRef.current = text;
-                }}
-                placeholder={t('verification.dairyName')}
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <AppText style={styles.inputLabel}>{t('verification.receiptDate')}</AppText>
-              <TextInput
-                style={styles.textInput}
-                value={receiptDate}
-                onChangeText={(text) => {
-                  console.log('receiptDate changed:', text);
-                  setReceiptDate(text);
-                  receiptDateRef.current = text;
-                }}
-                placeholder="YYYY-MM-DD"
-              />
-            </View>
-
+            {/* Actions */}
             {loading ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#16A34A" />
@@ -474,12 +510,13 @@ export default function VerificationScreen({ navigation }) {
                   <AppText style={styles.submitButtonText}>{t('common.confirm')}</AppText>
                 </TouchableOpacity>
 
-                <TouchableOpacity 
-                  style={[styles.secondaryActionBtn, { marginTop: 10, marginBottom: 20 }]} 
+                <TouchableOpacity
+                  style={[styles.secondaryActionBtn, { marginTop: 10, marginBottom: 20 }]}
                   onPress={() => {
-                    setShowOcrForm(false);
+                    setShowForm(false);
                     setSelectedFile(null);
                     setUploadedReceiptUrl('');
+                    setReceiptDate('');
                   }}
                 >
                   <AppText style={styles.secondaryActionBtnText}>{t('common.cancel')}</AppText>
@@ -488,8 +525,10 @@ export default function VerificationScreen({ navigation }) {
             )}
           </View>
         ) : (
+
+        /* ── STEP 1: Upload screen ────────────────────────────────────────── */
           <>
-            {/* Info Card */}
+            {/* Info card */}
             <View style={styles.infoCard}>
               <MaterialCommunityIcons name="information" size={20} color="#15803D" style={styles.infoIcon} />
               <View style={{ flex: 1 }}>
@@ -498,7 +537,7 @@ export default function VerificationScreen({ navigation }) {
               </View>
             </View>
 
-            {/* Selection Box / Preview */}
+            {/* Preview / placeholder */}
             {selectedFile ? (
               <View style={styles.previewContainer}>
                 {selectedFile.isImage ? (
@@ -524,7 +563,7 @@ export default function VerificationScreen({ navigation }) {
               </View>
             )}
 
-            {/* Source Action Buttons */}
+            {/* Source buttons */}
             {!selectedFile && (
               <View style={styles.actionButtonsRow}>
                 <TouchableOpacity style={styles.actionButton} onPress={handleCameraLaunch}>
@@ -544,7 +583,7 @@ export default function VerificationScreen({ navigation }) {
               </View>
             )}
 
-            {/* Loading / Progress Indicator */}
+            {/* Progress indicator */}
             {loading && (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#16A34A" />
@@ -555,7 +594,7 @@ export default function VerificationScreen({ navigation }) {
               </View>
             )}
 
-            {/* Submit Action Button */}
+            {/* Upload button */}
             {selectedFile && !loading && (
               <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
                 <AppText style={styles.submitButtonText}>{t('verification.submitBtn')}</AppText>
@@ -564,9 +603,22 @@ export default function VerificationScreen({ navigation }) {
           </>
         )}
       </ScrollView>
+
+      {/* Date Picker Modal */}
+      <DatePickerModal
+        visible={showDatePicker}
+        initialDate={receiptDate}
+        onClose={() => setShowDatePicker(false)}
+        onConfirm={(date) => {
+          setReceiptDate(date);
+          setShowDatePicker(false);
+        }}
+      />
     </SafeAreaView>
   );
 }
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: {
@@ -744,6 +796,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
   },
+  // Success screen
   successContainer: {
     flex: 1,
     backgroundColor: '#F8FAFC',
@@ -876,6 +929,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
   },
+  // Detail form
   formContainer: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
@@ -891,23 +945,6 @@ const styles = StyleSheet.create({
     color: '#1E293B',
     marginBottom: 14,
   },
-  warningCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FEF3C7',
-    borderColor: '#FDE68A',
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 16,
-  },
-  warningText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#92400E',
-    flex: 1,
-    lineHeight: 18,
-  },
   inputGroup: {
     marginBottom: 14,
   },
@@ -917,15 +954,135 @@ const styles = StyleSheet.create({
     color: '#475569',
     marginBottom: 6,
   },
-  textInput: {
-    height: 48,
-    borderColor: '#CBD5E1',
+  // Date picker trigger button
+  datePickerBtn: {
+    height: 52,
     borderWidth: 1,
+    borderColor: '#CBD5E1',
     borderRadius: 10,
     paddingHorizontal: 14,
-    fontSize: 14,
-    color: '#1E293B',
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#F8FAFC',
+  },
+  datePickerValueText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  datePickerPlaceholderText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#94A3B8',
+  },
+});
+
+// ─── Date Picker Modal Styles ─────────────────────────────────────────────────
+
+const dp = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 20,
+    paddingHorizontal: 16,
+    paddingBottom: 32,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1E293B',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  columns: {
+    flexDirection: 'row',
+    height: 220,
+    gap: 8,
+  },
+  col: {
+    flex: 1,
+  },
+  colLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#94A3B8',
+    textAlign: 'center',
+    marginBottom: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  scroll: {
+    flex: 1,
+    borderRadius: 10,
+    backgroundColor: '#F8FAFC',
+  },
+  item: {
+    paddingVertical: 9,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    borderRadius: 8,
+    marginHorizontal: 4,
+    marginVertical: 2,
+  },
+  itemSelected: {
+    backgroundColor: '#DCFCE7',
+  },
+  itemText: {
+    fontSize: 14,
+    color: '#475569',
+    fontWeight: '500',
+  },
+  itemTextSelected: {
+    color: '#16A34A',
+    fontWeight: '800',
+  },
+  futureWarning: {
+    fontSize: 12,
+    color: '#DC2626',
     fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 10,
+  },
+  actions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 20,
+  },
+  cancelBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  cancelText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  confirmBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#16A34A',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  confirmBtnDisabled: {
+    backgroundColor: '#94A3B8',
+  },
+  confirmText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });

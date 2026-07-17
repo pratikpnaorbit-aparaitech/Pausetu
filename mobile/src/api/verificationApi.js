@@ -8,10 +8,6 @@ export const verificationApi = {
     return instance.post('/verification/submit', payload);
   },
 
-  extractReceiptDetails: async (receiptUrl) => {
-    return instance.post('/verification/extract', { receiptUrl });
-  },
-
   getVerificationStatus: async () => {
     return instance.get('/verification/status');
   },
