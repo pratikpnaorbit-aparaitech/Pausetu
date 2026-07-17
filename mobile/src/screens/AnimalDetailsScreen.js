@@ -642,28 +642,23 @@ export default function AnimalDetailsScreen({ route, navigation }) {
 
               if (slide.type === 'video') {
                 const firstImage = mediaSlides.find(s => s.type === 'image')?.uri;
+                
+                const handlePlay = () => {
+                  if (player) {
+                    player.replace(slide.uri);
+                  }
+                  setIsVideoPlaying(true);
+                };
+                
                 return (
                   <View key={index} style={styles.videoSlide}>
                     <ImageWithLoader
                       uri={slide.thumbnail || firstImage || resolveMediaUrl(null)}
                       style={styles.galleryImage}
                       resizeMode="contain"
+                      onPress={handlePlay}
                     />
-                    <View style={styles.playButtonAbsoluteContainer} pointerEvents="box-none">
-                      <TouchableOpacity 
-                        style={styles.playButtonCircle} 
-                        onPress={() => {
-                          if (player) {
-                            player.replace(slide.uri);
-                          }
-                          setIsVideoPlaying(true);
-                        }} 
-                        activeOpacity={0.7}
-                      >
-                        <Ionicons name="play" size={36} color="#FFFFFF" style={styles.playIconOffset} />
-                      </TouchableOpacity>
-                    </View>
-                    <View style={styles.videoOverlay} pointerEvents="box-none">
+                    <View style={styles.videoOverlay} pointerEvents="none">
                       <AppText style={styles.videoSlideLabel}>{t('animalDetails.watchVideo')}</AppText>
                     </View>
                   </View>
@@ -693,6 +688,24 @@ export default function AnimalDetailsScreen({ route, navigation }) {
                   ]}
                 />
               ))}
+            </View>
+          )}
+
+          {/* Fixed Play Button Overlay over the entire Hero Media Container */}
+          {videoUri && (
+            <View style={styles.heroPlayOverlay} pointerEvents="box-none">
+              <TouchableOpacity 
+                style={styles.playButtonCircle} 
+                activeOpacity={0.85}
+                onPress={() => {
+                  if (player) {
+                    player.replace(videoUri);
+                  }
+                  setIsVideoPlaying(true);
+                }}
+              >
+                <Ionicons name="play" size={36} color="#FFFFFF" style={styles.playIconOffset} />
+              </TouchableOpacity>
             </View>
           )}
         </View>
@@ -1034,7 +1047,7 @@ const styles = StyleSheet.create({
     paddingBottom: 120,
   },
   galleryContainer: {
-    width: width,
+    width: '100%',
     height: GALLERY_HEIGHT,
     position: 'relative',
     backgroundColor: '#F1F5F9',
@@ -1077,6 +1090,16 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     alignItems: 'center',
     paddingBottom: 24,
+  },
+  heroPlayOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 100,
   },
   playButtonAbsoluteContainer: {
     ...StyleSheet.absoluteFillObject,
