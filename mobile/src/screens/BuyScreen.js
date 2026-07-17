@@ -11,6 +11,7 @@ import AppText from '../components/AppText';
 import SectionHeader from '../components/SectionHeader';
 import ListingCard from '../components/ListingCard';
 import LocationPicker from '../components/LocationPicker';
+import FilterBottomSheet from '../components/FilterBottomSheet';
 
 const CATEGORIES = [
   { id: 'all', nameKey: 'buy.all', image: require('../../assets/icons/all.png') },
@@ -185,6 +186,57 @@ const CategoryCardItem = React.memo(({ item, isSelected, onPress, t }) => {
   );
 });
 
+const FilterCardEntry = React.memo(({ onFilterPress }) => {
+  const scaleValue = React.useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    Animated.spring(scaleValue, {
+      toValue: 0.98,
+      useNativeDriver: true,
+      tension: 120,
+      friction: 7,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleValue, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 120,
+      friction: 7,
+    }).start();
+  };
+
+  return (
+    <TouchableOpacity
+      onPress={onFilterPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      activeOpacity={0.9}
+      style={styles.farmerFilterCardContainer}
+    >
+      <Animated.View style={[styles.farmerFilterCard, { transform: [{ scale: scaleValue }] }]}>
+        <LinearGradient
+          colors={['#FFFFFF', '#F5FCF3']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.farmerFilterGradient}
+        >
+          <View style={styles.farmerFilterContent}>
+            <AppText style={styles.farmerFilterTitle}>तुम्हाला काय पाहिजे?</AppText>
+            <AppText style={styles.farmerFilterSubtitle}>योग्य जनावरे शोधा</AppText>
+          </View>
+
+          {/* Circular Green Action Button */}
+          <View style={styles.farmerFilterActionBtn}>
+            <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+          </View>
+        </LinearGradient>
+      </Animated.View>
+    </TouchableOpacity>
+  );
+});
+
 const ListHeader = React.memo(({ 
   selectedCategory, 
   setSelectedCategory, 
@@ -193,7 +245,8 @@ const ListHeader = React.memo(({
   userProfile, 
   onChangeLocation,
   searchText,
-  setSearchText
+  setSearchText,
+  onFilterPress
 }) => {
   const { t } = useTranslation();
   const flatListRef = React.useRef(null);
@@ -287,7 +340,7 @@ const ListHeader = React.memo(({
         </TouchableOpacity>
       </View>
 
-      {/* Search & Filter Bar */}
+      {/* Search Bar (Full Width) */}
       <View style={styles.searchSection}>
         <View style={styles.searchBarContainer}>
           <Ionicons name="search" size={18} color="#64748B" style={styles.searchIcon} />
@@ -300,10 +353,10 @@ const ListHeader = React.memo(({
             onChangeText={setSearchText}
           />
         </View>
-        <TouchableOpacity style={styles.filterButton}>
-          <MaterialCommunityIcons name="tune-variant" size={20} color="#0F172A" />
-        </TouchableOpacity>
       </View>
+
+      {/* Farmer-Friendly Filter Card */}
+      <FilterCardEntry onFilterPress={onFilterPress} />
 
       {/* Browse Categories Section */}
       <View style={styles.categoriesSection}>
@@ -405,6 +458,7 @@ export default function BuyScreen({ navigation }) {
   const [searchText, setSearchText] = useState('');
   const [animalsList, setAnimalsList] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isFilterVisible, setIsFilterVisible] = useState(false);
 
   const getFilteredAnimals = () => {
     let list = animalsList;
@@ -564,6 +618,7 @@ export default function BuyScreen({ navigation }) {
                   onChangeLocation={handleLocationChange}
                   searchText={searchText}
                   setSearchText={setSearchText}
+                  onFilterPress={() => setIsFilterVisible(true)}
                 />
               }
               ListFooterComponent={
@@ -612,6 +667,13 @@ export default function BuyScreen({ navigation }) {
         visible={isLocationPickerVisible}
         onClose={() => setIsLocationPickerVisible(false)}
         onSelectLocation={handleSelectLocation}
+      />
+      <FilterBottomSheet
+        visible={isFilterVisible}
+        onClose={() => setIsFilterVisible(false)}
+        onApply={(filters) => {
+          console.log('[BuyScreen] Filters applied (UI only):', filters);
+        }}
       />
     </View>
   );
@@ -824,20 +886,78 @@ const styles = StyleSheet.create({
     fontSize: 14,
     height: '100%',
   },
-  filterButton: {
-    width: 48,
-    height: 48,
+  farmerFilterCardContainer: {
+    marginHorizontal: 16,
+    marginTop: 12,
+  },
+  farmerFilterCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 24,
+    overflow: 'hidden',
+    shadowColor: '#16A34A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.05,
+    shadowRadius: 16,
+    elevation: 3,
+  },
+  farmerFilterGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+  },
+  farmerFilterContent: {
+    flex: 1,
+  },
+  farmerFilterTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#0F172A',
+    letterSpacing: -0.2,
+  },
+  farmerFilterSubtitle: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '600',
+    marginTop: 3,
+  },
+  farmerFilterMiniCardsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 14,
+    gap: 8,
+  },
+  farmerMiniCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0FDF4',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#DCFCE7',
+  },
+  farmerMiniCardEmoji: {
+    fontSize: 14,
+    marginRight: 6,
+  },
+  farmerMiniCardText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#15803D',
+  },
+  farmerFilterActionBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#16A34A',
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 12,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.04,
-    shadowRadius: 16,
+    shadowColor: '#16A34A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
     elevation: 2,
   },
   categoriesSection: {

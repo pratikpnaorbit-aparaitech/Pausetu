@@ -4,6 +4,8 @@ const Setting = require('../models/Setting');
 const asyncHandler = require('../utils/asyncHandler');
 const { AppError } = require('../middleware/errorHandler');
 
+console.log("Verification Controller Loaded");
+
 const getSettingsHelper = async () => {
   let settings = await Setting.findOne();
   if (!settings) {
@@ -49,20 +51,12 @@ exports.submitVerification = asyncHandler(async (req, res, next) => {
     return next(new AppError('User not found', 404));
   }
 
-  // ── Profile field validation ──────────────────────────────────────────────
-  // Only require the fields the app actually collects (fullName + mobile).
-  // village/taluka/district/state are optional address fields not shown in UI.
-  const missingFields = [];
-  if (!user.fullName || !user.fullName.trim()) missingFields.push('fullName');
-  if (!user.mobile  || !user.mobile.trim())   missingFields.push('mobile');
-
-  if (missingFields.length > 0) {
-    return res.status(400).json({
-      status: 'error',
-      message: 'Please complete your profile before submitting verification',
-      missingFields
-    });
-  }
+  console.log("User:", user._id);
+  console.log("Profile:", {
+    fullName: user.fullName,
+    mobile: user.mobile,
+    isProfileCompleted: user.isProfileCompleted
+  });
 
   const settings = await getSettingsHelper();
   const isAuto = settings.verificationMode === 'auto';

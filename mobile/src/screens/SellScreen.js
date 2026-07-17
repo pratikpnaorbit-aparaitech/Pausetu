@@ -1,12 +1,93 @@
 import React, { useContext, useEffect, useState } from 'react';
-import { StyleSheet, View, SafeAreaView, ScrollView, Image, TouchableOpacity, Dimensions, FlatList, Share, Alert, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, SafeAreaView, ScrollView, Image, TouchableOpacity, Dimensions, FlatList, Share, Alert, ActivityIndicator, Animated } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppContext } from '../context/AppContext';
 import { api, resolveMediaUrl } from '../api/api';
 import { useTranslation } from 'react-i18next';
 import AppText from '../components/AppText';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
+
+const SellerCtaCard = React.memo(({ listingsCount, onPress, t }) => {
+  const scaleValue = React.useRef(new Animated.Value(1)).current;
+  const hasListings = listingsCount > 0;
+
+  const handlePressIn = () => {
+    Animated.spring(scaleValue, {
+      toValue: 0.98,
+      useNativeDriver: true,
+      tension: 120,
+      friction: 7,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleValue, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 120,
+      friction: 7,
+    }).start();
+  };
+
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      activeOpacity={0.9}
+      style={styles.ctaCardContainer}
+    >
+      <Animated.View style={[styles.ctaCardAnimated, { transform: [{ scale: scaleValue }] }]}>
+        <LinearGradient
+          colors={['#FFFFFF', '#F2FBF0']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.ctaGradient}
+        >
+          {/* Subtle Decorative Pattern */}
+          <View style={styles.ctaPatternCircle1} />
+          <View style={styles.ctaPatternCircle2} />
+
+          <View style={styles.ctaTopRow}>
+            {/* Outline icon in circular box */}
+            <View style={styles.ctaIconCircle}>
+              <MaterialCommunityIcons
+                name={hasListings ? 'bullhorn-outline' : 'cow'}
+                size={18}
+                color="#16A34A"
+              />
+            </View>
+          </View>
+
+          <View style={styles.ctaContentBody}>
+            <AppText style={styles.ctaTitle}>
+              {hasListings ? 'तुमची जाहिरात करा' : 'विक्रीसाठी जनावर जोडा'}
+            </AppText>
+            <AppText style={styles.ctaSubtitle} numberOfLines={2}>
+              {hasListings 
+                ? 'तुमच्या जाहिरातीला हजारो खरेदीदारांपर्यंत पोहोचवा.' 
+                : 'आजच तुमचं जनावर हजारो खरेदीदारांपर्यंत पोहोचवा.'}
+            </AppText>
+          </View>
+
+          {/* Premium CTA Button */}
+          <View style={styles.ctaButton}>
+            {hasListings ? (
+              <Ionicons name="megaphone-outline" size={12} color="#FFFFFF" style={{ marginRight: 4 }} />
+            ) : (
+              <Ionicons name="add" size={13} color="#FFFFFF" style={{ marginRight: 4 }} />
+            )}
+            <AppText style={styles.ctaButtonText}>
+              {hasListings ? 'जाहिरात करा' : 'जनावर जोडा'}
+            </AppText>
+          </View>
+        </LinearGradient>
+      </Animated.View>
+    </TouchableOpacity>
+  );
+});
 
 export default function SellScreen({ navigation }) {
   const { userProfile, userToken, exitGuestSession } = useContext(AppContext);
@@ -225,7 +306,7 @@ export default function SellScreen({ navigation }) {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Quick Statistics Grid */}
         <View style={styles.statsGrid}>
-          {statsData.map((item) => (
+          {statsData.slice(0, 3).map((item) => (
             <View key={item.id} style={styles.statCard}>
               <View style={styles.statCardHeader}>
                 <AppText style={styles.statCount}>{item.count}</AppText>
@@ -240,6 +321,19 @@ export default function SellScreen({ navigation }) {
               </View>
             </View>
           ))}
+
+          {/* Premium Call-To-Action Card */}
+          <SellerCtaCard
+            listingsCount={listings.length}
+            t={t}
+            onPress={() => {
+              if (listings.length > 0) {
+                Alert.alert(t('common.info', { defaultValue: 'Info' }), 'जाहिरात सुविधा लवकरच उपलब्ध होईल!');
+              } else {
+                navigation.navigate('AddAnimal');
+              }
+            }}
+          />
         </View>
 
         {/* Quick Actions Row */}
@@ -513,6 +607,95 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.02,
     shadowRadius: 8,
     elevation: 2,
+  },
+  ctaCardContainer: {
+    width: '46%',
+    marginHorizontal: '2%',
+    marginBottom: 16,
+  },
+  ctaCardAnimated: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
+    overflow: 'hidden',
+    shadowColor: '#16A34A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  ctaGradient: {
+    padding: 14,
+    height: 154, // matches statCard height
+    justifyContent: 'space-between',
+    position: 'relative',
+  },
+  ctaPatternCircle1: {
+    position: 'absolute',
+    top: -10,
+    right: -10,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#E8F8E6',
+    opacity: 0.25,
+  },
+  ctaPatternCircle2: {
+    position: 'absolute',
+    bottom: -20,
+    left: -20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#E8F8E6',
+    opacity: 0.15,
+  },
+  ctaTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  ctaIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#E8F8E6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  ctaContentBody: {
+    flex: 1,
+    marginTop: 8,
+    justifyContent: 'center',
+  },
+  ctaTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#1E293B',
+    lineHeight: 18,
+  },
+  ctaSubtitle: {
+    fontSize: 9,
+    color: '#64748B',
+    fontWeight: '600',
+    lineHeight: 13,
+    marginTop: 2,
+  },
+  ctaButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#16A34A',
+    borderRadius: 12,
+    paddingVertical: 7,
+    shadowColor: '#16A34A',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.16,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  ctaButtonText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
   statCardHeader: {
     flexDirection: 'row',
