@@ -51,31 +51,24 @@ export default function LocationPicker({ visible, onClose, onSelectLocation }) {
         return;
       }
 
-      const loc = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced
-      });
+      const loc = await Location.getCurrentPositionAsync({});
       const { latitude, longitude } = loc.coords;
       const reverse = await Location.reverseGeocodeAsync({ latitude, longitude });
 
       if (reverse && reverse.length > 0) {
         const addr = reverse[0];
         const selected = {
-          state: addr.region || 'Maharashtra',
-          district: addr.district || addr.subregion || addr.city || 'Pune',
-          taluka: addr.district || 'Pune',
-          village: addr.city || addr.subregion || 'Pune'
+          state: addr.region || '',
+          district: addr.district || addr.subregion || addr.city || '',
+          taluka: addr.district || '',
+          village: addr.city || addr.subregion || ''
         };
         onSelectLocation(selected);
       } else {
-        onSelectLocation({
-          state: 'Maharashtra',
-          district: 'Pune',
-          taluka: 'Pune',
-          village: 'Pune'
-        });
+        Alert.alert(t('locationPicker.errorTitle') || 'Error', 'Location details not found.');
       }
     } catch (e) {
-      console.warn('GPS location detection failed:', e.message);
+      console.warn('Location error:', e);
       Alert.alert(
         t('locationPicker.errorTitle') || 'Error',
         t('locationPicker.detectError') || 'Could not detect location. Please enter PIN code.'
@@ -101,10 +94,10 @@ export default function LocationPicker({ visible, onClose, onSelectLocation }) {
       if (data && data[0] && data[0].Status === 'Success' && data[0].PostOffice && data[0].PostOffice.length > 0) {
         const postOffice = data[0].PostOffice[0];
         const selected = {
-          state: postOffice.State || 'Maharashtra',
-          district: postOffice.District || 'Pune',
-          taluka: postOffice.Block || postOffice.District || 'Pune',
-          village: postOffice.Name || postOffice.Block || 'Pune'
+          state: postOffice.State || '',
+          district: postOffice.District || '',
+          taluka: postOffice.Block || postOffice.District || '',
+          village: postOffice.Name || postOffice.Block || ''
         };
         onSelectLocation(selected);
       } else {

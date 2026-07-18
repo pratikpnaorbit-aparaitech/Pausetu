@@ -1,5 +1,5 @@
 import React, { useContext, useState, useCallback, useEffect, useRef } from 'react';
-import { StyleSheet, View, SafeAreaView, TouchableOpacity, TextInput, FlatList, Image, ActivityIndicator, Alert, Animated, Dimensions } from 'react-native';
+import { StyleSheet, View, SafeAreaView, TouchableOpacity, TextInput, FlatList, Image, ActivityIndicator, Alert, Animated, Dimensions, Platform } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { AppContext } from '../context/AppContext';
@@ -276,12 +276,12 @@ const ListHeader = React.memo(({
     if (userProfile?.district) {
       return {
         title: userProfile.district,
-        subtitle: userProfile.state || 'Maharashtra'
+        subtitle: userProfile.state || ''
       };
     }
     return {
-      title: 'Pune',
-      subtitle: 'Maharashtra'
+      title: t('buy.locationNotSet', { defaultValue: 'Location Not Set' }),
+      subtitle: t('buy.tapToDetect', { defaultValue: 'Tap to detect location' })
     };
   };
 
@@ -330,7 +330,7 @@ const ListHeader = React.memo(({
   return (
     <View>
       {/* Location Card */}
-      <View style={styles.locationCard}>
+      <TouchableOpacity style={styles.locationCard} activeOpacity={0.7} onPress={onChangeLocation}>
         <View style={styles.locationInfo}>
           <View style={styles.locationPinIconWrapper}>
             <Ionicons name="location" size={18} color="#16A34A" />
@@ -344,10 +344,10 @@ const ListHeader = React.memo(({
             </AppText>
           </View>
         </View>
-        <TouchableOpacity style={styles.changeButton} activeOpacity={0.6} onPress={onChangeLocation}>
+        <View style={styles.changeButton}>
           <AppText style={styles.changeButtonText}>{t('buy.change')}</AppText>
-        </TouchableOpacity>
-      </View>
+        </View>
+      </TouchableOpacity>
 
       {/* Search Bar (Full Width) */}
       <View style={styles.searchSection}>
@@ -459,15 +459,16 @@ const ListFooter = React.memo(({ onViewDetails, recommendedAnimals, selectedCate
 export default function BuyScreen({ navigation }) {
   const { userProfile, userToken, updateLocation } = useContext(AppContext);
   const [isLocationPickerVisible, setIsLocationPickerVisible] = useState(false);
-  const isGuest = userToken === 'guest';
-  const name = isGuest ? 'Guest' : userProfile?.name || 'User';
   const { t } = useTranslation();
+  const isGuest = userToken === 'guest';
+  const name = isGuest ? t('profile.guestUser') : userProfile?.name || 'User';
 
   const getInitial = (nameStr) => {
     if (!nameStr || typeof nameStr !== 'string' || !nameStr.trim()) return '?';
     return nameStr.trim().charAt(0).toUpperCase();
   };
   const userInitial = getInitial(name);
+  const profileImageUrl = (userProfile?.profilePhoto || userProfile?.photo) ? resolveMediaUrl(userProfile.profilePhoto || userProfile.photo) : null;
 
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchText, setSearchText] = useState('');
@@ -476,6 +477,44 @@ export default function BuyScreen({ navigation }) {
   const [isFilterVisible, setIsFilterVisible] = useState(false);
   const [activeFilters, setActiveFilters] = useState(null);
   const mainListRef = useRef(null);
+
+  const handleLocationTap = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setIsLocationPickerVisible(true);
+        return;
+      }
+      
+      const loc = await Location.getCurrentPositionAsync({});
+      const { latitude, longitude } = loc.coords;
+      const reverse = await Location.reverseGeocodeAsync({ latitude, longitude });
+      
+      if (reverse && reverse.length > 0) {
+        const addr = reverse[0];
+        const selected = {
+          state: addr.region || '',
+          district: addr.district || addr.subregion || addr.city || '',
+          taluka: addr.district || '',
+          village: addr.city || addr.subregion || ''
+        };
+        updateLocation(selected);
+        
+        setActiveFilters(prev => ({
+          ...prev,
+          state: selected.state,
+          district: selected.district,
+          taluka: selected.taluka,
+          village: selected.village
+        }));
+      } else {
+        setIsLocationPickerVisible(true);
+      }
+    } catch (e) {
+      console.warn('Location error:', e);
+      setIsLocationPickerVisible(true);
+    }
+  };
 
   const getDistance = (lat1, lon1, lat2, lon2) => {
     if (!lat1 || !lon1 || !lat2 || !lon2) return Infinity;
@@ -729,7 +768,8 @@ export default function BuyScreen({ navigation }) {
       />
       <Image
         source={require('../../assets/farmer-bg.webp')}
-        style={[StyleSheet.absoluteFillObject, { opacity: 0.025, resizeMode: 'cover' }]}
+        style={[StyleSheet.absoluteFillObject, { opacity: 0.025 }]}
+        resizeMode="cover"
       />
       <SafeAreaView style={styles.safeArea}>
         {/* Main Body Wrap */}
@@ -759,7 +799,11 @@ export default function BuyScreen({ navigation }) {
                 <View style={styles.notificationHeaderBadge} />
               </TouchableOpacity>
               <TouchableOpacity style={styles.avatarCircle} onPress={() => navigation.navigate('Profile')}>
-                <AppText style={styles.avatarText}>{userInitial}</AppText>
+                {profileImageUrl ? (
+                  <Image source={{ uri: profileImageUrl }} style={styles.avatarImage} resizeMode="cover" />
+                ) : (
+                  <AppText style={styles.avatarText}>{userInitial}</AppText>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -781,7 +825,7 @@ export default function BuyScreen({ navigation }) {
                   onViewDetails={handleViewDetails}
                   featuredAnimals={filteredAnimals.slice(0, 3)}
                   userProfile={userProfile}
-                  onChangeLocation={handleLocationChange}
+                  onChangeLocation={handleLocationTap}
                   searchText={searchText}
                   setSearchText={setSearchText}
                   onFilterPress={() => setIsFilterVisible(true)}
@@ -935,6 +979,11 @@ const styles = StyleSheet.create({
     borderColor: '#16A34A',
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   avatarText: {
     fontSize: 14,

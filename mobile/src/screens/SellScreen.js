@@ -95,6 +95,13 @@ export default function SellScreen({ navigation }) {
   const name = isGuest ? 'Guest' : userProfile?.name || 'User';
   const { t } = useTranslation();
 
+  const getInitial = (nameStr) => {
+    if (!nameStr || typeof nameStr !== 'string' || !nameStr.trim()) return '?';
+    return nameStr.trim().charAt(0).toUpperCase();
+  };
+  const userInitial = getInitial(name);
+  const profileImageUrl = (userProfile?.profilePhoto || userProfile?.photo) ? resolveMediaUrl(userProfile.profilePhoto || userProfile.photo) : null;
+
   const [listings, setListings] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -294,11 +301,12 @@ export default function SellScreen({ navigation }) {
             <Ionicons name="notifications-outline" size={22} color="#0F172A" />
             <View style={styles.notificationDot} />
           </TouchableOpacity>
-          <TouchableOpacity activeOpacity={0.8} onPress={() => navigation.navigate('Profile')}>
-            <Image
-              source={{ uri: userProfile?.photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80' }}
-              style={styles.avatarImage}
-            />
+          <TouchableOpacity activeOpacity={0.8} onPress={() => navigation.navigate('Profile')} style={!profileImageUrl ? styles.avatarCircle : {}}>
+            {profileImageUrl ? (
+              <Image source={{ uri: profileImageUrl }} style={styles.avatarImage} />
+            ) : (
+              <AppText style={styles.avatarText}>{userInitial}</AppText>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -594,6 +602,21 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1.5,
     borderColor: '#16A34A',
+  },
+  avatarCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#DCFCE7',
+    borderWidth: 1.5,
+    borderColor: '#16A34A',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#16A34A',
   },
   scrollContent: {
     paddingBottom: 160,

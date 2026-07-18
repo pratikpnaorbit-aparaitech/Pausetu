@@ -5,16 +5,20 @@ import React, { useState } from 'react';
 import { StyleSheet, View, TouchableOpacity, Platform, Image } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { AppContext } from '../../../context/AppContext';
+import { resolveMediaUrl } from '../../../api/api';
 import AppText from '../AppText';
 
 export default function BuyerHeader({ name, onNavigateToSell, onNavigateToNotifications, onNavigateToProfile }) {
   const { t } = useTranslation();
+  const { userProfile } = React.useContext(AppContext);
   const [nearbyActive, setNearbyActive] = useState(true);
 
   const getInitial = (nameStr) => {
     if (!nameStr || typeof nameStr !== 'string' || !nameStr.trim()) return '?';
     return nameStr.trim().charAt(0).toUpperCase();
   };
+  const profileImageUrl = (userProfile?.profilePhoto || userProfile?.photo) ? resolveMediaUrl(userProfile.profilePhoto || userProfile.photo) : null;
 
   return (
     <View style={styles.container}>
@@ -52,12 +56,16 @@ export default function BuyerHeader({ name, onNavigateToSell, onNavigateToNotifi
           </TouchableOpacity>
 
           <TouchableOpacity 
-            style={styles.avatar} 
+            style={profileImageUrl ? styles.avatarImageWrap : styles.avatar} 
             onPress={onNavigateToProfile} 
             aria-label="Profile"
             activeOpacity={0.7}
           >
-            <AppText style={styles.avatarText}>{getInitial(name)}</AppText>
+            {profileImageUrl ? (
+              <Image source={{ uri: profileImageUrl }} style={styles.avatarImage} resizeMode="cover" />
+            ) : (
+              <AppText style={styles.avatarText}>{getInitial(name)}</AppText>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -212,6 +220,20 @@ const styles = StyleSheet.create({
     borderColor: '#16A34A',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  avatarImageWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#16A34A',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   avatarText: {
     fontSize: 15,

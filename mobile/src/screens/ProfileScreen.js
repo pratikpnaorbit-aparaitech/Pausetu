@@ -5,6 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { AppContext } from '../context/AppContext';
 import { profileApi } from '../api/profileApi';
 import { useTranslation } from 'react-i18next';
+import { resolveMediaUrl } from '../api/api';
 import AppText from '../components/AppText';
 import VerificationCard from '../components/VerificationCard';
 
@@ -184,6 +185,7 @@ export default function ProfileScreen({ navigation }) {
       const res = await profileApi.uploadPhoto(formData, (percent) => {
         setUploadProgress(percent);
       });
+      console.log('[ProfileScreen] Upload Response:', res);
 
       if (res.status === 'success') {
         Alert.alert(t('common.success'), t('profile.uploadSuccess'));
@@ -213,9 +215,10 @@ export default function ProfileScreen({ navigation }) {
     return nameStr.trim().charAt(0).toUpperCase();
   };
 
-  const profileImageUrl = userProfile?.photo
-    ? (userProfile.photo.startsWith('http') ? userProfile.photo : `http://10.0.2.2:5000${userProfile.photo}`)
-    : null;
+  const profileImageUrl = (userProfile?.profilePhoto || userProfile?.photo) ? resolveMediaUrl(userProfile.profilePhoto || userProfile.photo) : null;
+  console.log('[ProfileScreen] Stored Profile object:', userProfile);
+  console.log('[ProfileScreen] Final Image URI passed to Image:', profileImageUrl);
+
   const userInitial = getInitial(userProfile?.name);
   const displayName = userProfile?.name?.trim() ? userProfile.name : t('profile.notProvided');
   const displayRole = userProfile?.role?.trim() ? userProfile.role : t('profile.notProvided');

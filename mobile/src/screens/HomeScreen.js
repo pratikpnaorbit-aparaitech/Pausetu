@@ -1,9 +1,10 @@
 import React, { useContext, useState } from 'react';
-import { StyleSheet, View, SafeAreaView, ScrollView, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, SafeAreaView, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppContext } from '../context/AppContext';
 import { useTranslation } from 'react-i18next';
+import { resolveMediaUrl } from '../api/api';
 import AppText from '../components/AppText';
 import { usePremium } from '../hooks/usePremium';
 import DashboardPremiumCard from '../components/PremiumAdvisor/DashboardPremiumCard';
@@ -22,6 +23,7 @@ export default function HomeScreen() {
     return nameStr.trim().charAt(0).toUpperCase();
   };
   const userInitial = getInitial(name);
+  const profileImageUrl = (userProfile?.profilePhoto || userProfile?.photo) ? resolveMediaUrl(userProfile.profilePhoto || userProfile.photo) : null;
 
   const { isPremium } = usePremium();
   const [showPremiumAdvisor, setShowPremiumAdvisor] = useState(false);
@@ -32,9 +34,13 @@ export default function HomeScreen() {
         {/* Welcome Header Card */}
         <LinearGradient colors={isPremium ? ['#7F00FF', '#E100FF'] : ['#11998e', '#38ef7d']} style={styles.headerCard}>
           <View style={styles.profileRow}>
-            <View style={styles.avatarCircle}>
-              <AppText style={styles.avatarText}>{userInitial}</AppText>
-            </View>
+            {profileImageUrl ? (
+              <Image source={{ uri: profileImageUrl }} style={styles.avatarImage} />
+            ) : (
+              <View style={styles.avatarCircle}>
+                <AppText style={styles.avatarText}>{userInitial}</AppText>
+              </View>
+            )}
             <View style={styles.profileDetails}>
               <AppText style={styles.welcomeText}>{t('home.welcomeBack')}</AppText>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -135,6 +141,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
+  },
+  avatarImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     borderWidth: 1,
     borderColor: '#FFFFFF',
   },

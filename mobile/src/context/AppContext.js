@@ -57,6 +57,7 @@ export const AppProvider = ({ children }) => {
       taluka: user.taluka || '',
       district: user.district || '',
       state: user.state || '',
+      profilePhoto: user.profilePhoto || '',
       photo: user.profilePhoto || user.photo || '',
       language: user.preferredLanguage || fallbackLanguage,
       verification: user.verification || { status: 'unverified' }

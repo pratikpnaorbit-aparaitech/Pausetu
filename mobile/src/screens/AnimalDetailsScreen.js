@@ -627,7 +627,7 @@ export default function AnimalDetailsScreen({ route, navigation }) {
                     <ImageWithLoader
                       uri={slide.uri}
                       style={styles.galleryImage}
-                      resizeMode="cover"
+                      resizeMode="contain"
                       onPress={() => {
                         setZoomImageUri(slide.uri);
                         setIsZoomVisible(true);
@@ -661,7 +661,7 @@ export default function AnimalDetailsScreen({ route, navigation }) {
                         handlePlay();
                       }}
                     />
-                    <View style={styles.playButtonAbsoluteContainer} pointerEvents="none">
+                    <View style={[styles.playButtonAbsoluteContainer, { pointerEvents: 'none' }]}>
                       <View style={styles.playButtonCircle}>
                         <Ionicons name="play" size={36} color="#FFFFFF" style={styles.playIconOffset} />
                       </View>

@@ -5,9 +5,7 @@ import { useTranslation } from 'react-i18next';
 import AppText from '../components/AppText';
 
 const ROLES = [
-  { key: 'profileCompletion.farmer', value: 'Farmer' },
-  { key: 'profileCompletion.doctor', value: 'Veterinary Doctor' },
-  { key: 'profileCompletion.merchant', value: 'Merchant / Cattle Buyer' }
+  { key: 'profileCompletion.farmer', value: 'Farmer', label: '🐄 शेतकरी (खरेदी आणि विक्री)' }
 ];
 
 export default function ProfileCompletionScreen() {
@@ -65,7 +63,7 @@ export default function ProfileCompletionScreen() {
                     onPress={() => setSelectedRole(role.value)}
                   >
                     <AppText style={[styles.roleOptionText, isSelected && styles.roleOptionTextSelected]}>
-                      {t(role.key)}
+                      {role.label || t(role.key)}
                     </AppText>
                     <View style={[styles.checkCircle, isSelected && styles.checkCircleSelected]}>
                       {isSelected && <View style={styles.checkInner} />}
