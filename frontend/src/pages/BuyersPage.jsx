@@ -1,6 +1,6 @@
 import React, { useContext, useState } from 'react';
 import { AdminContext } from '../context/AdminContext';
-import { Ban, Unlock, Trash2, User, Eye, Edit2, Search, AlertCircle, RefreshCw, X, Save } from 'lucide-react';
+import { Ban, Unlock, Trash2, User, Eye, Edit2, Search, AlertCircle, RefreshCw, X, Save, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function BuyersPage() {
   const {

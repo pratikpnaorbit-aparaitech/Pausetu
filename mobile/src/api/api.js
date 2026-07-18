@@ -151,6 +151,15 @@ export const api = {
     return instance.get(`/animals?${query}`);
   },
 
+  getRecommendedAnimals: async () => {
+    return instance.get('/animals/recommended');
+  },
+  
+  // Submit a complaint for an animal listing
+  submitComplaint: async (data) => {
+    return instance.post('/complaints', data);
+  },
+
   getAnimalById: async (id) => {
     return instance.get(`/animals/${id}`);
   },
@@ -182,6 +191,15 @@ export const api = {
 
   deleteNotification: async (id) => {
     return instance.delete(`/notifications/${id}`);
+  },
+
+  // Favorites
+  getFavorites: async () => {
+    return instance.get('/buyers/favorites');
+  },
+
+  toggleFavorite: async (animalId) => {
+    return instance.post('/buyers/favorites', { animalId });
   }
 };
 

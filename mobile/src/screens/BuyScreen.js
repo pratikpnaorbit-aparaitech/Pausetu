@@ -13,6 +13,7 @@ import SectionHeader from '../components/SectionHeader';
 import ListingCard from '../components/ListingCard';
 import LocationPicker from '../components/LocationPicker';
 import FilterBottomSheet from '../components/FilterBottomSheet';
+import LanguageSelector from '../components/LanguageSelector';
 
 const CATEGORIES = [
   { id: 'all', nameKey: 'buy.all', image: require('../../assets/icons/all.png') },
@@ -791,9 +792,7 @@ export default function BuyScreen({ navigation }) {
 
             {/* Right Controls */}
             <View style={styles.headerActions}>
-              <TouchableOpacity style={styles.sellButton} onPress={handleNavigateToSell}>
-                <AppText style={styles.sellButtonText}>{t('buy.sellPlus')}</AppText>
-              </TouchableOpacity>
+              <LanguageSelector style={{ marginRight: 8 }} />
               <TouchableOpacity style={styles.notificationHeaderBtn} onPress={() => navigation.navigate('Notifications')}>
                 <Ionicons name="notifications-outline" size={20} color="#0F172A" />
                 <View style={styles.notificationHeaderBadge} />

@@ -10,7 +10,7 @@ export const AppContext = createContext();
 export const AppProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isOnboarded, setIsOnboarded] = useState(false);
-  const [language, setLanguage] = useState('en');
+  const [language, setLanguage] = useState('mr');
   const [userToken, setUserToken] = useState(null);
   const [isGuest, setIsGuest] = useState(false);
   const [isProfileComplete, setIsProfileComplete] = useState(false);
@@ -19,6 +19,7 @@ export const AppProvider = ({ children }) => {
   const [userProfile, setUserProfile] = useState(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [fontSize, setFontSize] = useState('Medium'); // 'Small' | 'Medium' | 'Large'
+  const [favorites, setFavorites] = useState([]);
 
   const hasMeaningfulProfileData = (user) => {
     if (!user) return false;
@@ -77,7 +78,7 @@ export const AppProvider = ({ children }) => {
         ]);
 
         const onboarded = await AsyncStorage.getItem('isOnboarded');
-        const lang = await AsyncStorage.getItem('language') || 'en';
+        const lang = await AsyncStorage.getItem('language') || 'mr';
         const token = await secureStorage.getItem('userToken');
         const locationGranted = await AsyncStorage.getItem('hasLocationPermission');
         const cachedProfile = await AsyncStorage.getItem('userProfile');
@@ -160,6 +161,52 @@ export const AppProvider = ({ children }) => {
     registerLogoutHandler(logout);
   }, []);
 
+  // Fetch favorites whenever the userToken is set
+  useEffect(() => {
+    const fetchFavorites = async () => {
+      if (!userToken || userToken === 'guest') {
+        setFavorites([]);
+        return;
+      }
+      try {
+        const { api } = require('../api/api');
+        const res = await api.getFavorites();
+        if (res?.status === 'success') {
+          const favIds = (res.data || []).map(f => String(f._id ?? f.id ?? f).trim());
+          setFavorites(favIds);
+        }
+      } catch (e) {
+        console.warn('Failed to fetch initial favorites in AppContext', e);
+      }
+    };
+    fetchFavorites();
+  }, [userToken]);
+
+  const toggleFavoriteContext = async (animalId) => {
+    if (!userToken || userToken === 'guest') return { success: false, reason: 'auth' };
+    
+    const { api } = require('../api/api');
+    const normId = String(animalId).trim();
+    const isCurrentlyFav = favorites.includes(normId);
+    
+    // Optimistic Update
+    setFavorites(prev => isCurrentlyFav ? prev.filter(id => id !== normId) : [...prev, normId]);
+    
+    try {
+      const res = await api.toggleFavorite(normId);
+      if (res?.status !== 'success') {
+        // Rollback
+        setFavorites(prev => isCurrentlyFav ? [...prev, normId] : prev.filter(id => id !== normId));
+        return { success: false };
+      }
+      return { success: true, isFavorited: res.isFavorited };
+    } catch (e) {
+      // Rollback
+      setFavorites(prev => isCurrentlyFav ? [...prev, normId] : prev.filter(id => id !== normId));
+      return { success: false };
+    }
+  };
+
   const completeOnboarding = async (selectedLang) => {
     try {
       await AsyncStorage.setItem('isOnboarded', 'true');
@@ -170,6 +217,16 @@ export const AppProvider = ({ children }) => {
       await i18n.changeLanguage(selectedLang);
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const changeAppLanguage = async (selectedLang) => {
+    try {
+      await AsyncStorage.setItem('language', selectedLang);
+      setLanguage(selectedLang);
+      await i18n.changeLanguage(selectedLang);
+    } catch (e) {
+      console.error('[AppContext] changeAppLanguage failed:', e);
     }
   };
 
@@ -427,6 +484,9 @@ export const AppProvider = ({ children }) => {
         toggleDarkMode,
         setAppFontSize,
         updateLocation,
+        changeAppLanguage,
+        favorites,
+        toggleFavoriteContext,
       }}
     >
       {children}

@@ -3,7 +3,7 @@ import { AdminContext } from '../context/AdminContext';
 import {
   LayoutDashboard, Clock, Layers, Users, UserCheck,
   FolderTree, Tag, MapPin, Shield, BarChart3, Settings,
-  AlertCircle, HelpCircle, LogOut, Search, User, X, Menu
+  AlertCircle, HelpCircle, LogOut, Search, User, X, Menu, Archive
 } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -11,11 +11,13 @@ const NAV_ITEMS = [
   { name: 'Pending Approvals',icon: Clock,           section: 'main', badgeType: 'approvals' },
   { name: 'Verification Requests', icon: Shield,     section: 'main', badgeType: 'verifications' },
   { name: 'Animals',          icon: Layers,          section: 'main' },
+  { name: 'History',          icon: Archive,         section: 'main' },
   { name: 'Sellers',          icon: Users,           section: 'main' },
   { name: 'Buyers',           icon: UserCheck,       section: 'main' },
   { name: 'Categories',       icon: FolderTree,      section: 'catalog' },
   { name: 'Breeds',           icon: Tag,             section: 'catalog' },
   { name: 'Locations',        icon: MapPin,          section: 'catalog' },
+  { name: 'Complaints',       icon: AlertCircle,     section: 'system' },
   { name: 'Audit Logs',       icon: Shield,          section: 'system' },
   { name: 'Reports',          icon: BarChart3,       section: 'system' },
   { name: 'Settings',         icon: Settings,        section: 'system' },

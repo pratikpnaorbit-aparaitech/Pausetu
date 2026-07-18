@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { AppContext } from '../../../context/AppContext';
 import { resolveMediaUrl } from '../../../api/api';
 import AppText from '../AppText';
+import LanguageSelector from '../LanguageSelector';
 
 export default function BuyerHeader({ name, onNavigateToSell, onNavigateToNotifications, onNavigateToProfile }) {
   const { t } = useTranslation();
@@ -36,14 +37,7 @@ export default function BuyerHeader({ name, onNavigateToSell, onNavigateToNotifi
 
         {/* Action Group */}
         <View style={styles.actionGroup}>
-          <TouchableOpacity 
-            style={styles.premiumSellBtn} 
-            onPress={onNavigateToSell} 
-            activeOpacity={0.8}
-          >
-            <MaterialCommunityIcons name="plus-circle" size={16} color="#FFFFFF" style={styles.sellIcon} />
-            <AppText style={styles.premiumSellText}>{t('buy.sellPlus', { defaultValue: 'Sell +' })}</AppText>
-          </TouchableOpacity>
+          <LanguageSelector style={{ marginRight: 8 }} />
 
           <TouchableOpacity 
             style={styles.iconBtn} 

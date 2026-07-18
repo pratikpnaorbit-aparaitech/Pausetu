@@ -3,7 +3,8 @@ import axios from './axios';
 export const sellerApi = {
   getAll: async () => {
     try {
-      const res = await axios.get('/admin/users?role=seller');
+      // Fetch all buyers since the mobile app registers everyone as a buyer by default
+      const res = await axios.get('/admin/users?role=buyer');
       if (res && res.status === 'success' && res.data.users) {
         // Fetch animals to calculate listing counts per seller
         let animals = [];
@@ -34,7 +35,7 @@ export const sellerApi = {
             isDeleted: false,
             photo: u.profilePhoto || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=120&q=80'
           };
-        });
+        }).filter(u => u.totalListings > 0); // Only keep users who actually have listings
       }
     } catch (e) {
       console.error('[Seller API Error]', e);

@@ -1181,4 +1181,7 @@ input:focus:not(:focus-visible) {
   aside { display: none !important; }
   header { display: none !important; }
   main { padding: 0 !important; }
+  .print-hide { display: none !important; }
+  .sidebar-layout { grid-template-columns: 1fr !important; }
+  .sidebar-aside, .sidebar-layout > div[role="region"] { display: none !important; }
 }

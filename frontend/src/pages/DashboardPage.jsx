@@ -118,6 +118,63 @@ export default function DashboardPage() {
 
   const getWidget = (id) => widgets.find((w) => w.id === id);
 
+  const [globalUnlock, setGlobalUnlock] = useState(false);
+  const [loadingGlobalUnlock, setLoadingGlobalUnlock] = useState(true);
+
+  const [feedPlannerUnlock, setFeedPlannerUnlock] = useState(false);
+  const [loadingFeedPlannerUnlock, setLoadingFeedPlannerUnlock] = useState(true);
+
+  useEffect(() => {
+    const fetchUnlockStatus = async () => {
+      try {
+        const settings = await verificationApi.getSettings();
+        if (settings) {
+          setGlobalUnlock(!!settings.marketPriceGlobalUnlock);
+          setFeedPlannerUnlock(!!settings.feedPlannerGlobalUnlock);
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoadingGlobalUnlock(false);
+        setLoadingFeedPlannerUnlock(false);
+      }
+    };
+    fetchUnlockStatus();
+  }, []);
+
+  const feedPlannerStats = useMemo(() => {
+    const sUnlocked = (sellers || []).filter((s) => s.feedPlannerAccess?.hasAccess).length;
+    const bUnlocked = (buyers || []).filter((b) => b.feedPlannerAccess?.hasAccess).length;
+    const totalUnlocked = sUnlocked + bUnlocked || 8;
+    return {
+      unlockedUsers: totalUnlocked,
+      revenue: totalUnlocked * 1,
+      usage: totalUnlocked * 4 + 15
+    };
+  }, [sellers, buyers]);
+
+  const handleToggleGlobalUnlock = async () => {
+    const newValue = !globalUnlock;
+    setGlobalUnlock(newValue);
+    try {
+      await verificationApi.updateSettings({ marketPriceGlobalUnlock: newValue });
+    } catch (e) {
+      console.error(e);
+      setGlobalUnlock(!newValue);
+    }
+  };
+
+  const handleToggleFeedPlannerUnlock = async () => {
+    const newValue = !feedPlannerUnlock;
+    setFeedPlannerUnlock(newValue);
+    try {
+      await verificationApi.updateSettings({ feedPlannerGlobalUnlock: newValue });
+    } catch (e) {
+      console.error(e);
+      setFeedPlannerUnlock(!newValue);
+    }
+  };
+
   // Loading skeleton
   if (isLoading) {
     return (
@@ -173,6 +230,7 @@ export default function DashboardPage() {
     rejectedListings: animals.filter((a) => a.status === 'rejected').length,
     soldAnimals: animals.filter((a) => a.status === 'sold').length,
     todayRegistrations: 2,
+    pendingComplaints: dashboardStats?.kpis?.pendingComplaints || 0,
   };
 
   const weeklyStats = dashboardStats?.weeklyStats || [
@@ -186,63 +244,6 @@ export default function DashboardPage() {
 
   const COLORS = ['var(--color-primary)', 'var(--color-info)', 'var(--color-warning)', '#8b5cf6', '#f43f5e', '#14b8a6'];
   const distEntries = Object.entries(distribution);
-
-  const [globalUnlock, setGlobalUnlock] = useState(false);
-  const [loadingGlobalUnlock, setLoadingGlobalUnlock] = useState(true);
-
-  const [feedPlannerUnlock, setFeedPlannerUnlock] = useState(false);
-  const [loadingFeedPlannerUnlock, setLoadingFeedPlannerUnlock] = useState(true);
-
-  useEffect(() => {
-    const fetchUnlockStatus = async () => {
-      try {
-        const settings = await verificationApi.getSettings();
-        if (settings) {
-          setGlobalUnlock(!!settings.marketPriceGlobalUnlock);
-          setFeedPlannerUnlock(!!settings.feedPlannerGlobalUnlock);
-        }
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoadingGlobalUnlock(false);
-        setLoadingFeedPlannerUnlock(false);
-      }
-    };
-    fetchUnlockStatus();
-  }, []);
-
-  const handleToggleGlobalUnlock = async () => {
-    const newValue = !globalUnlock;
-    setGlobalUnlock(newValue);
-    try {
-      await verificationApi.updateSettings({ marketPriceGlobalUnlock: newValue });
-    } catch (e) {
-      console.error(e);
-      setGlobalUnlock(!newValue);
-    }
-  };
-
-  const handleToggleFeedPlannerUnlock = async () => {
-    const newValue = !feedPlannerUnlock;
-    setFeedPlannerUnlock(newValue);
-    try {
-      await verificationApi.updateSettings({ feedPlannerGlobalUnlock: newValue });
-    } catch (e) {
-      console.error(e);
-      setFeedPlannerUnlock(!newValue);
-    }
-  };
-
-  const feedPlannerStats = useMemo(() => {
-    const sUnlocked = sellers.filter((s) => s.feedPlannerAccess?.hasAccess).length;
-    const bUnlocked = buyers.filter((b) => b.feedPlannerAccess?.hasAccess).length;
-    const totalUnlocked = sUnlocked + bUnlocked || 8;
-    return {
-      unlockedUsers: totalUnlocked,
-      revenue: totalUnlocked * 1,
-      usage: totalUnlocked * 4 + 15
-    };
-  }, [sellers, buyers]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -444,6 +445,7 @@ export default function DashboardPage() {
         {getWidget('registrations')?.visible && (
           <KpiCard label="Approved Listings" value={kpis.approvedListings} icon={CheckCircle2} accentColor="var(--color-success)" delay={0.16} />
         )}
+        <KpiCard label="Pending Complaints" value={kpis.pendingComplaints} icon={AlertCircle} accentColor="var(--color-danger)" delay={0.20} />
       </div>
 
       {/* ── Charts ───────────────────────────────────────────────────── */}

@@ -4,17 +4,19 @@ import SidebarLayout from './layouts/SidebarLayout';
 import ConfirmModal from './components/ConfirmModal';
 import RejectionModal from './components/RejectionModal';
 import DetailsModal from './components/DetailsModal';
-import { CheckCircle2, AlertCircle, AlertTriangle, Info, X } from 'lucide-react';
+import { CheckCircle2, AlertCircle, AlertTriangle, Info, X, Search } from 'lucide-react';
 
 // Lazy Load Pages
 const DashboardPage        = lazy(() => import('./pages/DashboardPage'));
 const PendingApprovalsPage = lazy(() => import('./pages/PendingApprovalsPage'));
 const AnimalsPage          = lazy(() => import('./pages/AnimalsPage'));
+const HistoryPage          = lazy(() => import('./pages/HistoryPage'));
 const SellersPage          = lazy(() => import('./pages/SellersPage'));
 const BuyersPage           = lazy(() => import('./pages/BuyersPage'));
 const CategoriesPage       = lazy(() => import('./pages/CategoriesPage'));
 const BreedsPage           = lazy(() => import('./pages/BreedsPage'));
 const LocationsPage        = lazy(() => import('./pages/LocationsPage'));
+const ComplaintsPage       = lazy(() => import('./pages/ComplaintsPage'));
 const AuditLogsPage        = lazy(() => import('./pages/AuditLogsPage'));
 const ReportsPage          = lazy(() => import('./pages/ReportsPage'));
 const SettingsPage         = lazy(() => import('./pages/SettingsPage'));
@@ -154,11 +156,13 @@ export default function AppRoutes() {
       case 'Pending Approvals': return <PendingApprovalsPage />;
       case 'Verification Requests': return <Suspense fallback={<PageSkeleton />}><VerificationRequestsPage /></Suspense>;
       case 'Animals':           return <AnimalsPage />;
+      case 'History':           return <Suspense fallback={<PageSkeleton />}><HistoryPage /></Suspense>;
       case 'Sellers':           return <SellersPage />;
       case 'Buyers':            return <BuyersPage />;
       case 'Categories':        return <CategoriesPage />;
       case 'Breeds':            return <BreedsPage />;
       case 'Locations':         return <LocationsPage />;
+      case 'Complaints':        return <Suspense fallback={<PageSkeleton />}><ComplaintsPage /></Suspense>;
       case 'Audit Logs':        return <AuditLogsPage />;
       case 'Reports':           return <ReportsPage />;
       case 'Settings':          return <SettingsPage />;

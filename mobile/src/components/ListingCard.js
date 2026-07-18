@@ -1,13 +1,19 @@
-import React, { useState } from 'react';
+import React, { useContext } from 'react';
 import { View, StyleSheet, TouchableOpacity, Image, Share, Linking, Alert } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { resolveMediaUrl } from '../api/api';
 import { useTranslation } from 'react-i18next';
+import { AppContext } from '../context/AppContext';
+import { useNavigation } from '@react-navigation/native';
 import AppText from './AppText';
 
 export default function ListingCard({ item, onViewDetailsPress, style }) {
   const { t, i18n } = useTranslation();
-  const [isWishlisted, setIsWishlisted] = useState(false);
+  const navigation = useNavigation();
+  const { favorites, toggleFavoriteContext } = useContext(AppContext);
+  const normalizedItemId = String(item?._id ?? item?.id ?? '').trim();
+  const isWishlisted = favorites ? favorites.includes(normalizedItemId) : false;
+  
   const imageUrl = resolveMediaUrl(item.photos && item.photos.length > 0 ? item.photos[0] : null);
 
   const handleShare = async () => {
@@ -129,7 +135,19 @@ export default function ListingCard({ item, onViewDetailsPress, style }) {
 
           <TouchableOpacity 
             style={styles.floatingActionCircle} 
-            onPress={() => setIsWishlisted(!isWishlisted)}
+            onPress={async () => {
+              const res = await toggleFavoriteContext(normalizedItemId);
+              if (res && res.reason === 'auth') {
+                Alert.alert(
+                  t('common.loginRequired', { defaultValue: 'Login Required' }),
+                  t('animalDetails.loginToFavorite', { defaultValue: 'Please login to add animals to your favorites.' }),
+                  [
+                    { text: t('common.cancel'), style: 'cancel' },
+                    { text: t('common.login', { defaultValue: 'Login' }), onPress: () => navigation.navigate('Auth') }
+                  ]
+                );
+              }
+            }}
             activeOpacity={0.7}
           >
             <Ionicons 

@@ -2,7 +2,7 @@
 // Redesigned premium livestock details page with dynamic zoom views, spec cards, maps trackers, and call CTAs.
 
 import React, { useState, useRef, useCallback, useEffect, useContext, useMemo } from 'react';
-import { StyleSheet, View, ScrollView, Image, TouchableOpacity, Dimensions, Modal, Share, FlatList, SafeAreaView, ActivityIndicator, Linking, Alert, Platform } from 'react-native';
+import { StyleSheet, View, ScrollView, Image, TouchableOpacity, Dimensions, Modal, Share, FlatList, SafeAreaView, ActivityIndicator, Linking, Alert, Platform, TextInput } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import SectionHeader from '../components/SectionHeader';
@@ -60,6 +60,15 @@ const ImageWithLoader = ({ uri, style, resizeMode, onPress }) => {
 };
 
 export default function AnimalDetailsScreen({ route, navigation }) {
+  console.log('[DEBUG] AnimalDetailsScreen rendered/remounted');
+  
+  useEffect(() => {
+    console.log('[DEBUG] AnimalDetailsScreen MOUNTED');
+    return () => {
+      console.log('[DEBUG] AnimalDetailsScreen UNMOUNTED');
+    };
+  }, []);
+
   const passedAnimal = route.params?.animal || null;
   const animalId = passedAnimal?._id || passedAnimal?.id || null;
 
@@ -73,11 +82,19 @@ export default function AnimalDetailsScreen({ route, navigation }) {
   const [isPlayerPlaying, setIsPlayerPlaying] = useState(false);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [similarAnimals, setSimilarAnimals] = useState([]);
-  const [isWishlisted, setIsWishlisted] = useState(false);
   const [isReported, setIsReported] = useState(false);
+  const [isLiking, setIsLiking] = useState(false);
+  
+  // Complaint state
+  const [isComplaintModalVisible, setIsComplaintModalVisible] = useState(false);
+  const [complaintText, setComplaintText] = useState('');
+  const [isSubmittingComplaint, setIsSubmittingComplaint] = useState(false);
+  
   const { t } = useTranslation();
 
-  const { userProfile, isGuest } = useContext(AppContext);
+  const { userProfile, isGuest, userToken, favorites, toggleFavoriteContext } = useContext(AppContext);
+  const normalizedAnimalId = String(animalId || '').trim();
+  const isWishlisted = favorites ? favorites.includes(normalizedAnimalId) : false;
 
   // Helper to detect if a file path or object is a video
   const detectIsVideo = useCallback((item) => {
@@ -468,20 +485,98 @@ export default function AnimalDetailsScreen({ route, navigation }) {
   };
 
   const handleReport = () => {
-    Alert.alert(
-      t('buy.report', { defaultValue: 'Report Listing' }),
-      'Are you sure you want to report this cattle listing to PashuSetu administrators?',
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        { 
-          text: t('common.confirm'), 
-          onPress: () => {
-            setIsReported(true);
-            Alert.alert('Report Submitted', 'Thank you. We will audit this listing within 24 hours.');
-          } 
-        }
-      ]
-    );
+    if (isGuest || !userToken || userToken === 'guest') {
+      Alert.alert(
+        t('common.loginRequired', { defaultValue: 'Login Required' }),
+        t('animalDetails.loginToReport', { defaultValue: 'Please login to report this listing.' }),
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          { text: t('common.login', { defaultValue: 'Login' }), onPress: () => navigation.navigate('Auth') }
+        ]
+      );
+      return;
+    }
+    console.log('[DEBUG] Flag button pressed! userToken:', userToken);
+    setComplaintText('');
+    console.log('[DEBUG] Setting isComplaintModalVisible to true.');
+    // Defer the state update slightly to prevent React Native Web from capturing the tail-end 
+    // of the click event as a backdrop press, which instantly fires onRequestClose.
+    setTimeout(() => {
+      setIsComplaintModalVisible(true);
+    }, 50);
+  };
+
+  useEffect(() => {
+    console.log('[DEBUG] Modal state changed! isComplaintModalVisible:', isComplaintModalVisible);
+  }, [isComplaintModalVisible]);
+
+  const submitComplaint = async () => {
+    if (complaintText.trim().length < 10) {
+      Alert.alert(t('common.error', { defaultValue: 'Error' }), 'Complaint must be at least 10 characters long.');
+      return;
+    }
+    if (complaintText.length > 500) {
+      Alert.alert(t('common.error', { defaultValue: 'Error' }), 'Complaint cannot exceed 500 characters.');
+      return;
+    }
+
+    setIsSubmittingComplaint(true);
+    try {
+      const res = await api.submitComplaint({
+        animalId: animal._id || animal.id,
+        message: complaintText.trim()
+      });
+      if (res?.status === 'success') {
+        console.log('[DEBUG] AnimalDetailsScreen: submitComplaint SUCCESS. Calling setIsComplaintModalVisible(false). Line: ~517');
+        setIsComplaintModalVisible(false);
+        setIsReported(true);
+        Alert.alert(
+          'यशस्वीरित्या नोंदवली गेली',
+          'तुमची तक्रार यशस्वीरित्या नोंदवली गेली.',
+          [{ text: t('common.ok', { defaultValue: 'OK' }) }]
+        );
+      }
+    } catch (e) {
+      console.warn('Complaint submission error:', e);
+      const msg = e.response?.data?.message || 'Something went wrong. Please try again.';
+      Alert.alert(t('common.error', { defaultValue: 'Error' }), msg);
+    } finally {
+      setIsSubmittingComplaint(false);
+    }
+  };
+
+  // Favorites are now fetched globally via AppContext
+  // No local fetch needed
+
+  const handleLikeToggle = async () => {
+    if (isGuest || !userToken || userToken === 'guest') {
+       Alert.alert(
+        t('common.loginRequired', { defaultValue: 'Login Required' }),
+        t('animalDetails.loginToFavorite', { defaultValue: 'Please login to add animals to your favorites.' }),
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          { text: t('common.login', { defaultValue: 'Login' }), onPress: () => navigation.navigate('Auth') }
+        ]
+      );
+      return;
+    }
+
+    if (isLiking || !animalId) return;
+    setIsLiking(true);
+
+    try {
+      const res = await toggleFavoriteContext(animalId);
+      if (res && res.reason === 'auth') {
+        Alert.alert(t('common.error', { defaultValue: 'Error' }), t('common.loginRequired', { defaultValue: 'Login Required' }));
+      } else if (!res || !res.success) {
+        Alert.alert(t('common.error', { defaultValue: 'Error' }), t('common.somethingWentWrong', { defaultValue: 'Something went wrong. Please try again.' }));
+      }
+    } catch (e) {
+      console.warn('Like API error:', e);
+      Alert.alert(t('common.error', { defaultValue: 'Error' }), t('common.somethingWentWrong', { defaultValue: 'Something went wrong. Please try again.' }));
+    } finally {
+      setIsLiking(false);
+    }
   };
 
   const numericPrice = Number(animal.price?.replace(/[^0-9]/g, '') || 65000);
@@ -586,8 +681,9 @@ export default function AnimalDetailsScreen({ route, navigation }) {
           </TouchableOpacity>
           <TouchableOpacity 
             style={[styles.headerCircleButton, styles.headerBtnMargin]} 
-            onPress={() => setIsWishlisted(!isWishlisted)}
+            onPress={handleLikeToggle}
             activeOpacity={0.7}
+            disabled={isLiking}
           >
             <Ionicons 
               name={isWishlisted ? "heart" : "heart-outline"} 
@@ -953,6 +1049,84 @@ export default function AnimalDetailsScreen({ route, navigation }) {
               />
             )}
           </ScrollView>
+        </View>
+      </Modal>
+
+      {/* Complaint Modal */}
+      {isComplaintModalVisible && console.log('[DEBUG] Complaint Modal is currently being rendered to the DOM! visible:', isComplaintModalVisible)}
+      <Modal
+        visible={isComplaintModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {
+          console.log('[DEBUG] AnimalDetailsScreen: onRequestClose triggered! Calling setIsComplaintModalVisible(false). Line: ~1047');
+          if (!isSubmittingComplaint) setIsComplaintModalVisible(false);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <AppText style={styles.modalTitle}>Report Listing</AppText>
+              <TouchableOpacity 
+                onPress={() => {
+                  console.log('[DEBUG] AnimalDetailsScreen: Close (X) button pressed. Calling setIsComplaintModalVisible(false). Line: ~1054');
+                  setIsComplaintModalVisible(false);
+                }}
+                disabled={isSubmittingComplaint}
+                style={styles.closeModalButton}
+              >
+                <Ionicons name="close" size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+            
+            <AppText style={styles.modalSubtitle}>
+              Please describe the issue with this listing.
+            </AppText>
+            
+            <TextInput
+              style={styles.complaintInput}
+              multiline
+              numberOfLines={6}
+              placeholder="तुमची तक्रार लिहा... / Describe your complaint..."
+              placeholderTextColor="#94A3B8"
+              value={complaintText}
+              onChangeText={setComplaintText}
+              maxLength={500}
+              editable={!isSubmittingComplaint}
+              textAlignVertical="top"
+            />
+            <AppText style={styles.charCount}>
+              {complaintText.length}/500
+            </AppText>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity 
+                style={styles.cancelBtn} 
+                onPress={() => {
+                  console.log('[DEBUG] AnimalDetailsScreen: Cancel button pressed. Calling setIsComplaintModalVisible(false). Line: ~1085');
+                  setIsComplaintModalVisible(false);
+                }}
+                disabled={isSubmittingComplaint}
+              >
+                <AppText style={styles.cancelBtnText}>Cancel</AppText>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[
+                  styles.submitBtn,
+                  (complaintText.trim().length < 10 || isSubmittingComplaint) && styles.submitBtnDisabled
+                ]} 
+                onPress={submitComplaint}
+                disabled={complaintText.trim().length < 10 || isSubmittingComplaint}
+              >
+                {isSubmittingComplaint ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <AppText style={styles.submitBtnText}>Submit Complaint</AppText>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       </Modal>
     </View>
@@ -1617,5 +1791,96 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#F8FAFC',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    width: '100%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  closeModalButton: {
+    padding: 4,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#64748B',
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  complaintInput: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 15,
+    color: '#1E293B',
+    minHeight: 120,
+  },
+  charCount: {
+    fontSize: 12,
+    color: '#94A3B8',
+    textAlign: 'right',
+    marginTop: 8,
+    marginBottom: 20,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+  },
+  cancelBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cancelBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  submitBtn: {
+    backgroundColor: '#EF4444',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  submitBtnDisabled: {
+    backgroundColor: '#FCA5A5',
+  },
+  submitBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });
