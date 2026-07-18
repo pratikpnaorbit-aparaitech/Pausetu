@@ -20,6 +20,7 @@ import {
   UIManager,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import AppText from './AppText';
 
 const { height: SCREEN_H } = Dimensions.get('window');
@@ -31,67 +32,67 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-// ─── Data Definitions ────────────────────────────────────────────────────────
-
-const LIVESTOCK_CATEGORIES = [
-  { id: 'all',     label: 'सर्व',       image: require('../../assets/icons/all.png') },
-  { id: 'cow',     label: 'गाय',       image: require('../../assets/icons/cow.png') },
-  { id: 'buffalo', label: 'म्हैस',      image: require('../../assets/icons/buffalo.png') },
-  { id: 'goat',    label: 'बकरी',      image: require('../../assets/icons/goat.png') },
-  { id: 'sheep',   label: 'मेंढी',      image: require('../../assets/icons/sheep.png') },
-  { id: 'horse',   label: 'घोडा',      image: require('../../assets/icons/horse.png') },
-  { id: 'other',   label: 'इतर',       image: require('../../assets/icons/other.png') },
-];
-
-const BUDGET_OPTIONS = [
-  { id: 'any',       label: 'सर्व बजेट',      desc: 'कोणतीही किंमत' },
-  { id: '0-20k',     label: '₹२० हजारपर्यंत', desc: 'कमी किमतीत' },
-  { id: '20-50k',    label: '₹२०-५० हजार',   desc: 'मध्यम बजेट' },
-  { id: '50-1L',     label: '₹५० हजार-१ लाख', desc: 'उत्कृष्ट जनावरे' },
-  { id: '1-2L',      label: '₹१-२ लाख',      desc: 'खास जनावरे' },
-  { id: '2L+',       label: '₹२ लाख+',        desc: 'उच्च दर्जाचे' },
-];
-
-const DISTANCE_OPTIONS = [
-  { id: 'any',  label: 'माझ्या जवळ', desc: 'सर्व जनावरे' },
-  { id: '5',    label: '५ किमी',      desc: 'खूप जवळ' },
-  { id: '10',   label: '१० किमी',     desc: 'जवळपास' },
-  { id: '20',   label: '२० किमी',     desc: 'तालुक्यात' },
-  { id: '50',   label: '५० किमी',     desc: 'जिल्ह्यात' },
-];
-
-const GENDERS = [
-  { id: 'any',    label: 'सर्व' },
-  { id: 'male',   label: 'नर (वळू/बोकड)' },
-  { id: 'female', label: 'मादी (गाय/म्हैस)' },
-];
-
-const AGES = [
-  { id: 'any',  label: 'सर्व वय' },
-  { id: '0-1',  label: '१ वर्षापेक्षा कमी' },
-  { id: '1-3',  label: '१ ते ३ वर्षे' },
-  { id: '3-5',  label: '३ ते ५ वर्षे' },
-  { id: '5+',   label: '५ वर्षापेक्षा जास्त' },
-];
-
-const MILK_YIELDS = [
-  { id: 'any',  label: 'सर्व' },
-  { id: '0-5',  label: '५ लिटरपेक्षा कमी' },
-  { id: '5-10', label: '५ ते १० लिटर' },
-  { id: '10+',  label: '१० लिटरपेक्षा जास्त' },
-];
-
-const BREEDS_MAP = {
-  cow: ['सर्व जाती', 'गीर', 'साहिवाल', 'खिल्लार', 'एचएफ (HF)', 'जर्सी', 'इतर'],
-  buffalo: ['सर्व जाती', 'मुर्‍हा', 'जाफराबाद', 'पंढरपुरी', 'मेहसाणा', 'इतर'],
-  goat: ['सर्व जाती', 'उस्मानाबादी', 'शिरोही', 'जमुनापारी', 'बीटल', 'इतर'],
-  sheep: ['सर्व जाती', 'दख्खनी', 'नेल्लोर', 'माडग्याळ', 'इतर'],
-  horse: ['सर्व जाती', 'मारवाडी', 'काठियावाडी', 'नुकरा', 'इतर'],
-};
-
 // ─── Main Component ──────────────────────────────────────────────────────────
 
-export default function FilterBottomSheet({ visible, onClose, onApply }) {
+export default function FilterBottomSheet({ visible, onClose, onApply, initialFilters }) {
+  const { t } = useTranslation();
+
+  const LIVESTOCK_CATEGORIES = [
+    { id: 'all',     label: t('filter.allAnimals'),       image: require('../../assets/icons/all.png') },
+    { id: 'cow',     label: t('filter.cow'),       image: require('../../assets/icons/cow.png') },
+    { id: 'buffalo', label: t('filter.buffalo'),      image: require('../../assets/icons/buffalo.png') },
+    { id: 'goat',    label: t('filter.goat'),      image: require('../../assets/icons/goat.png') },
+    { id: 'sheep',   label: t('filter.sheep'),      image: require('../../assets/icons/sheep.png') },
+    { id: 'horse',   label: t('filter.horse'),      image: require('../../assets/icons/horse.png') },
+    { id: 'other',   label: t('filter.other'),       image: require('../../assets/icons/other.png') },
+  ];
+
+  const BUDGET_OPTIONS = [
+    { id: 'any',       label: t('filter.anyBudget') },
+    { id: '0-20k',     label: t('filter.upTo20k') },
+    { id: '20-50k',    label: t('filter.20To50k') },
+    { id: '50-1L',     label: t('filter.50kTo1L') },
+    { id: '1-2L',      label: t('filter.1LTo2L') },
+    { id: '2L+',       label: t('filter.above2L') },
+  ];
+
+  const DISTANCE_OPTIONS = [
+    { id: 'any',  label: t('filter.anyDistance') },
+    { id: '5',    label: t('filter.5km') },
+    { id: '10',   label: t('filter.10km') },
+    { id: '20',   label: t('filter.20km') },
+    { id: '50',   label: t('filter.50km') },
+  ];
+
+  const GENDERS = [
+    { id: 'any',    label: t('filter.allGenders') },
+    { id: 'male',   label: t('filter.male') },
+    { id: 'female', label: t('filter.female') },
+  ];
+
+  const AGES = [
+    { id: 'any',  label: t('filter.anyAge') },
+    { id: '0-2',  label: t('filter.under2Years') },
+    { id: '1-3',  label: t('filter.1To3Years') },
+    { id: '3-5',  label: t('filter.3To5Years') },
+    { id: '5+',   label: t('filter.above5Years') },
+  ];
+
+  const MILK_YIELDS = [
+    { id: 'any',  label: t('filter.anyMilk') },
+    { id: '0-5',  label: t('filter.upTo5L') },
+    { id: '5-10', label: t('filter.5To10L') },
+    { id: '10+',  label: t('filter.above10L') },
+  ];
+
+  const BREEDS_MAP = {
+    cow: [t('filter.allBreeds'), t('filter.gir'), t('filter.sahiwal'), t('filter.khillar'), t('filter.hf'), t('filter.jersey'), t('filter.other')],
+    buffalo: [t('filter.allBreeds'), t('filter.murrah'), t('filter.jaffarabadi'), t('filter.pandharpuri'), t('filter.mehsana'), t('filter.other')],
+    goat: [t('filter.allBreeds'), t('filter.osmanabadi'), t('filter.sirohi'), t('filter.jamunapari'), t('filter.beetal'), t('filter.other')],
+    sheep: [t('filter.allBreeds'), t('filter.deccani'), t('filter.nellore'), t('filter.madgyal'), t('filter.other')],
+    horse: [t('filter.allBreeds'), t('filter.marwari'), t('filter.kathiawadi'), t('filter.nukra'), t('filter.other')],
+  };
+
   // UI Selection States
   const [selectedCat,    setSelectedCat]    = useState('all');
   const [selectedBudget, setSelectedBudget] = useState('any');
@@ -101,7 +102,7 @@ export default function FilterBottomSheet({ visible, onClose, onApply }) {
   // Expanded fields
   const [selectedGender, setSelectedGender] = useState('any');
   const [selectedAge,    setSelectedAge]    = useState('any');
-  const [selectedBreed,  setSelectedBreed]  = useState('सर्व जाती');
+  const [selectedBreed,  setSelectedBreed]  = useState(t('filter.allBreeds'));
   const [selectedMilk,   setSelectedMilk]   = useState('any');
 
   // Animation values
@@ -109,10 +110,27 @@ export default function FilterBottomSheet({ visible, onClose, onApply }) {
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const dragY = useRef(new Animated.Value(0)).current;
 
-  // Handle breed reset when category changes
+  // Sync state with initialFilters when opening
   useEffect(() => {
-    setSelectedBreed('सर्व जाती');
-  }, [selectedCat]);
+    if (visible) {
+      setSelectedCat(initialFilters?.category || 'all');
+      setSelectedBudget(initialFilters?.budget || 'any');
+      setSelectedDist(initialFilters?.distance || 'any');
+      setSelectedGender(initialFilters?.gender || 'any');
+      setSelectedAge(initialFilters?.age || 'any');
+      setSelectedBreed(initialFilters?.breed || t('filter.allBreeds'));
+      setSelectedMilk(initialFilters?.milkYield || 'any');
+    }
+  }, [visible, initialFilters]);
+
+  // Handle breed reset when category changes
+  const prevCat = useRef(selectedCat);
+  useEffect(() => {
+    if (prevCat.current !== selectedCat && visible) {
+      setSelectedBreed(t('filter.allBreeds'));
+    }
+    prevCat.current = selectedCat;
+  }, [selectedCat, visible]);
 
   // Open/Close transition
   useEffect(() => {
@@ -175,9 +193,21 @@ export default function FilterBottomSheet({ visible, onClose, onApply }) {
     setSelectedDist('any');
     setSelectedGender('any');
     setSelectedAge('any');
-    setSelectedBreed('सर्व जाती');
+    setSelectedBreed(t('filter.allBreeds'));
     setSelectedMilk('any');
     setIsAdvancedOpen(false);
+    if (onApply) {
+      onApply({
+        category: 'all',
+        budget: 'any',
+        distance: 'any',
+        gender: 'any',
+        age: 'any',
+        breed: t('filter.allBreeds'),
+        milkYield: 'any',
+      });
+    }
+    onClose();
   };
 
   const handleApply = () => {
@@ -223,8 +253,8 @@ export default function FilterBottomSheet({ visible, onClose, onApply }) {
 
           <View style={styles.headerRow}>
             <View>
-              <AppText style={styles.headerTitle}>🌾 तुम्हाला काय पाहिजे?</AppText>
-              <AppText style={styles.headerSubtitle}>तुमच्या गरजेनुसार जनावरे शोधा.</AppText>
+              <AppText style={styles.headerTitle}>{t('filter.whatDoYouWant')}</AppText>
+              <AppText style={styles.headerSubtitle}>{t('filter.searchByNeeds')}</AppText>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7}>
               <Ionicons name="close" size={22} color="#64748B" />
@@ -239,7 +269,7 @@ export default function FilterBottomSheet({ visible, onClose, onApply }) {
 
           {/* 🐄 कोणतं जनावर? */}
           <View style={styles.section}>
-            <AppText style={styles.sectionTitle}>🐄 कोणतं जनावर पाहिजे?</AppText>
+            <AppText style={styles.sectionTitle}>{t('filter.whichAnimal')}</AppText>
             <View style={styles.grid}>
               {LIVESTOCK_CATEGORIES.map((cat) => {
                 const isSelected = selectedCat === cat.id;
@@ -267,7 +297,7 @@ export default function FilterBottomSheet({ visible, onClose, onApply }) {
 
           {/* 💰 तुमचं बजेट किती? */}
           <View style={styles.section}>
-            <AppText style={styles.sectionTitle}>💰 तुमचं बजेट किती आहे?</AppText>
+            <AppText style={styles.sectionTitle}>{t('filter.whatsYourBudget')}</AppText>
             <View style={styles.budgetGrid}>
               {BUDGET_OPTIONS.map((opt) => {
                 const isSelected = selectedBudget === opt.id;
@@ -292,7 +322,7 @@ export default function FilterBottomSheet({ visible, onClose, onApply }) {
 
           {/* 📍 कुठे पाहिजे? */}
           <View style={styles.section}>
-            <AppText style={styles.sectionTitle}>📍 घरून किती अंतरावर पाहिजे?</AppText>
+            <AppText style={styles.sectionTitle}>{t('filter.howFar')}</AppText>
             <View style={styles.distGrid}>
               {DISTANCE_OPTIONS.map((opt) => {
                 const isSelected = selectedDist === opt.id;
@@ -322,7 +352,7 @@ export default function FilterBottomSheet({ visible, onClose, onApply }) {
                 <View style={[styles.settingsIconBox, isAdvancedOpen && styles.settingsIconBoxActive]}>
                   <MaterialCommunityIcons name="tune-variant" size={20} color={isAdvancedOpen ? '#16A34A' : '#64748B'} />
                 </View>
-                <AppText style={styles.accordionTitle}>⚙️ आणखी पर्याय निवडा</AppText>
+                <AppText style={styles.accordionTitle}>{t('filter.moreOptions')}</AppText>
               </View>
               <Ionicons
                 name={isAdvancedOpen ? 'chevron-up' : 'chevron-down'}
@@ -337,7 +367,7 @@ export default function FilterBottomSheet({ visible, onClose, onApply }) {
                 {/* जात (Breed) */}
                 {breedsList.length > 0 && (
                   <View style={styles.subSection}>
-                    <AppText style={styles.subTitle}>जात निवडा</AppText>
+                    <AppText style={styles.subTitle}>{t('filter.selectBreed')}</AppText>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
                       {breedsList.map((br) => {
                         const isSelected = selectedBreed === br;
@@ -359,7 +389,7 @@ export default function FilterBottomSheet({ visible, onClose, onApply }) {
 
                 {/* नर / मादी */}
                 <View style={styles.subSection}>
-                  <AppText style={styles.subTitle}>नर किंवा मादी पाहिजे?</AppText>
+                  <AppText style={styles.subTitle}>{t('filter.maleOrFemale')}</AppText>
                   <View style={styles.chipRow}>
                     {GENDERS.map((g) => {
                       const isSelected = selectedGender === g.id;
@@ -380,7 +410,7 @@ export default function FilterBottomSheet({ visible, onClose, onApply }) {
 
                 {/* वय */}
                 <View style={styles.subSection}>
-                  <AppText style={styles.subTitle}>वय किती पाहिजे?</AppText>
+                  <AppText style={styles.subTitle}>{t('filter.whatAge')}</AppText>
                   <View style={styles.chipRow}>
                     {AGES.map((a) => {
                       const isSelected = selectedAge === a.id;
@@ -402,7 +432,7 @@ export default function FilterBottomSheet({ visible, onClose, onApply }) {
                 {/* दूध उत्पादन (dairy animals only) */}
                 {showMilkFilter && (
                   <View style={styles.subSection}>
-                    <AppText style={styles.subTitle}>दूध उत्पादन (प्रतिदिन)</AppText>
+                    <AppText style={styles.subTitle}>{t('filter.milkProduction')}</AppText>
                     <View style={styles.chipRow}>
                       {MILK_YIELDS.map((m) => {
                         const isSelected = selectedMilk === m.id;
@@ -433,12 +463,12 @@ export default function FilterBottomSheet({ visible, onClose, onApply }) {
         {/* Bottom Sticky Action Buttons */}
         <View style={styles.stickyFooter}>
           <TouchableOpacity style={styles.resetBtn} onPress={handleReset} activeOpacity={0.75}>
-            <AppText style={styles.resetBtnText}>साफ करा</AppText>
+            <AppText style={styles.resetBtnText}>{t('filter.clear')}</AppText>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.applyBtn} onPress={handleApply} activeOpacity={0.85}>
             <Ionicons name="search" size={18} color="#FFF" style={{ marginRight: 6 }} />
-            <AppText style={styles.applyBtnText}>जनावरे दाखवा</AppText>
+            <AppText style={styles.applyBtnText}>{t('filter.showAnimals')}</AppText>
           </TouchableOpacity>
         </View>
       </Animated.View>

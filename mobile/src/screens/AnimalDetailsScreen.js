@@ -656,10 +656,18 @@ export default function AnimalDetailsScreen({ route, navigation }) {
                       uri={slide.thumbnail || firstImage || resolveMediaUrl(null)}
                       style={styles.galleryImage}
                       resizeMode="contain"
-                      onPress={handlePlay}
+                      onPress={(e) => {
+                        console.log('[VideoPlayer] Play button/thumbnail tapped');
+                        handlePlay();
+                      }}
                     />
-                    <View style={styles.videoOverlay} pointerEvents="none">
-                      <AppText style={styles.videoSlideLabel}>{t('animalDetails.watchVideo')}</AppText>
+                    <View style={styles.playButtonAbsoluteContainer} pointerEvents="none">
+                      <View style={styles.playButtonCircle}>
+                        <Ionicons name="play" size={36} color="#FFFFFF" style={styles.playIconOffset} />
+                      </View>
+                      <AppText style={[styles.videoSlideLabel, { marginTop: 12 }]}>
+                        {t('animalDetails.watchVideo')}
+                      </AppText>
                     </View>
                   </View>
                 );
@@ -691,23 +699,6 @@ export default function AnimalDetailsScreen({ route, navigation }) {
             </View>
           )}
 
-          {/* Fixed Play Button Overlay over the entire Hero Media Container */}
-          {videoUri && (
-            <View style={styles.heroPlayOverlay} pointerEvents="box-none">
-              <TouchableOpacity 
-                style={styles.playButtonCircle} 
-                activeOpacity={0.85}
-                onPress={() => {
-                  if (player) {
-                    player.replace(videoUri);
-                  }
-                  setIsVideoPlaying(true);
-                }}
-              >
-                <Ionicons name="play" size={36} color="#FFFFFF" style={styles.playIconOffset} />
-              </TouchableOpacity>
-            </View>
-          )}
         </View>
 
         {/* Content Body */}
@@ -1090,16 +1081,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     alignItems: 'center',
     paddingBottom: 24,
-  },
-  heroPlayOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 100,
   },
   playButtonAbsoluteContainer: {
     ...StyleSheet.absoluteFillObject,

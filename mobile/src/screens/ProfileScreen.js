@@ -208,9 +208,15 @@ export default function ProfileScreen({ navigation }) {
     }
   };
 
+  const getInitial = (nameStr) => {
+    if (!nameStr || typeof nameStr !== 'string' || !nameStr.trim()) return '?';
+    return nameStr.trim().charAt(0).toUpperCase();
+  };
+
   const profileImageUrl = userProfile?.photo
     ? (userProfile.photo.startsWith('http') ? userProfile.photo : `http://10.0.2.2:5000${userProfile.photo}`)
     : null;
+  const userInitial = getInitial(userProfile?.name);
   const displayName = userProfile?.name?.trim() ? userProfile.name : t('profile.notProvided');
   const displayRole = userProfile?.role?.trim() ? userProfile.role : t('profile.notProvided');
   const displayMobile = userProfile?.mobile?.trim() ? userProfile.mobile : t('profile.notProvided');
@@ -276,10 +282,16 @@ export default function ProfileScreen({ navigation }) {
             <View style={styles.profileUserCard}>
               <View style={styles.userMainRow}>
                 <TouchableOpacity style={styles.avatarContainer} onPress={handleSelectPhoto}>
-                  <Image
-                    source={{ uri: profileImageUrl }}
-                    style={styles.avatarImage}
-                  />
+                  {profileImageUrl ? (
+                    <Image
+                      source={{ uri: profileImageUrl }}
+                      style={styles.avatarImage}
+                    />
+                  ) : (
+                    <View style={[styles.avatarImage, styles.avatarPlaceholder]}>
+                      <AppText style={styles.avatarInitial}>{userInitial}</AppText>
+                    </View>
+                  )}
                   <View style={styles.camOverlayBadge}>
                     <Ionicons name="camera" size={12} color="#fff" />
                   </View>
@@ -498,6 +510,15 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 30,
     backgroundColor: '#F1F5F9',
+  },
+  avatarPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarInitial: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#16A34A',
   },
   camOverlayBadge: {
     position: 'absolute',

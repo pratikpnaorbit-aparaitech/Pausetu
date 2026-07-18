@@ -11,6 +11,11 @@ export default function BuyerHeader({ name, onNavigateToSell, onNavigateToNotifi
   const { t } = useTranslation();
   const [nearbyActive, setNearbyActive] = useState(true);
 
+  const getInitial = (nameStr) => {
+    if (!nameStr || typeof nameStr !== 'string' || !nameStr.trim()) return '?';
+    return nameStr.trim().charAt(0).toUpperCase();
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.topRow}>
@@ -52,7 +57,7 @@ export default function BuyerHeader({ name, onNavigateToSell, onNavigateToNotifi
             aria-label="Profile"
             activeOpacity={0.7}
           >
-            <AppText style={styles.avatarText}>{name.charAt(0).toUpperCase()}</AppText>
+            <AppText style={styles.avatarText}>{getInitial(name)}</AppText>
           </TouchableOpacity>
         </View>
       </View>

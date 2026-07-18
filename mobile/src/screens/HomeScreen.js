@@ -17,6 +17,12 @@ export default function HomeScreen() {
   const name = isGuest ? t('profile.guestUser') : userProfile?.name || 'User';
   const role = isGuest ? t('profile.guestMode') : userProfile?.role || t('profile.farmer');
 
+  const getInitial = (nameStr) => {
+    if (!nameStr || typeof nameStr !== 'string' || !nameStr.trim()) return '?';
+    return nameStr.trim().charAt(0).toUpperCase();
+  };
+  const userInitial = getInitial(name);
+
   const { isPremium } = usePremium();
   const [showPremiumAdvisor, setShowPremiumAdvisor] = useState(false);
 
@@ -27,7 +33,7 @@ export default function HomeScreen() {
         <LinearGradient colors={isPremium ? ['#7F00FF', '#E100FF'] : ['#11998e', '#38ef7d']} style={styles.headerCard}>
           <View style={styles.profileRow}>
             <View style={styles.avatarCircle}>
-              <AppText style={styles.avatarText}>{name.charAt(0).toUpperCase()}</AppText>
+              <AppText style={styles.avatarText}>{userInitial}</AppText>
             </View>
             <View style={styles.profileDetails}>
               <AppText style={styles.welcomeText}>{t('home.welcomeBack')}</AppText>

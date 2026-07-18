@@ -1,6 +1,7 @@
-import React, { useContext, useState, useCallback, useEffect } from 'react';
-import { StyleSheet, View, SafeAreaView, TouchableOpacity, TextInput, FlatList, Image, ActivityIndicator, Alert, Animated } from 'react-native';
+import React, { useContext, useState, useCallback, useEffect, useRef } from 'react';
+import { StyleSheet, View, SafeAreaView, TouchableOpacity, TextInput, FlatList, Image, ActivityIndicator, Alert, Animated, Dimensions } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 import { AppContext } from '../context/AppContext';
 import { api, resolveMediaUrl } from '../api/api';
 import { useTranslation } from 'react-i18next';
@@ -186,7 +187,7 @@ const CategoryCardItem = React.memo(({ item, isSelected, onPress, t }) => {
   );
 });
 
-const FilterCardEntry = React.memo(({ onFilterPress }) => {
+const FilterCardEntry = React.memo(({ onFilterPress, filterCount }) => {
   const scaleValue = React.useRef(new Animated.Value(1)).current;
 
   const handlePressIn = () => {
@@ -224,7 +225,14 @@ const FilterCardEntry = React.memo(({ onFilterPress }) => {
         >
           <View style={styles.farmerFilterContent}>
             <AppText style={styles.farmerFilterTitle}>तुम्हाला काय पाहिजे?</AppText>
-            <AppText style={styles.farmerFilterSubtitle}>योग्य जनावरे शोधा</AppText>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <AppText style={styles.farmerFilterSubtitle}>योग्य जनावरे शोधा</AppText>
+              {filterCount > 0 && (
+                <View style={styles.filterBadge}>
+                  <AppText style={styles.filterBadgeText}>({filterCount})</AppText>
+                </View>
+              )}
+            </View>
           </View>
 
           {/* Circular Green Action Button */}
@@ -246,7 +254,8 @@ const ListHeader = React.memo(({
   onChangeLocation,
   searchText,
   setSearchText,
-  onFilterPress
+  onFilterPress,
+  filterCount
 }) => {
   const { t } = useTranslation();
   const flatListRef = React.useRef(null);
@@ -356,7 +365,7 @@ const ListHeader = React.memo(({
       </View>
 
       {/* Farmer-Friendly Filter Card */}
-      <FilterCardEntry onFilterPress={onFilterPress} />
+      <FilterCardEntry onFilterPress={onFilterPress} filterCount={filterCount} />
 
       {/* Browse Categories Section */}
       <View style={styles.categoriesSection}>
@@ -454,27 +463,184 @@ export default function BuyScreen({ navigation }) {
   const name = isGuest ? 'Guest' : userProfile?.name || 'User';
   const { t } = useTranslation();
 
+  const getInitial = (nameStr) => {
+    if (!nameStr || typeof nameStr !== 'string' || !nameStr.trim()) return '?';
+    return nameStr.trim().charAt(0).toUpperCase();
+  };
+  const userInitial = getInitial(name);
+
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchText, setSearchText] = useState('');
   const [animalsList, setAnimalsList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isFilterVisible, setIsFilterVisible] = useState(false);
+  const [activeFilters, setActiveFilters] = useState(null);
+  const mainListRef = useRef(null);
 
-  const getFilteredAnimals = () => {
+  const getDistance = (lat1, lon1, lat2, lon2) => {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return Infinity;
+    const R = 6371; // km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
+
+  const handleApplyFilters = async (filters) => {
+    // Distance filter handling
+    if (filters.distance && filters.distance !== 'any') {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('लोकेशनची परवानगी नाही', 'तुमचे लोकेशन उपलब्ध नाही, त्यामुळे सर्व ठिकाणची जनावरे दाखवत आहोत.', [{ text: 'ठीक आहे' }]);
+        filters.distance = 'any';
+        filters.userLocation = null;
+      } else {
+        try {
+          // Use Balanced accuracy to get location quickly without delaying UI
+          const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          filters.userLocation = {
+            latitude: loc.coords.latitude,
+            longitude: loc.coords.longitude
+          };
+        } catch (error) {
+          Alert.alert('लोकेशन त्रुटी', 'लोकेशन मिळवता आले नाही, त्यामुळे सर्व ठिकाणची जनावरे दाखवत आहोत.', [{ text: 'ठीक आहे' }]);
+          filters.distance = 'any';
+          filters.userLocation = null;
+        }
+      }
+    }
+
+    setActiveFilters(filters);
+    if (filters.category) {
+      setSelectedCategory(filters.category);
+    }
+    setIsFilterVisible(false);
+
+    if (mainListRef.current) {
+      try {
+        mainListRef.current.scrollToOffset({ offset: 0, animated: true });
+      } catch (e) {
+        // ignore scroll error if list is empty
+      }
+    }
+  };
+
+  const getActiveFilterCount = () => {
+    let count = 0;
+    if (selectedCategory && selectedCategory !== 'all') count++;
+    if (!activeFilters) return count;
+    
+    if (activeFilters.budget && activeFilters.budget !== 'any') count++;
+    if (activeFilters.distance && activeFilters.distance !== 'any') count++;
+    if (activeFilters.gender && activeFilters.gender !== 'any') count++;
+    if (activeFilters.age && activeFilters.age !== 'any') count++;
+    if (activeFilters.breed && activeFilters.breed !== 'सर्व जाती') count++;
+    if (activeFilters.milkYield && activeFilters.milkYield !== 'any') count++;
+    return count;
+  };
+
+  const filteredAnimals = React.useMemo(() => {
     let list = animalsList;
 
-    // Filter by selected category
+    // Filter by selected category (from top bar or bottom sheet)
     if (selectedCategory && selectedCategory !== 'all') {
       if (selectedCategory === 'other') {
         const knownSlugs = ['cow', 'buffalo', 'goat', 'sheep', 'horse'];
         list = list.filter((animal) => {
-          const slug = animal.categoryId?.slug?.toLowerCase();
+          const slug = animal.categorySlug || animal.categoryId?.slug?.toLowerCase();
           return !slug || !knownSlugs.includes(slug);
         });
       } else {
         list = list.filter((animal) => {
-          const slug = animal.categoryId?.slug?.toLowerCase();
+          const slug = animal.categorySlug || animal.categoryId?.slug?.toLowerCase();
           return slug === selectedCategory.toLowerCase();
+        });
+      }
+    }
+
+    // Filter by active filters from FilterBottomSheet
+    if (activeFilters) {
+      // Budget
+      if (activeFilters.budget && activeFilters.budget !== 'any') {
+        list = list.filter(animal => {
+          const p = animal.rawPrice || 0;
+          switch (activeFilters.budget) {
+            case '0-20k': return p <= 20000;
+            case '20-50k': return p > 20000 && p <= 50000;
+            case '50-1L': return p > 50000 && p <= 100000;
+            case '1-2L': return p > 100000 && p <= 200000;
+            case '2L+': return p > 200000;
+            default: return true;
+          }
+        });
+      }
+
+      // Distance
+      if (activeFilters.distance && activeFilters.distance !== 'any' && activeFilters.userLocation) {
+        const maxDist = parseInt(activeFilters.distance, 10);
+        list = list.filter(animal => {
+          if (!animal.latitude || !animal.longitude) return false;
+          const dist = getDistance(
+            activeFilters.userLocation.latitude,
+            activeFilters.userLocation.longitude,
+            animal.latitude,
+            animal.longitude
+          );
+          return dist <= maxDist;
+        });
+      }
+
+      // Gender
+      if (activeFilters.gender && activeFilters.gender !== 'any') {
+        list = list.filter(animal => {
+          if (!animal.gender) return false;
+          const g = animal.gender.toLowerCase();
+          const target = activeFilters.gender.toLowerCase();
+          return g === target || g === target.charAt(0);
+        });
+      }
+
+      // Age (simple mapping assuming animal.age is text like '3 Years', '5 Months' or numeric strings)
+      if (activeFilters.age && activeFilters.age !== 'any') {
+        list = list.filter(animal => {
+          const ageStr = (animal.age || '').toLowerCase();
+          const numMatch = ageStr.match(/(\d+(\.\d+)?)/);
+          if (!numMatch) return false;
+          let val = parseFloat(numMatch[1]);
+          if (ageStr.includes('month') || ageStr.includes('महिने') || ageStr.includes('महिना')) val = val / 12;
+
+          switch (activeFilters.age) {
+            case '0-2': return val < 2;
+            case '1-3': return val >= 1 && val <= 3;
+            case '3-5': return val > 3 && val <= 5;
+            case '5+': return val > 5;
+            default: return true;
+          }
+        });
+      }
+
+      // Breed
+      if (activeFilters.breed && activeFilters.breed !== 'सर्व जाती') {
+        list = list.filter(animal => animal.breed === activeFilters.breed);
+      }
+
+      // Milk Yield
+      if (activeFilters.milkYield && activeFilters.milkYield !== 'any') {
+        list = list.filter(animal => {
+          const capStr = (animal.health?.milkCapacity || '').toLowerCase();
+          const match = capStr.match(/(\d+(\.\d+)?)/);
+          if (!match) return false;
+          const val = parseFloat(match[1]);
+
+          switch (activeFilters.milkYield) {
+            case '0-5': return val <= 5;
+            case '5-10': return val > 5 && val <= 10;
+            case '10+': return val > 10;
+            default: return true;
+          }
         });
       }
     }
@@ -492,9 +658,7 @@ export default function BuyScreen({ navigation }) {
     }
 
     return list;
-  };
-
-  const filteredAnimals = getFilteredAnimals();
+  }, [animalsList, selectedCategory, activeFilters, searchText]);
 
   const fetchLiveListings = async (showSpinner = true) => {
     if (showSpinner) setLoading(true);
@@ -507,6 +671,7 @@ export default function BuyScreen({ navigation }) {
           name: a.title,
           breed: a.breedId?.name || 'Unknown Breed',
           age: a.age,
+          rawPrice: a.price,
           price: `₹${a.price.toLocaleString()}`,
           sellerName: a.sellerId?.name || 'Seller',
           location: `${a.village}, ${a.district}`,
@@ -514,7 +679,8 @@ export default function BuyScreen({ navigation }) {
           isFeatured: a.views > 200,
           postedTime: 'Active',
           photos: a.photos,
-          video: a.video
+          video: a.video,
+          categorySlug: a.categoryId?.slug?.toLowerCase()
         }));
         setAnimalsList(mappedList);
       }
@@ -593,7 +759,7 @@ export default function BuyScreen({ navigation }) {
                 <View style={styles.notificationHeaderBadge} />
               </TouchableOpacity>
               <TouchableOpacity style={styles.avatarCircle} onPress={() => navigation.navigate('Profile')}>
-                <AppText style={styles.avatarText}>{name.charAt(0).toUpperCase()}</AppText>
+                <AppText style={styles.avatarText}>{userInitial}</AppText>
               </TouchableOpacity>
             </View>
           </View>
@@ -605,6 +771,7 @@ export default function BuyScreen({ navigation }) {
             </View>
           ) : (
             <FlatList
+              ref={mainListRef}
               data={filteredAnimals}
               keyExtractor={(item) => item.id}
               ListHeaderComponent={
@@ -618,6 +785,7 @@ export default function BuyScreen({ navigation }) {
                   searchText={searchText}
                   setSearchText={setSearchText}
                   onFilterPress={() => setIsFilterVisible(true)}
+                  filterCount={getActiveFilterCount()}
                 />
               }
               ListFooterComponent={
@@ -670,9 +838,8 @@ export default function BuyScreen({ navigation }) {
       <FilterBottomSheet
         visible={isFilterVisible}
         onClose={() => setIsFilterVisible(false)}
-        onApply={(filters) => {
-          console.log('[BuyScreen] Filters applied (UI only):', filters);
-        }}
+        initialFilters={activeFilters}
+        onApply={handleApplyFilters}
       />
     </View>
   );
@@ -923,6 +1090,18 @@ const styles = StyleSheet.create({
     color: '#64748B',
     fontWeight: '600',
     marginTop: 3,
+  },
+  filterBadge: {
+    backgroundColor: '#DCFCE7',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginLeft: 6,
+  },
+  filterBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#16A34A',
   },
   farmerFilterMiniCardsRow: {
     flexDirection: 'row',

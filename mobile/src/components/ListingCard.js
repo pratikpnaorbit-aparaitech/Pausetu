@@ -74,7 +74,7 @@ export default function ListingCard({ item, onViewDetailsPress, style }) {
   // Determine seller name & verification status
   const sellerName = item.sellerName || item.sellerId?.name || 'Seller';
   const isSellerVerified = item.sellerId?.verification?.status === 'approved' || item.isVerified;
-  const sellerInitial = sellerName.charAt(0).toUpperCase();
+  const sellerInitial = (sellerName && typeof sellerName === 'string' && sellerName.trim()) ? sellerName.trim().charAt(0).toUpperCase() : '?';
 
   // Role localized label
   const getSellerLabel = () => {

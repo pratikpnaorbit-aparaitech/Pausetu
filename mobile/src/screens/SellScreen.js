@@ -484,7 +484,7 @@ export default function SellScreen({ navigation }) {
             <View key={item.id} style={styles.enquiryCard}>
               <View style={styles.enquiryLeft}>
                 <View style={styles.enquiryAvatarCircle}>
-                  <AppText style={styles.enquiryAvatarText}>{item.buyerName.charAt(0)}</AppText>
+                  <AppText style={styles.enquiryAvatarText}>{(item.buyerName && typeof item.buyerName === 'string' && item.buyerName.trim()) ? item.buyerName.trim().charAt(0).toUpperCase() : '?'}</AppText>
                 </View>
                 <View style={styles.enquiryMeta}>
                   <AppText style={styles.enquiryBuyer}>{item.buyerName}</AppText>
