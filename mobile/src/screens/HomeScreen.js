@@ -87,18 +87,12 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Recent Activities Section */}
+        {/* Recent Updates - shows real notifications when available */}
         <AppText style={styles.sectionTitle}>{t('home.recentUpdates')}</AppText>
-        <View style={styles.updateCard}>
-          <AppText style={styles.updateBadge}>{t('home.alertBadge')}</AppText>
-          <AppText style={styles.updateTitle}>{t('home.fodderAlert')}</AppText>
-          <AppText style={styles.updateTime}>{t('home.hoursAgo2')}</AppText>
-        </View>
-
-        <View style={styles.updateCard}>
-          <AppText style={[styles.updateBadge, styles.doctorBadge]}>{t('home.doctorBadge')}</AppText>
-          <AppText style={styles.updateTitle}>{t('home.doctorAlert')}</AppText>
-          <AppText style={styles.updateTime}>{t('home.hoursAgo5')}</AppText>
+        <View style={styles.emptyUpdatesCard}>
+          <MaterialCommunityIcons name="bell-outline" size={28} color="rgba(255,255,255,0.3)" />
+          <AppText style={styles.emptyUpdatesText}>{t('home.noRecentUpdates')}</AppText>
+          <AppText style={styles.emptyUpdatesDesc}>{t('home.noRecentUpdatesDesc')}</AppText>
         </View>
       </ScrollView>
 
@@ -215,38 +209,26 @@ const styles = StyleSheet.create({
     color: '#B0BEC5',
     marginTop: 4,
   },
-  updateCard: {
+  emptyUpdatesCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.03)',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.06)',
-    padding: 16,
+    padding: 20,
+    alignItems: 'center',
     marginBottom: 12,
   },
-  updateBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(235, 48, 14, 0.15)',
-    color: '#FF7043',
-    paddingVertical: 2,
-    paddingHorizontal: 8,
-    borderRadius: 4,
-    fontSize: 11,
-    fontWeight: 'bold',
-    overflow: 'hidden',
-  },
-  doctorBadge: {
-    backgroundColor: 'rgba(0, 230, 118, 0.15)',
-    color: '#00E676',
-  },
-  updateTitle: {
-    color: '#FFFFFF',
+  emptyUpdatesText: {
+    color: 'rgba(255,255,255,0.5)',
     fontSize: 14,
+    fontWeight: '600',
     marginTop: 8,
-    fontWeight: '500',
   },
-  updateTime: {
-    color: '#90A4AE',
+  emptyUpdatesDesc: {
+    color: 'rgba(255,255,255,0.3)',
     fontSize: 11,
-    marginTop: 6,
+    textAlign: 'center',
+    marginTop: 4,
+    lineHeight: 16,
   },
 });

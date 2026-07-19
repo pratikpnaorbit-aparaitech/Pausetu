@@ -3,7 +3,7 @@ import { StyleSheet, View, TouchableOpacity, ScrollView, SafeAreaView, ActivityI
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import AppText from '../../components/AppText';
-import { PLANS, MOCK_PAYMENT_PROVIDERS } from '../../constants/premiumConstants';
+import { PLANS, PAYMENT_PROVIDERS } from '../../constants/premiumConstants';
 import { usePremium } from '../../hooks/usePremium';
 
 export default function PremiumAdvisorPaymentScreen({ onPaymentSuccess, onBack }) {
@@ -19,7 +19,7 @@ export default function PremiumAdvisorPaymentScreen({ onPaymentSuccess, onBack }
   const handlePay = async () => {
     setProcessing(true);
     try {
-      // Dummy ₹1 Payment Process
+      // ₹1 payment process
       const response = await subscribe(selectedPlan, 1, selectedProvider);
       
       if (response.success) {
@@ -83,12 +83,6 @@ export default function PremiumAdvisorPaymentScreen({ onPaymentSuccess, onBack }
                   {t(plan.priceKey)}
                 </AppText>
                 
-                <View style={styles.dummyPriceRow}>
-                  <AppText style={styles.dummyPriceText}>
-                    Dummy Test Fee: ₹1
-                  </AppText>
-                </View>
-
                 <AppText style={styles.planDesc}>
                   {t(plan.descKey)}
                 </AppText>
@@ -99,11 +93,11 @@ export default function PremiumAdvisorPaymentScreen({ onPaymentSuccess, onBack }
 
         {/* Gateway Provider Selection */}
         <AppText style={styles.sectionTitle}>
-          Select Payment Method
+          {t('premiumAdvisor.paymentScreen.selectPaymentMethod')}
         </AppText>
         
         <View style={styles.providersContainer}>
-          {MOCK_PAYMENT_PROVIDERS.map((provider) => {
+          {PAYMENT_PROVIDERS.map((provider) => {
             const isSelected = selectedProvider === provider.id;
             return (
               <TouchableOpacity
@@ -129,11 +123,11 @@ export default function PremiumAdvisorPaymentScreen({ onPaymentSuccess, onBack }
           })}
         </View>
 
-        {/* Gateway Config Details (For transparency / keys checking) */}
+        {/* Test mode notice */}
         <View style={styles.configCard}>
-          <Ionicons name="information-circle-outline" size={16} color="#475569" style={{ marginRight: 6 }} />
+          <Ionicons name="shield-checkmark-outline" size={16} color="#475569" style={{ marginRight: 6 }} />
           <AppText style={styles.configText}>
-            Gateway Mode: Dummy (₹1 Test Environment Enabled)
+            {t('premiumAdvisor.paymentScreen.testModeNote')}
           </AppText>
         </View>
       </ScrollView>
@@ -230,19 +224,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#0F172A',
     marginBottom: 4,
-  },
-  dummyPriceRow: {
-    backgroundColor: '#FEF3C7',
-    paddingVertical: 2,
-    paddingHorizontal: 6,
-    borderRadius: 6,
-    alignSelf: 'flex-start',
-    marginBottom: 12,
-  },
-  dummyPriceText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#D97706',
   },
   planDesc: {
     fontSize: 11,

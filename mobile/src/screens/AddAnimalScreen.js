@@ -25,11 +25,11 @@ import { AppContext } from '../context/AppContext';
 import { useTranslation } from 'react-i18next';
 import AppText from '../components/AppText';
 import { animalApi } from '../api/animalApi';
+import { reverseGeocodeWithCache } from '../utils/geocoder';
+import { refreshManager, REFRESH_EVENTS } from '../services/refreshManager';
 
 const { width, height } = Dimensions.get('window');
 
-// API Configurations
-const API_BASE_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5000/api' : 'http://localhost:5000/api';
 const DRAFTS_KEY = 'PASHUSETU_OFFLINE_DRAFTS';
 
 // Step descriptions
@@ -105,7 +105,7 @@ export default function AddAnimalScreen({ navigation }) {
   const [photoPreview, setPhotoPreview] = useState(null);
 
   // Step 3: Video Recording variables
-  const [video, setVideo] = useState(null); // Stores captured video path or mock URL
+  const [video, setVideo] = useState(null); // Stores captured video URI or uploaded URL
   const [isVideoRecording, setIsVideoRecording] = useState(false);
   const [videoTimer, setVideoTimer] = useState(0);
   const [videoPreview, setVideoPreview] = useState(null);
@@ -141,6 +141,8 @@ export default function AddAnimalScreen({ navigation }) {
   // GPS State
   const [latitude, setLatitude] = useState(null);
   const [longitude, setLongitude] = useState(null);
+  const [pincode, setPincode] = useState('');
+  const [formattedAddress, setFormattedAddress] = useState('');
   const [gpsLoading, setGpsLoading] = useState(false);
   const [gpsSuccess, setGpsSuccess] = useState(false);
 
@@ -464,12 +466,35 @@ export default function AddAnimalScreen({ navigation }) {
       }
 
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      setLatitude(loc.coords.latitude);
-      setLongitude(loc.coords.longitude);
+      const lat = loc.coords.latitude;
+      const lng = loc.coords.longitude;
+
+      setLatitude(lat);
+      setLongitude(lng);
+
+      const geocoded = await reverseGeocodeWithCache(lat, lng);
+      if (geocoded) {
+        if (geocoded.pincode) setPincode(geocoded.pincode);
+        if (geocoded.formattedAddress) setFormattedAddress(geocoded.formattedAddress);
+
+        if (geocoded.state && !selectedState) {
+          setSelectedState({ name: geocoded.state });
+        }
+        if (geocoded.district && !selectedDistrict) {
+          setSelectedDistrict({ name: geocoded.district });
+        }
+        if (geocoded.taluka && !selectedTaluka) {
+          setSelectedTaluka({ name: geocoded.taluka });
+        }
+        if (geocoded.village && (!selectedVillage || selectedVillage === '')) {
+          setSelectedVillage(geocoded.village);
+        }
+      }
       setGpsSuccess(true);
     } catch (e) {
       setLatitude(17.2855);
       setLongitude(74.1839);
+      setFormattedAddress('Murti, Baramati, Pune, Maharashtra');
       setGpsSuccess(true);
     } finally {
       setGpsLoading(false);
@@ -560,6 +585,8 @@ export default function AddAnimalScreen({ navigation }) {
       district: selectedDistrict?.name || '',
       taluka: selectedTaluka?.name || '',
       village: (typeof selectedVillage === 'object' ? selectedVillage?.name : selectedVillage) || '',
+      pincode: pincode || '',
+      formattedAddress: formattedAddress || [typeof selectedVillage === 'object' ? selectedVillage?.name : selectedVillage, selectedTaluka?.name, selectedDistrict?.name, selectedState?.name].filter(Boolean).join(', '),
       latitude: latitude,
       longitude: longitude,
       mediaMetadata: {
@@ -669,6 +696,7 @@ export default function AddAnimalScreen({ navigation }) {
 
       const body = await animalApi.createAnimal(finalPayload);
       if (body.status === 'success') {
+        refreshManager.emit(REFRESH_EVENTS.LISTING_CREATED, body.data?.animal);
         showAlert(
           t('common.success'),
           t('addAnimal.publishSuccess'),
@@ -2025,7 +2053,9 @@ export default function AddAnimalScreen({ navigation }) {
               {gpsSuccess ? (
                 <View style={styles.gpsSuccessBox}>
                   <Ionicons name="checkmark-circle" size={24} color="#16A34A" />
-                  <AppText style={styles.gpsSuccessText}>{t('addAnimal.gpsLocationAttached', { lat: latitude.toFixed(4), lng: longitude.toFixed(4) })}</AppText>
+                  <AppText style={styles.gpsSuccessText}>
+                    📍 {formattedAddress || [typeof selectedVillage === 'object' ? selectedVillage?.name : selectedVillage, selectedTaluka?.name, selectedDistrict?.name, selectedState?.name].filter(Boolean).join(', ')}
+                  </AppText>
                 </View>
               ) : (
                 <TouchableOpacity
@@ -2053,7 +2083,7 @@ export default function AddAnimalScreen({ navigation }) {
             <AppText style={styles.wizardLabel}>{t('addAnimal.previewListing')}</AppText>
 
             {/* Photos scroll */}
-            <AppText style={styles.previewTitle}>Live Photos:</AppText>
+            <AppText style={styles.previewTitle}>{t('addAnimal.livePhotosTitle')}</AppText>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.previewPhotoRow}>
               {photos.map((p, idx) => (
                 <Image key={idx} source={{ uri: p.uri }} style={styles.previewThumb} />
@@ -2062,15 +2092,15 @@ export default function AddAnimalScreen({ navigation }) {
 
             {/* Details panel */}
             <View style={styles.previewPanel}>
-              <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>नाव / Title:</Text> {title}</AppText>
-              <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>जात / Breed:</Text> {selectedBreed?.name}</AppText>
-              <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>वय / Age:</Text> {age} Years</AppText>
-              {weight !== '' && <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>वजन / Weight:</Text> {weight} kg</AppText>}
-              <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>लिंग / Gender:</Text> {gender}</AppText>
-              <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>लसीकरण / Vaccinated:</Text> {isVaccinated ? 'होय / Yes' : 'नाही / No'}</AppText>
-              {milkCapacity !== '' && <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>दूध देण्याची क्षमता / Milk:</Text> {milkCapacity} L/day</AppText>}
-              <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>अपेक्षित किंमत / Price:</Text> ₹{price} ({isNegotiable ? 'Negotiable' : 'Fixed'})</AppText>
-              <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>पत्ता / Location:</Text> {typeof selectedVillage === 'object' ? selectedVillage?.name : selectedVillage}, {selectedTaluka?.name}, {selectedDistrict?.name}, {selectedState?.name}</AppText>
+              <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>{t('addAnimal.previewLabelTitle')} </Text> {title}</AppText>
+              <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>{t('addAnimal.previewLabelBreed')} </Text> {selectedBreed?.name}</AppText>
+              <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>{t('addAnimal.previewLabelAge')} </Text> {age} {t('common.years')}</AppText>
+              {weight !== '' && <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>{t('addAnimal.previewLabelWeight')} </Text> {weight} {t('common.kg')}</AppText>}
+              <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>{t('addAnimal.previewLabelGender')} </Text> {gender}</AppText>
+              <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>{t('addAnimal.previewLabelVaccinated')} </Text> {isVaccinated ? t('common.yes') : t('common.no')}</AppText>
+              {milkCapacity !== '' && <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>{t('addAnimal.previewLabelMilk')} </Text> {milkCapacity} {t('common.litersPerDay')}</AppText>}
+              <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>{t('addAnimal.previewLabelPrice')} </Text> ₹{price} ({isNegotiable ? t('common.negotiable') : t('common.fixed')})</AppText>
+              <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>{t('addAnimal.previewLabelLocation')} </Text> {typeof selectedVillage === 'object' ? selectedVillage?.name : selectedVillage}, {selectedTaluka?.name}, {selectedDistrict?.name}, {selectedState?.name}</AppText>
             </View>
 
             <TouchableOpacity style={styles.editSectionBtn} onPress={() => setCurrentStep(4)}>

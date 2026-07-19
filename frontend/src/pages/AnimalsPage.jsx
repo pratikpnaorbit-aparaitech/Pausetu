@@ -2,6 +2,9 @@ import React, { useContext, useState } from 'react';
 import { AdminContext } from '../context/AdminContext';
 import { Check, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 
+import { useWebAutoRefresh } from '../hooks/useWebAutoRefresh';
+import { REFRESH_EVENTS } from '../services/refreshManager';
+
 // Status badge using design system class
 function StatusBadge({ status }) {
   const map = {
@@ -28,7 +31,13 @@ export default function AnimalsPage() {
     triggerConfirm,
     handleSoftDeleteListing,
     showToast,
+    loadDashboardData,
   } = useContext(AdminContext);
+
+  useWebAutoRefresh(loadDashboardData, {
+    events: [REFRESH_EVENTS.LISTING_CREATED, REFRESH_EVENTS.LISTING_UPDATED, REFRESH_EVENTS.LISTING_DELETED],
+    pageKey: 'AnimalsPage'
+  });
 
   const [selectedAnimals, setSelectedAnimals] = useState([]);
   const [currentPage, setCurrentPage]         = useState(1);

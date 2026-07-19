@@ -5,6 +5,8 @@ import NotificationCard from '../components/NotificationCard';
 import { api } from '../api/api';
 import { useTranslation } from 'react-i18next';
 import AppText from '../components/AppText';
+import { useAutoRefresh } from '../hooks/useAutoRefresh';
+import { REFRESH_EVENTS } from '../services/refreshManager';
 
 const mapBackendNotification = (n) => {
   let category = 'System';
@@ -82,9 +84,13 @@ export default function NotificationsScreen({ navigation }) {
     }
   };
 
-  useEffect(() => {
-    fetchNotifications();
-  }, []);
+  useAutoRefresh(
+    () => fetchNotifications(),
+    {
+      events: [REFRESH_EVENTS.NOTIFICATION_UPDATED, REFRESH_EVENTS.VERIFICATION_UPDATED],
+      screenKey: 'NotificationsScreen'
+    }
+  );
 
   const filteredNotifications = useMemo(() => {
     return notifications.filter((item) => {

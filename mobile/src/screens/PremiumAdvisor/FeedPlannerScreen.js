@@ -9,6 +9,8 @@ import AppText from '../../components/AppText';
 import { usePremium } from '../../hooks/usePremium';
 import { AppContext } from '../../context/AppContext';
 import { verificationApi } from '../../api/verificationApi';
+import { useAutoRefresh } from '../../hooks/useAutoRefresh';
+import { REFRESH_EVENTS } from '../../services/refreshManager';
 import FeedPlannerUnlockScreen from './FeedPlannerUnlockScreen';
 import { feedPlannerService } from '../../services/feedPlannerService';
 import TypingIndicator from '../../chatbot/components/TypingIndicator';
@@ -75,6 +77,26 @@ function FeedPlannerChatAssistant({ onRestart }) {
   const [analyzing, setAnalyzing] = useState(false);
   const [globalUnlock, setGlobalUnlock] = useState(false);
 
+  const fetchUnlockSettings = async () => {
+    try {
+      const res = await verificationApi.getSettings();
+      const fpUnlock = res?.feedPlannerGlobalUnlock ?? res?.data?.settings?.feedPlannerGlobalUnlock;
+      if (fpUnlock !== undefined) {
+        setGlobalUnlock(!!fpUnlock);
+      }
+    } catch (err) {
+      console.warn('[FeedPlannerScreen] Error fetching unlock settings:', err.message);
+    }
+  };
+
+  useAutoRefresh(
+    () => fetchUnlockSettings(),
+    {
+      events: [REFRESH_EVENTS.VERIFICATION_UPDATED],
+      screenKey: 'FeedPlannerScreen'
+    }
+  );
+
   useEffect(() => {
     setIsTyping(true);
     timerRef.current = setTimeout(() => {
@@ -82,13 +104,7 @@ function FeedPlannerChatAssistant({ onRestart }) {
       setMessages([{ id: 'greeting', sender: 'bot', text: t('feedPlanner.chat.qAnimal') }]);
     }, 600);
 
-    verificationApi.getSettings()
-      .then(res => {
-        if (res && res.feedPlannerGlobalUnlock !== undefined) {
-          setGlobalUnlock(!!res.feedPlannerGlobalUnlock);
-        }
-      })
-      .catch(err => console.log('Error setting check:', err));
+    fetchUnlockSettings();
 
     return () => timerRef.current && clearTimeout(timerRef.current);
   }, []);
@@ -206,6 +222,7 @@ function FeedPlannerChatAssistant({ onRestart }) {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header with Enterprise Status Badge */}
       <View style={styles.header}>
         <View style={styles.avatarContainer}>
           <View style={styles.avatar}>
@@ -214,11 +231,24 @@ function FeedPlannerChatAssistant({ onRestart }) {
           <View style={styles.onlineDot} />
         </View>
         <View style={styles.headerInfo}>
-          <AppText style={styles.headerTitle}>{t('feedPlanner.title')}</AppText>
+          <AppText style={styles.headerTitle} numberOfLines={1}>{t('feedPlanner.title')}</AppText>
           <AppText style={styles.headerSubtitle}>
             {isTyping || analyzing ? t('common.loading') : t('common.online')}
           </AppText>
         </View>
+
+        <View style={[styles.headerStatusPill, hasAccess ? styles.pillUnlocked : styles.pillLocked]}>
+          <MaterialCommunityIcons
+            name={hasAccess ? 'lock-open-variant' : 'lock'}
+            size={11}
+            color={hasAccess ? '#059669' : '#DC2626'}
+            style={{ marginRight: 3 }}
+          />
+          <AppText style={[styles.headerStatusPillText, { color: hasAccess ? '#059669' : '#DC2626' }]}>
+            {hasAccess ? t('common.available', { defaultValue: 'Available' }) : t('common.premium', { defaultValue: 'Premium' })}
+          </AppText>
+        </View>
+
         <TouchableOpacity style={styles.restartBtn} onPress={handlePressRestart} aria-label="Restart feed planner">
           <MaterialCommunityIcons name="refresh" size={20} color="#FFFFFF" />
         </TouchableOpacity>
@@ -527,5 +557,26 @@ const styles = StyleSheet.create({
   blockTextWarn: { fontSize: 12.5, color: '#DC2626', lineHeight: 18 },
   maharashtraNote: { fontSize: 11.5, color: '#64748B', textAlign: 'center', marginTop: 14 },
   recalcBtn: { backgroundColor: '#16A34A', padding: 12, borderRadius: 10, alignItems: 'center', marginTop: 14 },
-  recalcText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' }
+  recalcText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
+  headerStatusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginRight: 6,
+  },
+  pillLocked: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FCA5A5',
+  },
+  pillUnlocked: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#6EE7B7',
+  },
+  headerStatusPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+  }
 });

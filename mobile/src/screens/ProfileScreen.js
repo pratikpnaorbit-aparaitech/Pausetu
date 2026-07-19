@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { resolveMediaUrl } from '../api/api';
 import AppText from '../components/AppText';
 import VerificationCard from '../components/VerificationCard';
+import { formatLocationDisplay } from '../utils/geocoder';
 
 const SELLER_STATS = [
   { id: '1', labelKey: 'profile.activeListings', value: '3', icon: 'list-box-outline', color: '#16A34A' },
@@ -224,9 +225,7 @@ export default function ProfileScreen({ navigation }) {
   const displayRole = userProfile?.role?.trim() ? userProfile.role : t('profile.notProvided');
   const displayMobile = userProfile?.mobile?.trim() ? userProfile.mobile : t('profile.notProvided');
   const displayEmail = userProfile?.email?.trim() ? userProfile.email : t('profile.notProvided');
-  const displayLocation = userProfile?.village
-    ? `${userProfile.village}, ${userProfile.taluka || ''}, ${userProfile.district || ''}, ${userProfile.state || ''}`.replace(/, ,/g, ',').replace(/(^,)|(,$)/g, '')
-    : t('profile.notConfigured');
+  const displayLocation = formatLocationDisplay(userProfile).formatted || t('profile.notConfigured');
 
   if (isProfileLoading && !userProfile) {
     return (

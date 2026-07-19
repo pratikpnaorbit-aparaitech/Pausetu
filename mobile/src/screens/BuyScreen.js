@@ -14,6 +14,7 @@ import ListingCard from '../components/ListingCard';
 import LocationPicker from '../components/LocationPicker';
 import FilterBottomSheet from '../components/FilterBottomSheet';
 import LanguageSelector from '../components/LanguageSelector';
+import { formatLocationDisplay } from '../utils/geocoder';
 
 const CATEGORIES = [
   { id: 'all', nameKey: 'buy.all', image: require('../../assets/icons/all.png') },
@@ -25,125 +26,7 @@ const CATEGORIES = [
   { id: 'other', nameKey: 'buy.other', image: require('../../assets/icons/other.png') },
 ];
 
-const FEATURED_ANIMALS = [
-  {
-    id: 'f1',
-    name: 'HF Cross Cow',
-    breed: 'Holstein Friesian',
-    age: '3.5 Years',
-    price: '₹55,000',
-    location: 'Baramati, Pune',
-    isVerified: true,
-    isFeatured: true,
-    categorySlug: 'cow',
-  },
-  {
-    id: 'f2',
-    name: 'Murrah Buffalo',
-    breed: 'Pure Murrah',
-    age: '4 Years',
-    price: '₹85,000',
-    location: 'Hassan, Karnataka',
-    isVerified: true,
-    isFeatured: true,
-    categorySlug: 'buffalo',
-  },
-  {
-    id: 'f3',
-    name: 'Sirohi Goat',
-    breed: 'Sirohi',
-    age: '1.5 Years',
-    price: '₹12,500',
-    location: 'Sikar, Rajasthan',
-    isVerified: false,
-    isFeatured: true,
-    categorySlug: 'goat',
-  },
-];
 
-const LATEST_LISTINGS = [
-  {
-    id: 'l1',
-    name: 'Sahiwal Cow',
-    breed: 'Sahiwal',
-    age: '3 Years',
-    price: '₹48,000',
-    sellerName: 'Ramesh Patel',
-    location: 'Surat, Gujarat',
-    isVerified: true,
-    isFeatured: false,
-    postedTime: '2 hours ago',
-    categorySlug: 'cow',
-  },
-  {
-    id: 'l2',
-    name: 'Jafarabadi Buffalo',
-    breed: 'Jafarabadi',
-    age: '5 Years',
-    price: '₹95,000',
-    sellerName: 'Suresh Kumar',
-    location: 'Junagadh, Gujarat',
-    isVerified: true,
-    isFeatured: true,
-    postedTime: '5 hours ago',
-    categorySlug: 'buffalo',
-  },
-  {
-    id: 'l3',
-    name: 'Beetal Goat',
-    breed: 'Beetal',
-    age: '2 Years',
-    price: '₹15,000',
-    sellerName: 'Amit Singh',
-    location: 'Gurdaspur, Punjab',
-    isVerified: false,
-    isFeatured: false,
-    postedTime: '1 day ago',
-    categorySlug: 'goat',
-  },
-];
-
-const RECOMMENDED_ANIMALS = [
-  {
-    id: 'r1',
-    name: 'Gir Cow',
-    breed: 'Gir',
-    age: '2.8 Years',
-    price: '₹62,000',
-    sellerName: 'Devendra Vyas',
-    location: 'Rajkot, Gujarat',
-    isVerified: true,
-    isFeatured: true,
-    postedTime: '3 hours ago',
-    categorySlug: 'cow',
-  },
-  {
-    id: 'r2',
-    name: 'Bhadawari Buffalo',
-    breed: 'Bhadawari',
-    age: '3 Years',
-    price: '₹75,000',
-    sellerName: 'Rajesh Mishra',
-    location: 'Etawah, Uttar Pradesh',
-    isVerified: false,
-    isFeatured: false,
-    postedTime: '6 hours ago',
-    categorySlug: 'buffalo',
-  },
-  {
-    id: 'r3',
-    name: 'Jamnapari Goat',
-    breed: 'Jamnapari',
-    age: '1 Year',
-    price: '₹14,000',
-    sellerName: 'Vikas Dubey',
-    location: 'Kanpur, Uttar Pradesh',
-    isVerified: true,
-    isFeatured: true,
-    postedTime: '1 day ago',
-    categorySlug: 'goat',
-  },
-];
 
 // Standalone React.memo components to prevent unmounting/remounting of list headers and footers
 const CategoryCardItem = React.memo(({ item, isSelected, onPress, t }) => {
@@ -262,27 +145,17 @@ const ListHeader = React.memo(({
   const flatListRef = React.useRef(null);
 
   const getDisplayLocation = () => {
-    if (userProfile?.village) {
+    if (!userProfile?.village && !userProfile?.taluka && !userProfile?.district) {
       return {
-        title: userProfile.village,
-        subtitle: [userProfile.taluka, userProfile.district, userProfile.state].filter(Boolean).join(', ')
+        title: t('buy.locationNotSet', { defaultValue: 'Location Not Set' }),
+        subtitle: t('buy.tapToDetect', { defaultValue: 'Tap to detect location' })
       };
     }
-    if (userProfile?.taluka) {
-      return {
-        title: userProfile.taluka,
-        subtitle: [userProfile.district, userProfile.state].filter(Boolean).join(', ')
-      };
-    }
-    if (userProfile?.district) {
-      return {
-        title: userProfile.district,
-        subtitle: userProfile.state || ''
-      };
-    }
+
+    const { title, subtitle } = formatLocationDisplay(userProfile);
     return {
-      title: t('buy.locationNotSet', { defaultValue: 'Location Not Set' }),
-      subtitle: t('buy.tapToDetect', { defaultValue: 'Tap to detect location' })
+      title: title || t('buy.locationNotSet', { defaultValue: 'Location Not Set' }),
+      subtitle: subtitle || userProfile?.state || ''
     };
   };
 
@@ -307,26 +180,7 @@ const ListHeader = React.memo(({
     }
   }, [selectedCategory]);
 
-  const displayFeatured = (featuredAnimals && featuredAnimals.length > 0)
-    ? featuredAnimals
-    : FEATURED_ANIMALS.filter(animal => {
-        if (selectedCategory && selectedCategory !== 'all') {
-          if (selectedCategory === 'other') {
-            const knownSlugs = ['cow', 'buffalo', 'goat', 'sheep', 'horse'];
-            if (knownSlugs.includes(animal.categorySlug)) return false;
-          } else {
-            if (animal.categorySlug !== selectedCategory) return false;
-          }
-        }
-        if (searchText && searchText.trim() !== '') {
-          const query = searchText.toLowerCase().trim();
-          const nameMatch = animal.name?.toLowerCase().includes(query);
-          const breedMatch = animal.breed?.toLowerCase().includes(query);
-          const locationMatch = animal.location?.toLowerCase().includes(query);
-          return nameMatch || breedMatch || locationMatch;
-        }
-        return true;
-      });
+  const displayFeatured = featuredAnimals || [];
 
   return (
     <View>
@@ -417,26 +271,7 @@ const ListHeader = React.memo(({
 const ListFooter = React.memo(({ onViewDetails, recommendedAnimals, selectedCategory, searchText }) => {
   const { t } = useTranslation();
 
-  const displayRecommended = (recommendedAnimals && recommendedAnimals.length > 0)
-    ? recommendedAnimals
-    : RECOMMENDED_ANIMALS.filter(animal => {
-        if (selectedCategory && selectedCategory !== 'all') {
-          if (selectedCategory === 'other') {
-            const knownSlugs = ['cow', 'buffalo', 'goat', 'sheep', 'horse'];
-            if (knownSlugs.includes(animal.categorySlug)) return false;
-          } else {
-            if (animal.categorySlug !== selectedCategory) return false;
-          }
-        }
-        if (searchText && searchText.trim() !== '') {
-          const query = searchText.toLowerCase().trim();
-          const nameMatch = animal.name?.toLowerCase().includes(query);
-          const breedMatch = animal.breed?.toLowerCase().includes(query);
-          const locationMatch = animal.location?.toLowerCase().includes(query);
-          return nameMatch || breedMatch || locationMatch;
-        }
-        return true;
-      });
+  const displayRecommended = recommendedAnimals || [];
 
   if (displayRecommended.length === 0) return <View style={{ height: 24 }} />;
 

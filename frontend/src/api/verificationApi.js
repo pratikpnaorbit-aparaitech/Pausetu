@@ -43,8 +43,8 @@ export const verificationApi = {
   getSettings: async () => {
     try {
       const res = await axios.get('/verification/settings');
-      if (res && res.status === 'success') {
-        return res.data.settings;
+      if (res && (res.status === 'success' || res.settings || res.data?.settings)) {
+        return res.data?.settings || res.settings || res;
       }
     } catch (e) {
       console.error('[Verification API Get Settings Error]', e);
@@ -55,7 +55,10 @@ export const verificationApi = {
   updateSettings: async (settingsData) => {
     try {
       const res = await axios.put('/verification/settings', settingsData);
-      return res && res.status === 'success';
+      if (res && (res.status === 'success' || res.settings || res.data?.settings)) {
+        return res.data?.settings || res.settings || res;
+      }
+      return res;
     } catch (e) {
       console.error('[Verification API Update Settings Error]', e);
       throw e;

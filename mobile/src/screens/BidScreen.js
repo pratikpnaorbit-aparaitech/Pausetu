@@ -9,6 +9,8 @@ import AppText from '../components/AppText';
 import { usePremium } from '../hooks/usePremium';
 import { AppContext } from '../context/AppContext';
 import { verificationApi } from '../api/verificationApi';
+import { useAutoRefresh } from '../hooks/useAutoRefresh';
+import { REFRESH_EVENTS } from '../services/refreshManager';
 import MarketPriceUnlockScreen from './PremiumAdvisor/MarketPriceUnlockScreen';
 import PriceCard from '../components/PriceCard';
 import ConfidenceMeter from '../components/ConfidenceMeter';
@@ -88,6 +90,26 @@ function MarketPriceChatAssistant({ onRestart }) {
   const [analyzing, setAnalyzing] = useState(false);
   const [globalUnlock, setGlobalUnlock] = useState(false);
 
+  const fetchUnlockSettings = async () => {
+    try {
+      const res = await verificationApi.getSettings();
+      const mpUnlock = res?.marketPriceGlobalUnlock ?? res?.data?.settings?.marketPriceGlobalUnlock;
+      if (mpUnlock !== undefined) {
+        setGlobalUnlock(!!mpUnlock);
+      }
+    } catch (err) {
+      console.warn('[BidScreen] Error fetching unlock settings:', err.message);
+    }
+  };
+
+  useAutoRefresh(
+    () => fetchUnlockSettings(),
+    {
+      events: [REFRESH_EVENTS.VERIFICATION_UPDATED],
+      screenKey: 'MarketPriceEstimator'
+    }
+  );
+
   useEffect(() => {
     setIsTyping(true);
     timerRef.current = setTimeout(() => {
@@ -95,13 +117,7 @@ function MarketPriceChatAssistant({ onRestart }) {
       setMessages([{ id: 'greeting', sender: 'bot', text: t('estimator.chat.qAnimal') }]);
     }, 600);
 
-    verificationApi.getSettings()
-      .then(res => {
-        if (res && res.marketPriceGlobalUnlock !== undefined) {
-          setGlobalUnlock(!!res.marketPriceGlobalUnlock);
-        }
-      })
-      .catch(err => console.log('Error settings:', err));
+    fetchUnlockSettings();
 
     return () => timerRef.current && clearTimeout(timerRef.current);
   }, []);
@@ -215,7 +231,12 @@ function MarketPriceChatAssistant({ onRestart }) {
               result: priceResult
             }]);
           } else {
-            setShowPayment(true);
+            setMessages(prev => [...prev, {
+              id: 'locked_result',
+              sender: 'bot',
+              isLockedCard: true,
+              result: priceResult
+            }]);
           }
         }, 1500);
       }, 800);
@@ -227,12 +248,15 @@ function MarketPriceChatAssistant({ onRestart }) {
     if (res.success) {
       setShowPayment(false);
       const priceResult = runPriceEstimation(answers);
-      setMessages(prev => [...prev, {
-        id: 'result',
-        sender: 'bot',
-        isResultCard: true,
-        result: priceResult
-      }]);
+      setMessages(prev => {
+        const filtered = prev.filter(m => !m.isLockedCard);
+        return [...filtered, {
+          id: 'result',
+          sender: 'bot',
+          isResultCard: true,
+          result: priceResult
+        }];
+      });
     } else {
       Alert.alert(t('common.error'), res.error || 'Payment failed');
     }
@@ -277,7 +301,7 @@ function MarketPriceChatAssistant({ onRestart }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* WhatsApp Header */}
+      {/* Header with Enterprise Status Badge */}
       <View style={styles.header}>
         <View style={styles.headerAvatarContainer}>
           <View style={styles.headerAvatar}>
@@ -286,11 +310,24 @@ function MarketPriceChatAssistant({ onRestart }) {
           <View style={styles.onlineBadge} />
         </View>
         <View style={styles.headerInfo}>
-          <AppText style={styles.headerTitle}>{t('estimator.title')}</AppText>
+          <AppText style={styles.headerTitle} numberOfLines={1}>{t('estimator.title')}</AppText>
           <AppText style={styles.headerSubtitle}>
             {isTyping || analyzing ? t('common.loading') : t('common.online')}
           </AppText>
         </View>
+
+        <View style={[styles.headerStatusPill, hasAccess ? styles.pillUnlocked : styles.pillLocked]}>
+          <MaterialCommunityIcons
+            name={hasAccess ? 'lock-open-variant' : 'lock'}
+            size={11}
+            color={hasAccess ? '#059669' : '#DC2626'}
+            style={{ marginRight: 3 }}
+          />
+          <AppText style={[styles.headerStatusPillText, { color: hasAccess ? '#059669' : '#DC2626' }]}>
+            {hasAccess ? t('common.available', { defaultValue: 'Available' }) : t('common.premium', { defaultValue: 'Premium' })}
+          </AppText>
+        </View>
+
         <TouchableOpacity style={styles.restartHeaderBtn} onPress={handlePressRestart} aria-label="Restart valuation assistant">
           <MaterialCommunityIcons name="refresh" size={20} color="#FFFFFF" />
         </TouchableOpacity>
@@ -330,6 +367,31 @@ function MarketPriceChatAssistant({ onRestart }) {
                 <AppText style={styles.summaryText}>• {t('estimator.steps.milkProduction')}: {t(`estimator.chat.milkOptions.${item.answers.milk}`)}</AppText>
                 <AppText style={styles.summaryText}>• {t('estimator.steps.health')}: {t(`estimator.health.${item.answers.health}`)}</AppText>
                 <AppText style={styles.summaryText}>• {t('estimator.steps.location')}: {t(`estimator.chat.districtOptions.${item.answers.district}`)}</AppText>
+              </View>
+            );
+          }
+          if (item.isLockedCard) {
+            return (
+              <View style={styles.lockedCardContainer}>
+                <View style={styles.lockedHeaderRow}>
+                  <MaterialCommunityIcons name="lock-closed" size={22} color="#B45309" />
+                  <AppText style={styles.lockedCardTitle}>
+                    {t('estimator.locked.title', { defaultValue: 'बाजारभाव तयार आहे' })}
+                  </AppText>
+                </View>
+                <AppText style={styles.lockedCardDesc}>
+                  {t('estimator.locked.desc', { defaultValue: 'AI ने तुमच्या पशूचे मूल्यांकन पूर्ण केले आहे.\n\nपूर्ण निकाल पाहण्यासाठी कृपया पेमेंट / सत्यापन पूर्ण करा.' })}
+                </AppText>
+                <TouchableOpacity
+                  style={styles.unlockBtnPrimary}
+                  onPress={() => setShowPayment(true)}
+                  activeOpacity={0.85}
+                >
+                  <MaterialCommunityIcons name="lock-open-variant" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                  <AppText style={styles.unlockBtnPrimaryText}>
+                    {t('estimator.locked.unlockBtn', { defaultValue: 'Unlock Now (अनलॉक करा)' })}
+                  </AppText>
+                </TouchableOpacity>
               </View>
             );
           }
@@ -540,5 +602,76 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 1,
   },
-  completedNoticeText: { fontSize: 12.5, color: '#B45309', fontWeight: '600', textAlign: 'center' }
+  completedNoticeText: { fontSize: 12.5, color: '#B45309', fontWeight: '600', textAlign: 'center' },
+  lockedCardContainer: {
+    backgroundColor: '#FFFBEB',
+    borderColor: '#F59E0B',
+    borderWidth: 1.5,
+    borderRadius: 16,
+    padding: 18,
+    marginVertical: 12,
+    marginHorizontal: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3
+  },
+  lockedHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8
+  },
+  lockedCardTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#92400E',
+    marginLeft: 6
+  },
+  lockedCardDesc: {
+    fontSize: 13.5,
+    color: '#78350F',
+    lineHeight: 20,
+    marginBottom: 14
+  },
+  unlockBtnPrimary: {
+    backgroundColor: '#16A34A',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#16A34A',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    elevation: 3
+  },
+  unlockBtnPrimaryText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 14.5
+  },
+  headerStatusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginRight: 6,
+  },
+  pillLocked: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FCA5A5',
+  },
+  pillUnlocked: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#6EE7B7',
+  },
+  headerStatusPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+  }
 });

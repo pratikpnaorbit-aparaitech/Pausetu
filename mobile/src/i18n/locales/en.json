@@ -26,7 +26,15 @@
     "share": "Share",
     "permissionDenied": "Permission Denied",
     "today": "TODAY",
-    "online": "Online"
+    "online": "Online",
+    "comingSoon": "This feature will be available soon!",
+    "yes": "Yes",
+    "no": "No",
+    "years": "Years",
+    "kg": "kg",
+    "negotiable": "Negotiable",
+    "fixed": "Fixed",
+    "litersPerDay": "L/day"
   },
   "tabs": {
     "buy": "Buy",
@@ -95,7 +103,9 @@
     "fodderAlert": "Fodder prices are projected to rise next week.",
     "doctorAlert": "Dr. Sharma is now online for medical consults.",
     "hoursAgo2": "2 hours ago",
-    "hoursAgo5": "5 hours ago"
+    "hoursAgo5": "5 hours ago",
+    "noRecentUpdates": "No recent updates",
+    "noRecentUpdatesDesc": "Check back later for notifications and alerts."
   },
   "buy": {
     "searchPlaceholder": "Search animals, breeds...",
@@ -245,7 +255,15 @@
     "inReview": "In review",
     "contactBuyerTitle": "{{action}} Buyer",
     "contactBuyerMsg": "Opening {{action}} interface for {{buyerName}}.",
-    "postedAgo": "Posted {{time}}"
+    "postedAgo": "Posted {{time}}",
+    "soldListing": "Sold",
+    "views": "Since beginning",
+    "greeting": {
+      "morning": "Good Morning,",
+      "afternoon": "Good Afternoon,",
+      "evening": "Good Evening,",
+      "night": "Good Night,"
+    }
   },
   "animalDetails": {
     "loading": "Loading animal details...",
@@ -780,7 +798,9 @@
       "confirmTitle": "Confirm Purchase",
       "confirmDesc": "Are you sure you want to subscribe to the {{plan}} for {{price}}?",
       "confirmYes": "Yes, Pay",
-      "confirmNo": "Cancel"
+      "confirmNo": "Cancel",
+      "selectPaymentMethod": "Select Payment Method",
+      "testModeNote": "Test payment mode — ₹1 charge applies"
     },
     "chatbot": {
       "title": "AI Pashu Advisor",
@@ -922,6 +942,17 @@
         "insemination": "Insemination Type",
         "lastVaccine": "Last Vaccine Received"
       }
+    },
+    "voiceModal": {
+      "listening": "Listening...",
+      "speakClearly": "Speak clearly in Hindi, Marathi, or English",
+      "hint": "Say your question clearly",
+      "cancel": "Cancel"
+    },
+    "chat": {
+      "photoAttached": "Photo Attached",
+      "photoAttachedDesc": "Your selected photo has been attached to this message.",
+      "noImagePicker": "Image upload is not available in this environment."
     }
   },
   "estimator": {

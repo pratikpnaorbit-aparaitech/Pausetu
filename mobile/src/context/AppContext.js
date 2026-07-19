@@ -4,6 +4,7 @@ import { secureStorage, registerLogoutHandler } from '../api/api';
 import { profileApi } from '../api/profileApi';
 import i18n from '../i18n/i18n';
 import { Asset } from 'expo-asset';
+import { refreshManager, REFRESH_EVENTS } from '../services/refreshManager';
 
 export const AppContext = createContext();
 
@@ -306,6 +307,8 @@ export const AppProvider = ({ children }) => {
         const isComplete = Boolean(user.fullName || user.isProfileCompleted);
         await AsyncStorage.setItem('isProfileComplete', isComplete ? 'true' : 'false');
         setIsProfileComplete(isComplete);
+
+        refreshManager.emit(REFRESH_EVENTS.PROFILE_UPDATED, completeData);
       } else {
         setUserProfile(null);
         setIsProfileComplete(false);
@@ -348,14 +351,16 @@ export const AppProvider = ({ children }) => {
   const updateLocation = async (locData) => {
     try {
       const updated = {
+        ...userProfile,
         name: userProfile?.name || 'Guest',
         role: userProfile?.role || 'Farmer',
         mobile: userProfile?.mobile || '',
         language: userProfile?.language || language || 'en',
-        village: locData.village || '',
-        taluka: locData.taluka || '',
-        district: locData.district || '',
-        state: locData.state || '',
+        village: locData.village || userProfile?.village || '',
+        taluka: locData.taluka || userProfile?.taluka || '',
+        district: locData.district || userProfile?.district || '',
+        state: locData.state || userProfile?.state || '',
+        verification: userProfile?.verification || { status: 'unverified' }
       };
       
       if (userToken && userToken !== 'guest') {
@@ -370,19 +375,21 @@ export const AppProvider = ({ children }) => {
           preferredLanguage: updated.language
         };
         await profileApi.updateProfile(payload);
+        await refreshProfileData();
+      } else {
+        await AsyncStorage.setItem('userProfile', JSON.stringify(updated));
+        setUserProfile(updated);
       }
-      
-      await AsyncStorage.setItem('userProfile', JSON.stringify(updated));
-      setUserProfile(updated);
     } catch (e) {
       console.error('[Context Error] updateLocation failed:', e);
-      // Local fallback
+      // Local fallback preserving existing user profile fields
       const fallback = {
         ...userProfile,
-        village: locData.village || '',
-        taluka: locData.taluka || '',
-        district: locData.district || '',
-        state: locData.state || '',
+        village: locData.village || userProfile?.village || '',
+        taluka: locData.taluka || userProfile?.taluka || '',
+        district: locData.district || userProfile?.district || '',
+        state: locData.state || userProfile?.state || '',
+        verification: userProfile?.verification || { status: 'unverified' }
       };
       setUserProfile(fallback);
     }

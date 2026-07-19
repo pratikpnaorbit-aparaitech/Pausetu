@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useContext } from 'react';
 import { verificationApi } from '../api/verificationApi';
 import { AdminContext } from '../context/AdminContext';
+import { useWebAutoRefresh } from '../hooks/useWebAutoRefresh';
+import { refreshManager, REFRESH_EVENTS } from '../services/refreshManager';
 import {
   Check, X, Eye, Search, AlertCircle, RefreshCw, Loader2, ShieldAlert
 } from 'lucide-react';
@@ -41,6 +43,14 @@ export default function VerificationRequestsPage() {
     }
   };
 
+  useWebAutoRefresh(
+    () => loadRequests(activeTab),
+    {
+      events: [REFRESH_EVENTS.VERIFICATION_UPDATED],
+      pageKey: 'VerificationRequestsPage'
+    }
+  );
+
   useEffect(() => {
     loadRequests(activeTab);
   }, [activeTab]);
@@ -55,6 +65,7 @@ export default function VerificationRequestsPage() {
     try {
       const success = await verificationApi.updateStatus(id, 'approved');
       if (success) {
+        refreshManager.emit(REFRESH_EVENTS.VERIFICATION_UPDATED);
         loadRequests(activeTab);
         if (loadDashboardData) {
           loadDashboardData(true);

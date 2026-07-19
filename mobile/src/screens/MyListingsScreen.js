@@ -6,6 +6,8 @@ import { animalApi } from '../api/animalApi';
 import { resolveMediaUrl } from '../api/api';
 import { useTranslation } from 'react-i18next';
 import AppText from '../components/AppText';
+import { useAutoRefresh } from '../hooks/useAutoRefresh';
+import { REFRESH_EVENTS } from '../services/refreshManager';
 
 const TABS = ['All', 'Active', 'Pending', 'Sold', 'Rejected'];
 
@@ -22,15 +24,13 @@ export default function MyListingsScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    fetchMyListings();
-
-    const unsubscribe = navigation.addListener('focus', () => {
-      fetchMyListings();
-    });
-
-    return unsubscribe;
-  }, [navigation, userProfile]);
+  useAutoRefresh(
+    () => fetchMyListings(),
+    {
+      events: [REFRESH_EVENTS.LISTING_CREATED, REFRESH_EVENTS.LISTING_UPDATED, REFRESH_EVENTS.LISTING_DELETED],
+      screenKey: 'MyListingsScreen'
+    }
+  );
 
   const fetchMyListings = async () => {
     if (!userProfile || !userProfile.id || userToken === 'guest') {

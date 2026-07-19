@@ -11,6 +11,7 @@ import { api, resolveMediaUrl } from '../api/api';
 import { useTranslation } from 'react-i18next';
 import AppText from '../components/AppText';
 import { AppContext } from '../context/AppContext';
+import { reverseGeocodeWithCache, formatLocationDisplay } from '../utils/geocoder';
 
 const { width } = Dimensions.get('window');
 const GALLERY_HEIGHT = 300;
@@ -60,14 +61,6 @@ const ImageWithLoader = ({ uri, style, resizeMode, onPress }) => {
 };
 
 export default function AnimalDetailsScreen({ route, navigation }) {
-  console.log('[DEBUG] AnimalDetailsScreen rendered/remounted');
-  
-  useEffect(() => {
-    console.log('[DEBUG] AnimalDetailsScreen MOUNTED');
-    return () => {
-      console.log('[DEBUG] AnimalDetailsScreen UNMOUNTED');
-    };
-  }, []);
 
   const passedAnimal = route.params?.animal || null;
   const animalId = passedAnimal?._id || passedAnimal?.id || null;
@@ -288,6 +281,41 @@ export default function AnimalDetailsScreen({ route, navigation }) {
 
         if (res.status === 'success' && res.data?.animal) {
           const a = res.data.animal;
+          
+          let displayLocation = [a.village, a.district].filter(Boolean).join(', ') || passedAnimal?.location || '';
+          let talukaVal = a.taluka || null;
+          let districtVal = a.district || null;
+          let stateVal = a.state || null;
+          let villageVal = a.village || null;
+          let pincodeVal = a.pincode || null;
+          let formattedAddr = a.formattedAddress || null;
+
+          // Legacy migration: If listing contains latitude/longitude but missing formattedAddress/village
+          if (a.latitude && a.longitude && (!a.formattedAddress || !a.village)) {
+            const geocoded = await reverseGeocodeWithCache(a.latitude, a.longitude);
+            if (geocoded) {
+              villageVal = geocoded.village || villageVal;
+              talukaVal = geocoded.taluka || talukaVal;
+              districtVal = geocoded.district || districtVal;
+              stateVal = geocoded.state || stateVal;
+              pincodeVal = geocoded.pincode || pincodeVal;
+              formattedAddr = geocoded.formattedAddress;
+              displayLocation = formattedAddr;
+              
+              // Persist generated address back to database once
+              api.updateAnimal(a._id, {
+                village: villageVal,
+                taluka: talukaVal,
+                district: districtVal,
+                state: stateVal,
+                pincode: pincodeVal,
+                formattedAddress: formattedAddr
+              }).catch(err => console.warn('[AnimalDetails] Auto-geocode background persist failed:', err.message));
+            }
+          } else if (a.formattedAddress) {
+            displayLocation = a.formattedAddress;
+          }
+
           setAnimal({
             ...a,
             _id: a._id,
@@ -297,7 +325,7 @@ export default function AnimalDetailsScreen({ route, navigation }) {
             age: a.age || passedAnimal?.age || 'N/A',
             price: `₹${(a.price || 0).toLocaleString()}`,
             sellerName: a.sellerId?.name || passedAnimal?.sellerName || 'Seller',
-            location: [a.village, a.district].filter(Boolean).join(', ') || passedAnimal?.location || '',
+            location: displayLocation,
             isVerified: a.status === 'approved',
             isFeatured: (a.views || 0) > 200,
             photos: a.photos || [],
@@ -312,10 +340,12 @@ export default function AnimalDetailsScreen({ route, navigation }) {
             sellerId: a.sellerId || null,
             latitude: a.latitude || null,
             longitude: a.longitude || null,
-            state: a.state || null,
-            district: a.district || null,
-            taluka: a.taluka || null,
-            village: a.village || null,
+            state: stateVal,
+            district: districtVal,
+            taluka: talukaVal,
+            village: villageVal,
+            pincode: pincodeVal,
+            formattedAddress: formattedAddr,
             milkYield: a.milkYield || null,
             pregnant: a.pregnant || false,
             lactation: a.lactation || null,
@@ -464,24 +494,54 @@ export default function AnimalDetailsScreen({ route, navigation }) {
   };
 
   const handleOpenMaps = async () => {
-    let url = '';
-    if (animal.latitude && animal.longitude) {
-      url = `https://www.google.com/maps/search/?api=1&query=${animal.latitude},${animal.longitude}`;
-    } else if (animal.location) {
-      const encoded = encodeURIComponent(
-        [animal.village, animal.taluka, animal.district, animal.state].filter(Boolean).join(', ') || animal.location
-      );
-      url = `https://www.google.com/maps/search/?api=1&query=${encoded}`;
-    } else {
-      Alert.alert(t('animalDetails.locationUnavailable'), t('animalDetails.noLocationMsg'));
+    const lat = animal?.latitude || animal?.mediaMetadata?.latitude || passedAnimal?.latitude;
+    const lng = animal?.longitude || animal?.mediaMetadata?.longitude || passedAnimal?.longitude;
+
+    const validLat = (lat !== undefined && lat !== null && !isNaN(Number(lat))) ? Number(lat) : null;
+    const validLng = (lng !== undefined && lng !== null && !isNaN(Number(lng))) ? Number(lng) : null;
+
+    const locationStr = formatLocationDisplay({
+      village: animal?.village,
+      taluka: animal?.taluka,
+      district: animal?.district,
+      state: animal?.state
+    }).formatted || animal?.location || animal?.formattedAddress || passedAnimal?.location;
+
+    if (validLat !== null && validLng !== null) {
+      const nativeNavUrl = `google.navigation:q=${validLat},${validLng}&mode=d`;
+      const webDirUrl = `https://www.google.com/maps/dir/?api=1&destination=${validLat},${validLng}&travelmode=driving`;
+
+      if (Platform.OS === 'android') {
+        try {
+          // Directly launch Android native Google Maps driving navigation intent (bypasses canOpenURL API 30+ restrictions)
+          await Linking.openURL(nativeNavUrl);
+          return;
+        } catch (androidErr) {
+          console.warn('[Maps] Native intent launch failed, using web fallback:', androidErr.message);
+        }
+      }
+
+      // Web/iOS or Android fallback
+      try {
+        await Linking.openURL(webDirUrl);
+      } catch (webErr) {
+        Alert.alert(t('animalDetails.cannotOpenMaps'), t('animalDetails.cannotOpenMapsMsg'));
+      }
       return;
     }
-    const supported = await Linking.canOpenURL(url);
-    if (supported) {
-      Linking.openURL(url);
-    } else {
-      Alert.alert(t('animalDetails.cannotOpenMaps'), t('animalDetails.cannotOpenMapsMsg'));
+
+    if (locationStr) {
+      const encoded = encodeURIComponent(locationStr);
+      const webDirUrl = `https://www.google.com/maps/dir/?api=1&destination=${encoded}&travelmode=driving`;
+      try {
+        await Linking.openURL(webDirUrl);
+      } catch (err) {
+        Alert.alert(t('animalDetails.cannotOpenMaps'), t('animalDetails.cannotOpenMapsMsg'));
+      }
+      return;
     }
+
+    Alert.alert(t('animalDetails.locationUnavailable'), t('animalDetails.noLocationMsg'));
   };
 
   const handleReport = () => {
@@ -496,19 +556,11 @@ export default function AnimalDetailsScreen({ route, navigation }) {
       );
       return;
     }
-    console.log('[DEBUG] Flag button pressed! userToken:', userToken);
     setComplaintText('');
-    console.log('[DEBUG] Setting isComplaintModalVisible to true.');
-    // Defer the state update slightly to prevent React Native Web from capturing the tail-end 
-    // of the click event as a backdrop press, which instantly fires onRequestClose.
     setTimeout(() => {
       setIsComplaintModalVisible(true);
     }, 50);
   };
-
-  useEffect(() => {
-    console.log('[DEBUG] Modal state changed! isComplaintModalVisible:', isComplaintModalVisible);
-  }, [isComplaintModalVisible]);
 
   const submitComplaint = async () => {
     if (complaintText.trim().length < 10) {
@@ -527,7 +579,6 @@ export default function AnimalDetailsScreen({ route, navigation }) {
         message: complaintText.trim()
       });
       if (res?.status === 'success') {
-        console.log('[DEBUG] AnimalDetailsScreen: submitComplaint SUCCESS. Calling setIsComplaintModalVisible(false). Line: ~517');
         setIsComplaintModalVisible(false);
         setIsReported(true);
         Alert.alert(
@@ -936,9 +987,16 @@ export default function AnimalDetailsScreen({ route, navigation }) {
                 <Ionicons name="location" size={20} color="#16A34A" />
               </View>
               <View style={styles.locationMeta}>
-                <AppText style={styles.locationPrimary}>{animal.location}</AppText>
+                <AppText style={styles.locationPrimary}>
+                  📍 {animal.formattedAddress || animal.location || t('animalDetails.locationUnavailable')}
+                </AppText>
                 <AppText style={styles.locationSecondary}>
-                  {[animal.taluka && `Taluka: ${animal.taluka}`, animal.district && `District: ${animal.district}`, animal.state && `State: ${animal.state}`].filter(Boolean).join(', ') || t('animalDetails.locationUnavailable')}
+                  {[
+                    animal.village && `${t('profile.village')}: ${animal.village}`,
+                    animal.taluka && `${t('profile.taluka')}: ${animal.taluka}`,
+                    animal.district && `${t('profile.district')}: ${animal.district}`,
+                    animal.state && `${t('profile.state')}: ${animal.state}`
+                  ].filter(Boolean).join(' | ') || t('animalDetails.locationUnavailable')}
                 </AppText>
               </View>
             </View>
@@ -1053,13 +1111,11 @@ export default function AnimalDetailsScreen({ route, navigation }) {
       </Modal>
 
       {/* Complaint Modal */}
-      {isComplaintModalVisible && console.log('[DEBUG] Complaint Modal is currently being rendered to the DOM! visible:', isComplaintModalVisible)}
       <Modal
         visible={isComplaintModalVisible}
         transparent={true}
         animationType="fade"
         onRequestClose={() => {
-          console.log('[DEBUG] AnimalDetailsScreen: onRequestClose triggered! Calling setIsComplaintModalVisible(false). Line: ~1047');
           if (!isSubmittingComplaint) setIsComplaintModalVisible(false);
         }}
       >
@@ -1069,7 +1125,6 @@ export default function AnimalDetailsScreen({ route, navigation }) {
               <AppText style={styles.modalTitle}>Report Listing</AppText>
               <TouchableOpacity 
                 onPress={() => {
-                  console.log('[DEBUG] AnimalDetailsScreen: Close (X) button pressed. Calling setIsComplaintModalVisible(false). Line: ~1054');
                   setIsComplaintModalVisible(false);
                 }}
                 disabled={isSubmittingComplaint}
@@ -1103,7 +1158,6 @@ export default function AnimalDetailsScreen({ route, navigation }) {
               <TouchableOpacity 
                 style={styles.cancelBtn} 
                 onPress={() => {
-                  console.log('[DEBUG] AnimalDetailsScreen: Cancel button pressed. Calling setIsComplaintModalVisible(false). Line: ~1085');
                   setIsComplaintModalVisible(false);
                 }}
                 disabled={isSubmittingComplaint}

@@ -19,7 +19,7 @@ export const PLANS = [
   }
 ];
 
-export const MOCK_PAYMENT_PROVIDERS = [
+export const PAYMENT_PROVIDERS = [
   { id: 'upi', name: 'Google Pay / PhonePe (UPI)', logo: 'phone' },
   { id: 'card', name: 'Debit / Credit Card', logo: 'card-outline' },
   { id: 'netbanking', name: 'Net Banking', logo: 'business-outline' }

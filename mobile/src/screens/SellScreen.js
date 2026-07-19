@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useState } from 'react';
-import { StyleSheet, View, SafeAreaView, ScrollView, Image, TouchableOpacity, Dimensions, FlatList, Share, Alert, ActivityIndicator, Animated, Platform } from 'react-native';
+import { StyleSheet, View, SafeAreaView, ScrollView, Image, TouchableOpacity, Dimensions, FlatList, Share, Alert, ActivityIndicator, Animated, Platform, AppState } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppContext } from '../context/AppContext';
 import { api, resolveMediaUrl } from '../api/api';
@@ -63,12 +63,10 @@ const SellerCtaCard = React.memo(({ listingsCount, onPress, t }) => {
 
           <View style={styles.ctaContentBody}>
             <AppText style={styles.ctaTitle}>
-              {hasListings ? 'तुमची जाहिरात करा' : 'विक्रीसाठी जनावर जोडा'}
+              {hasListings ? t('sell.postAnimal') : t('sell.addAnimal')}
             </AppText>
             <AppText style={styles.ctaSubtitle} numberOfLines={2}>
-              {hasListings 
-                ? 'तुमच्या जाहिरातीला हजारो खरेदीदारांपर्यंत पोहोचवा.' 
-                : 'आजच तुमचं जनावर हजारो खरेदीदारांपर्यंत पोहोचवा.'}
+              {t('sell.subtitle')}
             </AppText>
           </View>
 
@@ -80,7 +78,7 @@ const SellerCtaCard = React.memo(({ listingsCount, onPress, t }) => {
               <Ionicons name="add" size={13} color="#FFFFFF" style={{ marginRight: 4 }} />
             )}
             <AppText style={styles.ctaButtonText}>
-              {hasListings ? 'जाहिरात करा' : 'जनावर जोडा'}
+              {hasListings ? t('sell.postAnimal') : t('sell.addAnimal')}
             </AppText>
           </View>
         </LinearGradient>
@@ -94,6 +92,33 @@ export default function SellScreen({ navigation }) {
   const isGuest = userToken === 'guest';
   const name = isGuest ? 'Guest' : userProfile?.name || 'User';
   const { t } = useTranslation();
+
+  const [greetingKey, setGreetingKey] = useState('sell.greeting.morning');
+
+  useEffect(() => {
+    const updateGreeting = () => {
+      const hour = new Date().getHours();
+      let newKey = 'sell.greeting.morning';
+      if (hour >= 5 && hour < 12) newKey = 'sell.greeting.morning';
+      else if (hour >= 12 && hour < 17) newKey = 'sell.greeting.afternoon';
+      else if (hour >= 17 && hour < 21) newKey = 'sell.greeting.evening';
+      else newKey = 'sell.greeting.night';
+      
+      setGreetingKey(prev => prev !== newKey ? newKey : prev);
+    };
+
+    updateGreeting();
+
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (nextAppState === 'active') {
+        updateGreeting();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   const getInitial = (nameStr) => {
     if (!nameStr || typeof nameStr !== 'string' || !nameStr.trim()) return '?';
@@ -287,7 +312,7 @@ export default function SellScreen({ navigation }) {
       {/* Sticky Header block */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <AppText style={styles.greetingText}>{t('sell.goodMorning')}</AppText>
+          <AppText style={styles.greetingText}>{t(greetingKey)}</AppText>
           <AppText style={styles.sellerName}>{name}</AppText>
           <AppText style={styles.headerSubtitle}>{t('sell.summarySubtitle')}</AppText>
         </View>
@@ -335,19 +360,12 @@ export default function SellScreen({ navigation }) {
             listingsCount={listings.length}
             t={t}
             onPress={() => {
-              console.log("CTA Card Pressed");
-              console.log("Current listings:", listings.length);
-              
               if (listings.length > 0) {
-                if (Platform.OS === 'web') {
-                  window.alert('जाहिरात सुविधा लवकरच उपलब्ध होईल!');
-                } else {
-                  Alert.alert(
-                    t('common.info', { defaultValue: 'Info' }), 
-                    'जाहिरात सुविधा लवकरच उपलब्ध होईल!', 
-                    [{ text: 'OK' }]
-                  );
-                }
+                Alert.alert(
+                  t('common.info', { defaultValue: 'Info' }),
+                  t('common.comingSoon'),
+                  [{ text: 'OK' }]
+                );
               } else {
                 navigation.navigate('AddAnimal');
               }
@@ -641,6 +659,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.02,
     shadowRadius: 8,
     elevation: 2,
+    minHeight: 140,
+    justifyContent: 'space-between',
   },
   ctaCardContainer: {
     width: '46%',
@@ -656,12 +676,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 10,
     elevation: 3,
+    minHeight: 140,
   },
   ctaGradient: {
     padding: 14,
-    height: 154, // matches statCard height
+    minHeight: 140,
     justifyContent: 'space-between',
     position: 'relative',
+    height: '100%',
   },
   ctaPatternCircle1: {
     position: 'absolute',

@@ -1,10 +1,12 @@
-import React, { useContext, useMemo, useState, useEffect } from 'react';
+import React, { useContext, useMemo, useState, useEffect, useCallback } from 'react';
 import { AdminContext } from '../context/AdminContext';
 import {
   Users, UserCheck, Layers, Clock, Download, Printer,
   ChevronUp, AlertCircle, RefreshCw, TrendingUp, CheckCircle2, XCircle, Lock, Unlock
 } from 'lucide-react';
 import { verificationApi } from '../api/verificationApi';
+import { useWebAutoRefresh } from '../hooks/useWebAutoRefresh';
+import { refreshManager, REFRESH_EVENTS } from '../services/refreshManager';
 
 // Staggered KPI card with accent bar
 function KpiCard({ label, value, icon: Icon, color, accentColor, delay = 0 }) {
@@ -119,58 +121,83 @@ export default function DashboardPage() {
   const getWidget = (id) => widgets.find((w) => w.id === id);
 
   const [globalUnlock, setGlobalUnlock] = useState(false);
-  const [loadingGlobalUnlock, setLoadingGlobalUnlock] = useState(true);
+  const [loadingGlobalUnlock, setLoadingGlobalUnlock] = useState(false);
 
   const [feedPlannerUnlock, setFeedPlannerUnlock] = useState(false);
-  const [loadingFeedPlannerUnlock, setLoadingFeedPlannerUnlock] = useState(true);
-
-  useEffect(() => {
-    const fetchUnlockStatus = async () => {
-      try {
-        const settings = await verificationApi.getSettings();
-        if (settings) {
-          setGlobalUnlock(!!settings.marketPriceGlobalUnlock);
-          setFeedPlannerUnlock(!!settings.feedPlannerGlobalUnlock);
-        }
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoadingGlobalUnlock(false);
-        setLoadingFeedPlannerUnlock(false);
-      }
-    };
-    fetchUnlockStatus();
-  }, []);
+  const [loadingFeedPlannerUnlock, setLoadingFeedPlannerUnlock] = useState(false);
 
   const feedPlannerStats = useMemo(() => {
-    const sUnlocked = (sellers || []).filter((s) => s.feedPlannerAccess?.hasAccess).length;
-    const bUnlocked = (buyers || []).filter((b) => b.feedPlannerAccess?.hasAccess).length;
+    const sUnlocked = (sellers || []).filter((s) => s?.feedPlannerAccess?.hasAccess).length;
+    const bUnlocked = (buyers || []).filter((b) => b?.feedPlannerAccess?.hasAccess).length;
     const totalUnlocked = sUnlocked + bUnlocked || 8;
     return {
-      unlockedUsers: totalUnlocked,
-      revenue: totalUnlocked * 1,
-      usage: totalUnlocked * 4 + 15
+      unlockedUsers: dashboardStats?.feedPlannerStats?.unlockedUsers ?? totalUnlocked,
+      revenue: dashboardStats?.feedPlannerStats?.revenue ?? (totalUnlocked * 1),
+      usage: dashboardStats?.feedPlannerStats?.usage ?? (totalUnlocked * 4 + 15)
     };
-  }, [sellers, buyers]);
+  }, [sellers, buyers, dashboardStats]);
 
-  const handleToggleGlobalUnlock = async () => {
-    const newValue = !globalUnlock;
-    setGlobalUnlock(newValue);
+  const fetchUnlockStatus = useCallback(async () => {
     try {
-      await verificationApi.updateSettings({ marketPriceGlobalUnlock: newValue });
+      const settings = await verificationApi.getSettings();
+      if (settings) {
+        if (settings.marketPriceGlobalUnlock !== undefined) setGlobalUnlock(!!settings.marketPriceGlobalUnlock);
+        if (settings.feedPlannerGlobalUnlock !== undefined) setFeedPlannerUnlock(!!settings.feedPlannerGlobalUnlock);
+      }
     } catch (e) {
-      console.error(e);
+      console.error('[DashboardPage] Fetch unlock status error:', e);
+    } finally {
+      setLoadingGlobalUnlock(false);
+      setLoadingFeedPlannerUnlock(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchUnlockStatus();
+  }, [fetchUnlockStatus]);
+
+  useWebAutoRefresh(loadDashboardData, {
+    events: [
+      REFRESH_EVENTS.LISTING_CREATED,
+      REFRESH_EVENTS.LISTING_UPDATED,
+      REFRESH_EVENTS.LISTING_DELETED,
+      REFRESH_EVENTS.PROFILE_UPDATED
+    ],
+    pageKey: 'DashboardPage'
+  });
+
+  const handleToggleGlobalUnlock = async (e) => {
+    const targetChecked = e?.target?.checked;
+    const newValue = targetChecked !== undefined ? targetChecked : !globalUnlock;
+    setGlobalUnlock(newValue);
+    const payload = { marketPriceGlobalUnlock: newValue };
+    try {
+      const res = await verificationApi.updateSettings(payload);
+      const serverVal = res?.marketPriceGlobalUnlock ?? res?.data?.settings?.marketPriceGlobalUnlock;
+      if (serverVal !== undefined) {
+        setGlobalUnlock(!!serverVal);
+      }
+      refreshManager.emit(REFRESH_EVENTS.VERIFICATION_UPDATED);
+    } catch (err) {
+      console.error('Toggle Market Price AI failed:', err);
       setGlobalUnlock(!newValue);
     }
   };
 
-  const handleToggleFeedPlannerUnlock = async () => {
-    const newValue = !feedPlannerUnlock;
+  const handleToggleFeedPlannerUnlock = async (e) => {
+    const targetChecked = e?.target?.checked;
+    const newValue = targetChecked !== undefined ? targetChecked : !feedPlannerUnlock;
     setFeedPlannerUnlock(newValue);
+    const payload = { feedPlannerGlobalUnlock: newValue };
     try {
-      await verificationApi.updateSettings({ feedPlannerGlobalUnlock: newValue });
-    } catch (e) {
-      console.error(e);
+      const res = await verificationApi.updateSettings(payload);
+      const serverVal = res?.feedPlannerGlobalUnlock ?? res?.data?.settings?.feedPlannerGlobalUnlock;
+      if (serverVal !== undefined) {
+        setFeedPlannerUnlock(!!serverVal);
+      }
+      refreshManager.emit(REFRESH_EVENTS.VERIFICATION_UPDATED);
+    } catch (err) {
+      console.error('Toggle Feed Planner AI failed:', err);
       setFeedPlannerUnlock(!newValue);
     }
   };

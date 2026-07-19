@@ -1,9 +1,11 @@
 import React, { useEffect, useRef } from 'react';
 import { StyleSheet, View, Modal, TouchableOpacity, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import AppText from '../AppText';
 
-export default function VoiceInputModal({ visible, onClose, onSpeechEnd }) {
+export default function VoiceInputModal({ visible, onClose }) {
+  const { t } = useTranslation();
   const pulseVal = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -27,25 +29,15 @@ export default function VoiceInputModal({ visible, onClose, onSpeechEnd }) {
     }
   }, [visible, pulseVal]);
 
-  const simulateSpeech = () => {
-    // Mock transcription output after 3 seconds
-    setTimeout(() => {
-      onSpeechEnd("How to increase daily milk production?");
-    }, 2200);
-  };
-
-  useEffect(() => {
-    if (visible) {
-      simulateSpeech();
-    }
-  }, [visible]);
+  // Voice recording is not yet implemented natively.
+  // The modal is shown as a UI placeholder until real STT integration is added.
 
   return (
     <Modal visible={visible} transparent animationType="fade">
       <View style={styles.overlay}>
         <View style={styles.card}>
-          <AppText style={styles.title}>Listening...</AppText>
-          <AppText style={styles.subtitle}>Speak clearly in Hindi, Marathi, or English</AppText>
+          <AppText style={styles.title}>{t('premiumAdvisor.voiceModal.listening')}</AppText>
+          <AppText style={styles.subtitle}>{t('premiumAdvisor.voiceModal.speakClearly')}</AppText>
           
           <View style={styles.animationContainer}>
             <Animated.View style={[
@@ -57,10 +49,10 @@ export default function VoiceInputModal({ visible, onClose, onSpeechEnd }) {
             </View>
           </View>
 
-          <AppText style={styles.statusText}>Try saying: "How to increase milk yield"</AppText>
+          <AppText style={styles.statusText}>{t('premiumAdvisor.voiceModal.hint')}</AppText>
 
           <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
-            <AppText style={styles.cancelText}>Cancel</AppText>
+            <AppText style={styles.cancelText}>{t('premiumAdvisor.voiceModal.cancel')}</AppText>
           </TouchableOpacity>
         </View>
       </View>

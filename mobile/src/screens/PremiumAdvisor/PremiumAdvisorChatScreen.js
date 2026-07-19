@@ -65,15 +65,31 @@ export default function PremiumAdvisorChatScreen({ onClose }) {
     sendMessage(text);
   };
 
-  const handleAttachImage = () => {
-    // Mock image attachment
-    const mockImageUrls = [
-      'https://images.unsplash.com/photo-1570042225831-d98fa7577f1e?auto=format&fit=crop&w=400&q=80', // cow
-      'https://images.unsplash.com/photo-1527153857715-3908f2bac5e8?auto=format&fit=crop&w=400&q=80', // farm
-    ];
-    const chosen = mockImageUrls[Math.floor(Math.random() * mockImageUrls.length)];
-    setAttachedImage(chosen);
-    Alert.alert("Photo Attached", "A mock photo of your cattle has been attached to the question.");
+  const handleAttachImage = async () => {
+    // Only attempt image picker if running on native — web has limited support
+    if (Platform.OS === 'web') {
+      Alert.alert(t('premiumAdvisor.chat.photoAttached'), t('premiumAdvisor.chat.noImagePicker'));
+      return;
+    }
+    try {
+      const { launchImageLibraryAsync, MediaType, requestMediaLibraryPermissionsAsync } = await import('expo-image-picker');
+      const { status } = await requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(t('common.permissionDenied'), t('common.cameraPermissionMsg'));
+        return;
+      }
+      const result = await launchImageLibraryAsync({
+        mediaTypes: MediaType.Images,
+        allowsEditing: true,
+        quality: 0.7,
+      });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setAttachedImage(result.assets[0].uri);
+        Alert.alert(t('premiumAdvisor.chat.photoAttached'), t('premiumAdvisor.chat.photoAttachedDesc'));
+      }
+    } catch {
+      Alert.alert(t('premiumAdvisor.chat.photoAttached'), t('premiumAdvisor.chat.noImagePicker'));
+    }
   };
 
   const handleClearHistory = () => {

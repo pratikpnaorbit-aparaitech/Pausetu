@@ -13,7 +13,11 @@ export const verificationApi = {
   },
 
   getSettings: async () => {
-    return instance.get('/verification/settings');
+    const res = await instance.get('/verification/settings');
+    if (res && res.status === 'success' && res.data?.settings) {
+      return res.data.settings;
+    }
+    return res?.settings || res;
   }
 };
 
