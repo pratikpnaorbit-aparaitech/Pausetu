@@ -2,7 +2,7 @@
 // Redesigned premium livestock details page with dynamic zoom views, spec cards, maps trackers, and call CTAs.
 
 import React, { useState, useRef, useCallback, useEffect, useContext, useMemo } from 'react';
-import { StyleSheet, View, ScrollView, Image, TouchableOpacity, Dimensions, Modal, Share, FlatList, SafeAreaView, ActivityIndicator, Linking, Alert, Platform, TextInput, Animated } from 'react-native';
+import { StyleSheet, View, ScrollView, Image, TouchableOpacity, Dimensions, Modal, Share, FlatList, SafeAreaView, ActivityIndicator, Linking, Alert, Platform, TextInput, Animated, PanResponder } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import SectionHeader from '../components/SectionHeader';
@@ -21,19 +21,28 @@ const GALLERY_HEIGHT = Math.min(Math.round(width * (4 / 3)), 420);
 
 const ImageWithLoader = ({ uri, style, resizeMode = 'contain', onPress }) => {
   const [loading, setLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
+  const fallbackUri = 'https://images.unsplash.com/photo-1546445317-29f4545e6d52?auto=format&fit=crop&w=800&q=80';
+
+  useEffect(() => {
+    setHasError(false);
+    setLoading(true);
+    fadeAnim.setValue(0);
+  }, [uri, fadeAnim]);
+
   const source = useMemo(() => {
-    if (!uri) {
-      return { uri: 'https://images.unsplash.com/photo-1546445317-29f4545e6d52?auto=format&fit=crop&w=800&q=80' };
+    if (hasError || !uri || typeof uri !== 'string' || uri.trim() === '' || uri.includes('undefined') || uri.includes('null')) {
+      return { uri: fallbackUri };
     }
     return { uri };
-  }, [uri]);
+  }, [uri, hasError]);
 
   const handleLoadStart = useCallback(() => {
     fadeAnim.setValue(0);
     setLoading(true);
-  }, [fadeAnim]);
+  }, [uri, fadeAnim]);
 
   const handleLoadEnd = useCallback(() => {
     setLoading(false);
@@ -42,7 +51,19 @@ const ImageWithLoader = ({ uri, style, resizeMode = 'contain', onPress }) => {
       duration: 280,
       useNativeDriver: true,
     }).start();
-  }, [fadeAnim]);
+  }, [uri, fadeAnim]);
+
+  const handleError = useCallback((e) => {
+    const errObj = e?.nativeEvent?.error || e;
+    console.warn(`[ImageWithLoader] Failed to load image URI "${uri}":`, errObj);
+    setHasError(true);
+    setLoading(false);
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 280,
+      useNativeDriver: true,
+    }).start();
+  }, [uri, fadeAnim]);
 
   return (
     <TouchableOpacity
@@ -50,6 +71,19 @@ const ImageWithLoader = ({ uri, style, resizeMode = 'contain', onPress }) => {
       onPress={onPress}
       style={[style, { overflow: 'hidden', backgroundColor: '#0F172A' }]}
     >
+      {/* Ambient Blurred Backdrop Layer: fills letterbox space smoothly with color-matched tones */}
+      {resizeMode === 'contain' && (
+        <Animated.Image
+          source={source}
+          style={[StyleSheet.absoluteFillObject, { opacity: fadeAnim, transform: [{ scale: 1.15 }] }]}
+          resizeMode="cover"
+          blurRadius={Platform.OS === 'ios' ? 25 : 15}
+        />
+      )}
+      {/* Dark tint overlay for pristine contrast behind foreground subject */}
+      {resizeMode === 'contain' && (
+        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(15, 23, 42, 0.45)' }]} />
+      )}
       {/* Skeleton shimmer while image loads */}
       {loading && (
         <View style={[StyleSheet.absoluteFillObject, styles.skeletonContainer]}>
@@ -58,16 +92,103 @@ const ImageWithLoader = ({ uri, style, resizeMode = 'contain', onPress }) => {
           </View>
         </View>
       )}
-      {/* Image fades in after load — contain so full animal is always visible */}
+      {/* Foreground Crisp Main Image — contain ensures 100% of animal is visible without cropping */}
       <Animated.Image
         source={source}
         style={[StyleSheet.absoluteFillObject, { opacity: fadeAnim }]}
         resizeMode={resizeMode}
         onLoadStart={handleLoadStart}
         onLoad={handleLoadEnd}
-        onError={handleLoadEnd}
+        onError={handleError}
       />
     </TouchableOpacity>
+  );
+};
+
+// Interactive full-screen zoom component with double-tap toggle & gesture pan tracking
+const ZoomableImage = ({ uri, isActive }) => {
+  const scale = useRef(new Animated.Value(1)).current;
+  const pan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const [currentScale, setCurrentScale] = useState(1);
+  const lastTap = useRef(0);
+
+  // Reset zoom & panning when active slide changes
+  useEffect(() => {
+    if (!isActive) {
+      Animated.parallel([
+        Animated.timing(scale, { toValue: 1, duration: 200, useNativeDriver: true }),
+        Animated.timing(pan, { toValue: { x: 0, y: 0 }, duration: 200, useNativeDriver: true }),
+      ]).start(() => {
+        setCurrentScale(1);
+      });
+    }
+  }, [isActive, scale, pan]);
+
+  const handleDoubleTap = () => {
+    const nextScale = currentScale > 1 ? 1 : 2.5;
+    Animated.parallel([
+      Animated.spring(scale, { toValue: nextScale, useNativeDriver: true, friction: 6 }),
+      Animated.spring(pan, { toValue: { x: 0, y: 0 }, useNativeDriver: true, friction: 6 }),
+    ]).start(() => {
+      setCurrentScale(nextScale);
+    });
+  };
+
+  const handleTouchEnd = () => {
+    const now = Date.now();
+    const DOUBLE_TAP_DELAY = 300;
+    if (lastTap.current && now - lastTap.current < DOUBLE_TAP_DELAY) {
+      handleDoubleTap();
+    }
+    lastTap.current = now;
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => currentScale > 1,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return currentScale > 1 && (Math.abs(gestureState.dx) > 2 || Math.abs(gestureState.dy) > 2);
+      },
+      onPanResponderGrant: () => {
+        pan.setOffset({
+          x: pan.x._value,
+          y: pan.y._value,
+        });
+        pan.setValue({ x: 0, y: 0 });
+      },
+      onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], { useNativeDriver: false }),
+      onPanResponderRelease: () => {
+        pan.flattenOffset();
+      },
+    })
+  ).current;
+
+  return (
+    <View style={styles.fullScreenImageSlide} onTouchEnd={handleTouchEnd} {...panResponder.panHandlers}>
+      <ScrollView
+        contentContainerStyle={styles.fullScreenScrollViewContent}
+        maximumZoomScale={4}
+        minimumZoomScale={1}
+        showsHorizontalScrollIndicator={false}
+        showsVerticalScrollIndicator={false}
+        centerContent
+      >
+        <Animated.Image
+          source={{ uri }}
+          style={[
+            styles.fullScreenImage,
+            {
+              transform: [
+                { scale: scale },
+                { translateX: pan.x },
+                { translateY: pan.y }
+              ]
+            }
+          ]}
+          resizeMode="contain"
+        />
+      </ScrollView>
+    </View>
   );
 };
 
@@ -81,6 +202,7 @@ export default function AnimalDetailsScreen({ route, navigation }) {
   const [error, setError] = useState(null);
   const [activeSlide, setActiveSlide] = useState(0);
   const [isZoomVisible, setIsZoomVisible] = useState(false);
+  const [zoomImageIndex, setZoomImageIndex] = useState(0);
   const [zoomImageUri, setZoomImageUri] = useState(null);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [isPlayerPlaying, setIsPlayerPlaying] = useState(false);
@@ -88,6 +210,17 @@ export default function AnimalDetailsScreen({ route, navigation }) {
   const [similarAnimals, setSimilarAnimals] = useState([]);
   const [isReported, setIsReported] = useState(false);
   const [isLiking, setIsLiking] = useState(false);
+
+  const handleOpenZoom = useCallback((index, uri) => {
+    setZoomImageIndex(index);
+    setZoomImageUri(uri || null);
+    setIsZoomVisible(true);
+  }, []);
+
+  const handleCloseZoom = useCallback(() => {
+    setIsZoomVisible(false);
+    setZoomImageUri(null);
+  }, []);
   
   // Complaint state
   const [isComplaintModalVisible, setIsComplaintModalVisible] = useState(false);
@@ -133,22 +266,30 @@ export default function AnimalDetailsScreen({ route, navigation }) {
   const mediaSlides = useMemo(() => {
     const slides = [];
 
-    // 1. Process photos list in original order (may contain mixed images and videos)
-    if (animal?.photos && animal.photos.length > 0) {
-      animal.photos.forEach((mediaItem) => {
-        const uri = getUri(mediaItem);
+    // 1. Process photos list in original order (filter out null, undefined, empty strings, invalid objects)
+    if (animal?.photos && Array.isArray(animal.photos) && animal.photos.length > 0) {
+      animal.photos.forEach((mediaItem, idx) => {
+        const rawUri = getUri(mediaItem);
+        // Ignore null, undefined, empty strings, whitespace-only strings, or literal 'null'/'undefined' strings
+        if (!rawUri || typeof rawUri !== 'string' || rawUri.trim() === '' || rawUri === 'undefined' || rawUri === 'null') {
+          console.warn(`[AnimalDetails] Skipping invalid/empty photo entry at index ${idx}:`, mediaItem);
+          return;
+        }
+
+        const resolved = resolveMediaUrl(rawUri);
+
         if (detectIsVideo(mediaItem)) {
           slides.push({
             type: 'video',
-            uri: resolveMediaUrl(uri),
-            thumbnail: animal.photos.find(p => !detectIsVideo(p)) 
-              ? resolveMediaUrl(getUri(animal.photos.find(p => !detectIsVideo(p))))
+            uri: resolved,
+            thumbnail: animal.photos.find(p => getUri(p) && !detectIsVideo(p)) 
+              ? resolveMediaUrl(getUri(animal.photos.find(p => getUri(p) && !detectIsVideo(p))))
               : null,
           });
         } else {
           slides.push({
             type: 'image',
-            uri: resolveMediaUrl(uri),
+            uri: resolved,
           });
         }
       });
@@ -157,13 +298,16 @@ export default function AnimalDetailsScreen({ route, navigation }) {
     // 2. Process separate video field if it exists and hasn't been added yet
     if (animal?.video) {
       const videoUriVal = getUri(animal.video);
-      const isAlreadyAdded = slides.some(s => s.type === 'video' && s.uri.includes(videoUriVal));
-      if (!isAlreadyAdded) {
-        slides.push({
-          type: 'video',
-          uri: resolveMediaUrl(videoUriVal),
-          thumbnail: slides.find(s => s.type === 'image')?.uri || null,
-        });
+      if (videoUriVal && typeof videoUriVal === 'string' && videoUriVal.trim() !== '' && videoUriVal !== 'null' && videoUriVal !== 'undefined') {
+        const resolvedVideo = resolveMediaUrl(videoUriVal);
+        const isAlreadyAdded = slides.some(s => s.type === 'video' && s.uri && s.uri.includes(videoUriVal));
+        if (!isAlreadyAdded) {
+          slides.push({
+            type: 'video',
+            uri: resolvedVideo,
+            thumbnail: slides.find(s => s.type === 'image')?.uri || null,
+          });
+        }
       }
     }
 
@@ -802,15 +946,16 @@ export default function AnimalDetailsScreen({ route, navigation }) {
                     <ImageWithLoader
                       uri={slide.uri}
                       style={styles.galleryImage}
-                      resizeMode="cover"
-                      onPress={() => {
-                        setZoomImageUri(slide.uri);
-                        setIsZoomVisible(true);
-                      }}
+                      resizeMode="contain"
+                      onPress={() => handleOpenZoom(index, slide.uri)}
                     />
-                    <View style={styles.zoomIndicatorOverlay}>
+                    <TouchableOpacity
+                      style={styles.zoomIndicatorOverlay}
+                      activeOpacity={0.8}
+                      onPress={() => handleOpenZoom(index, slide.uri)}
+                    >
                       <Ionicons name="scan" size={16} color="#FFFFFF" />
-                    </View>
+                    </TouchableOpacity>
                   </View>
                 );
               }
@@ -830,7 +975,7 @@ export default function AnimalDetailsScreen({ route, navigation }) {
                     <ImageWithLoader
                       uri={slide.thumbnail || firstImage || resolveMediaUrl(null)}
                       style={styles.galleryImage}
-                      resizeMode="cover"
+                      resizeMode="contain"
                       onPress={(e) => {
                         console.log('[VideoPlayer] Play button/thumbnail tapped');
                         handlePlay();
@@ -1153,31 +1298,129 @@ export default function AnimalDetailsScreen({ route, navigation }) {
         </View>
       </Modal>
 
-      {/* Full-Screen Image Zoom Modal */}
-      <Modal visible={isZoomVisible} transparent={true} animationType="fade" onRequestClose={() => setIsZoomVisible(false)}>
-        <View style={styles.zoomModalContainer}>
-          <SafeAreaView style={styles.zoomHeader}>
-            <TouchableOpacity style={styles.closeZoomBtn} onPress={() => setIsZoomVisible(false)}>
+      {/* Full-Screen Interactive Image & Gallery Viewer Modal */}
+      <Modal
+        visible={isZoomVisible}
+        transparent={false}
+        animationType="fade"
+        onRequestClose={handleCloseZoom}
+        statusBarTranslucent
+      >
+        <SafeAreaView style={styles.fullScreenGalleryContainer}>
+          {/* Header Bar */}
+          <View style={styles.fullScreenGalleryHeader}>
+            <TouchableOpacity
+              style={styles.fullScreenCloseBtn}
+              onPress={handleCloseZoom}
+              activeOpacity={0.7}
+            >
               <Ionicons name="close" size={26} color="#FFFFFF" />
             </TouchableOpacity>
-          </SafeAreaView>
-          
-          <ScrollView
-            contentContainerStyle={styles.zoomScrollViewContent}
-            maximumZoomScale={4}
-            minimumZoomScale={1}
-            showsHorizontalScrollIndicator={false}
-            showsVerticalScrollIndicator={false}
-          >
-            {zoomImageUri && (
-              <Image 
-                source={{ uri: zoomImageUri }} 
-                style={styles.zoomImage} 
-                resizeMode="contain" 
-              />
+
+            <View style={styles.fullScreenTitleWrap}>
+              <AppText style={styles.fullScreenTitle} numberOfLines={1}>
+                {animal?.name || animal?.breed || 'Animal Gallery'}
+              </AppText>
+              <AppText style={styles.fullScreenSubtitle}>
+                {t('animalDetails.doubleTapZoom', { defaultValue: 'Double-tap or pinch to zoom' })}
+              </AppText>
+            </View>
+
+            {/* Slide Count Counter Badge */}
+            {mediaSlides.length > 0 && (
+              <View style={styles.fullScreenPageBadge}>
+                <AppText style={styles.fullScreenPageText}>
+                  {zoomImageIndex + 1} / {mediaSlides.length}
+                </AppText>
+              </View>
             )}
-          </ScrollView>
-        </View>
+          </View>
+
+          {/* Swipeable Horizontal Gallery List */}
+          <FlatList
+            data={mediaSlides}
+            horizontal
+            pagingEnabled
+            initialScrollIndex={zoomImageIndex >= 0 && zoomImageIndex < mediaSlides.length ? zoomImageIndex : 0}
+            getItemLayout={(_, index) => ({ length: width, offset: width * index, index })}
+            keyExtractor={(_, index) => `fullscreen-slide-${index}`}
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={(e) => {
+              const newIdx = Math.round(e.nativeEvent.contentOffset.x / width);
+              if (newIdx !== zoomImageIndex && newIdx >= 0 && newIdx < mediaSlides.length) {
+                setZoomImageIndex(newIdx);
+                setActiveSlide(newIdx);
+                if (scrollRef.current) {
+                  scrollRef.current.scrollTo({ x: newIdx * width, animated: true });
+                }
+              }
+            }}
+            renderItem={({ item, index }) => {
+              if (item.type === 'image') {
+                return (
+                  <ZoomableImage
+                    uri={item.uri}
+                    isActive={zoomImageIndex === index}
+                  />
+                );
+              }
+
+              if (item.type === 'video') {
+                return (
+                  <View style={styles.fullScreenVideoSlide}>
+                    <Image
+                      source={{ uri: item.thumbnail || resolveMediaUrl(null) }}
+                      style={styles.fullScreenImage}
+                      resizeMode="contain"
+                    />
+                    <TouchableOpacity
+                      style={styles.fullScreenPlayOverlay}
+                      activeOpacity={0.8}
+                      onPress={() => {
+                        setIsZoomVisible(false);
+                        if (player) {
+                          player.replace(item.uri);
+                        }
+                        setIsVideoPlaying(true);
+                      }}
+                    >
+                      <View style={styles.playButtonCircle}>
+                        <Ionicons name="play" size={40} color="#FFFFFF" style={{ marginLeft: 4 }} />
+                      </View>
+                      <AppText style={[styles.videoSlideLabel, { marginTop: 12 }]}>
+                        {t('animalDetails.watchVideo')}
+                      </AppText>
+                    </TouchableOpacity>
+                  </View>
+                );
+              }
+
+              return (
+                <View style={styles.fullScreenPlaceholderSlide}>
+                  <MaterialCommunityIcons name="image-outline" size={72} color="#64748B" />
+                  <AppText style={styles.placeholderText}>
+                    {t('animalDetails.noPhotos', { defaultValue: 'No media available' })}
+                  </AppText>
+                </View>
+              );
+            }}
+          />
+
+          {/* Pagination dots overlay in full screen modal */}
+          {mediaSlides.length > 1 && (
+            <View style={styles.fullScreenPagination}>
+              {mediaSlides.map((_, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.fullScreenDot,
+                    zoomImageIndex === index ? styles.fullScreenActiveDot : styles.fullScreenInactiveDot
+                  ]}
+                />
+              ))}
+            </View>
+          )}
+        </SafeAreaView>
       </Modal>
 
       {/* Complaint Modal */}
@@ -1906,35 +2149,114 @@ const styles = StyleSheet.create({
   guestDisabledBtn: {
     opacity: 0.38,
   },
-  zoomModalContainer: {
+  fullScreenGalleryContainer: {
     flex: 1,
     backgroundColor: '#000000',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
-  zoomHeader: {
-    position: 'absolute',
-    top: 40,
-    right: 20,
+  fullScreenGalleryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'android' ? 40 : 12,
+    paddingBottom: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
     zIndex: 10,
   },
-  closeZoomBtn: {
+  fullScreenCloseBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.3)',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  zoomScrollViewContent: {
+  fullScreenTitleWrap: {
+    flex: 1,
+    marginHorizontal: 12,
+    alignItems: 'center',
+  },
+  fullScreenTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  fullScreenSubtitle: {
+    color: '#94A3B8',
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  fullScreenPageBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  fullScreenPageText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  fullScreenImageSlide: {
+    width: width,
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000000',
+  },
+  fullScreenScrollViewContent: {
     flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
     width: width,
   },
-  zoomImage: {
+  fullScreenImage: {
     width: width,
     height: '100%',
+  },
+  fullScreenVideoSlide: {
+    width: width,
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000000',
+    position: 'relative',
+  },
+  fullScreenPlayOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullScreenPlaceholderSlide: {
+    width: width,
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#0F172A',
+  },
+  fullScreenPagination: {
+    position: 'absolute',
+    bottom: 24,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullScreenDot: {
+    height: 7,
+    borderRadius: 3.5,
+    marginHorizontal: 4,
+  },
+  fullScreenActiveDot: {
+    width: 20,
+    backgroundColor: '#16A34A',
+  },
+  fullScreenInactiveDot: {
+    width: 7,
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
   },
   placeholderSlide: {
     width: width,
