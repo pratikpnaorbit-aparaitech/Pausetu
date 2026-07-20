@@ -16,7 +16,7 @@ import { reverseGeocodeWithCache, formatLocationDisplay } from '../utils/geocode
 const { width } = Dimensions.get('window');
 const GALLERY_HEIGHT = 300;
 
-const ImageWithLoader = ({ uri, style, resizeMode, onPress }) => {
+const ImageWithLoader = ({ uri, style, resizeMode = 'cover', onPress }) => {
   const [loading, setLoading] = useState(false);
   const source = useMemo(() => {
     if (!uri) {
@@ -34,15 +34,8 @@ const ImageWithLoader = ({ uri, style, resizeMode, onPress }) => {
   }, []);
 
   return (
-    <TouchableOpacity activeOpacity={onPress ? 0.85 : 1} onPress={onPress} style={style}>
-      {/* Blurred background to prevent blank/letterbox areas */}
-      <Image
-        source={source}
-        style={[StyleSheet.absoluteFillObject, { opacity: 0.3 }]}
-        resizeMode="cover"
-        blurRadius={Platform.OS === 'ios' ? 20 : 10}
-      />
-      {/* Main image with aspect ratio preserved */}
+    <TouchableOpacity activeOpacity={onPress ? 0.85 : 1} onPress={onPress} style={[style, { overflow: 'hidden' }]}>
+      {/* Main image filling container with cover resize mode */}
       <Image
         source={source}
         style={StyleSheet.absoluteFillObject}
@@ -774,7 +767,7 @@ export default function AnimalDetailsScreen({ route, navigation }) {
                     <ImageWithLoader
                       uri={slide.uri}
                       style={styles.galleryImage}
-                      resizeMode="contain"
+                      resizeMode="cover"
                       onPress={() => {
                         setZoomImageUri(slide.uri);
                         setIsZoomVisible(true);
@@ -802,7 +795,7 @@ export default function AnimalDetailsScreen({ route, navigation }) {
                     <ImageWithLoader
                       uri={slide.thumbnail || firstImage || resolveMediaUrl(null)}
                       style={styles.galleryImage}
-                      resizeMode="contain"
+                      resizeMode="cover"
                       onPress={(e) => {
                         console.log('[VideoPlayer] Play button/thumbnail tapped');
                         handlePlay();
@@ -1278,10 +1271,30 @@ const styles = StyleSheet.create({
     width: width,
     height: GALLERY_HEIGHT,
     position: 'relative',
+    overflow: 'hidden',
   },
   galleryImage: {
     width: width,
     height: GALLERY_HEIGHT,
+    overflow: 'hidden',
+  },
+  loaderCenter: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(241, 245, 249, 0.4)',
+  },
+  placeholderSlide: {
+    width: width,
+    height: GALLERY_HEIGHT,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+  },
+  placeholderText: {
+    marginTop: 12,
+    color: '#94A3B8',
+    fontSize: 14,
+    fontWeight: '600',
   },
   zoomIndicatorOverlay: {
     position: 'absolute',
@@ -1298,6 +1311,7 @@ const styles = StyleSheet.create({
     width: width,
     height: GALLERY_HEIGHT,
     position: 'relative',
+    overflow: 'hidden',
   },
   videoOverlay: {
     position: 'absolute',
