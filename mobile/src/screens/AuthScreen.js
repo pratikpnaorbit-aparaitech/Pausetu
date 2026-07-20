@@ -115,9 +115,9 @@ export default function AuthScreen({ navigation }) {
 
   const getGuestSubtext = () => {
     const lang = i18n?.language || 'mr';
-    if (lang.startsWith('mr')) return 'नोंदणी न करता वापरा';
-    if (lang.startsWith('hi')) return 'बिना पंजीकरण के उपयोग करें';
-    return 'Use without registration';
+    if (lang.startsWith('mr')) return 'नोंदणी न करता अॅप वापरा';
+    if (lang.startsWith('hi')) return 'बिना पंजीकरण के ऐप उपयोग करें';
+    return 'Use app without registration';
   };
 
   const renderTitle = () => {

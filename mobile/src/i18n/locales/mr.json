@@ -50,7 +50,7 @@
     "continueWithEmail": "ईमेल पत्त्याने पुढे जा",
     "emailPlaceholder": "ईमेल पत्ता टाका",
     "continue": "पुढे जा",
-    "continueAsGuest": "पाहुणे म्हणून पुढे जा",
+    "continueAsGuest": "नोंदणी न करता पुढे जा",
     "sendingOtp": "OTP पाठवित आहे...",
     "invalidEmail": "कृपया वैध ईमेल पत्ता टाका.",
     "otpError": "OTP पाठवण्यात अपयश. कृपया पुन्हा प्रयत्न करा."
