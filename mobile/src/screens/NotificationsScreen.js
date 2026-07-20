@@ -1,8 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { StyleSheet, View, Text, SafeAreaView, FlatList, TouchableOpacity, Alert, Modal, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, SafeAreaView, FlatList, TouchableOpacity, Alert, Modal, ActivityIndicator } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import NotificationCard from '../components/NotificationCard';
 import { api } from '../api/api';
+import { useTranslation } from 'react-i18next';
+import AppText from '../components/AppText';
+import { useAutoRefresh } from '../hooks/useAutoRefresh';
+import { REFRESH_EVENTS } from '../services/refreshManager';
 
 const mapBackendNotification = (n) => {
   let category = 'System';
@@ -63,8 +67,10 @@ export default function NotificationsScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isMenuVisible, setIsMenuVisible] = useState(false);
+  const { t } = useTranslation();
 
   const fetchNotifications = async () => {
+    setLoading(true);
     try {
       const res = await api.getMyNotifications();
       if (res.status === 'success') {
@@ -78,9 +84,13 @@ export default function NotificationsScreen({ navigation }) {
     }
   };
 
-  useEffect(() => {
-    fetchNotifications();
-  }, []);
+  useAutoRefresh(
+    () => fetchNotifications(),
+    {
+      events: [REFRESH_EVENTS.NOTIFICATION_UPDATED, REFRESH_EVENTS.VERIFICATION_UPDATED],
+      screenKey: 'NotificationsScreen'
+    }
+  );
 
   const filteredNotifications = useMemo(() => {
     return notifications.filter((item) => {
@@ -97,20 +107,19 @@ export default function NotificationsScreen({ navigation }) {
         )
       );
     } catch (err) {
-      Alert.alert('Error', 'Failed to mark notification as read.');
+      Alert.alert(t('common.error'), t('notifications.markReadFailed'));
     }
   };
 
   const handleMarkAllAsRead = async () => {
     try {
-      const unread = notifications.filter(n => !n.isRead);
-      await Promise.all(unread.map(n => api.markAsRead(n.id)));
+      await api.markAllAsRead();
       setNotifications(
         notifications.map((item) => ({ ...item, isRead: true }))
       );
-      Alert.alert('Success', 'All notifications marked as read.');
+      Alert.alert(t('common.success'), t('notifications.markAllReadSuccess'));
     } catch (err) {
-      Alert.alert('Error', 'Failed to mark all as read.');
+      Alert.alert(t('common.error'), t('notifications.markAllFailed'));
     }
   };
 
@@ -119,26 +128,26 @@ export default function NotificationsScreen({ navigation }) {
       await api.deleteNotification(id);
       setNotifications(notifications.filter((item) => item.id !== id));
     } catch (err) {
-      Alert.alert('Error', 'Failed to delete notification.');
+      Alert.alert(t('common.error'), t('notifications.deleteFailed'));
     }
   };
 
   const handleDeleteAll = () => {
     setIsMenuVisible(false);
     Alert.alert(
-      'Clear Notifications',
-      'Are you sure you want to clear all notifications?',
+      t('notifications.clearTitle'),
+      t('notifications.clearConfirm'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Clear All',
+          text: t('notifications.clearAll'),
           style: 'destructive',
           onPress: async () => {
             try {
               await Promise.all(notifications.map(n => api.deleteNotification(n.id)));
               setNotifications([]);
             } catch (err) {
-              Alert.alert('Error', 'Failed to clear all notifications.');
+              Alert.alert(t('common.error'), t('notifications.clearFailed'));
             }
           },
         },
@@ -159,13 +168,13 @@ export default function NotificationsScreen({ navigation }) {
           <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={22} color="#0F172A" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Notifications</Text>
+          <AppText style={styles.headerTitle}>{t('notifications.title')}</AppText>
         </View>
 
         <View style={styles.headerRight}>
           {notifications.length > 0 && (
             <TouchableOpacity style={styles.headerMarkReadBtn} onPress={handleMarkAllAsRead}>
-              <Text style={styles.headerMarkReadText}>Mark all as read</Text>
+              <AppText style={styles.headerMarkReadText}>{t('notifications.markAllRead')}</AppText>
             </TouchableOpacity>
           )}
 
@@ -194,12 +203,12 @@ export default function NotificationsScreen({ navigation }) {
                 ]}
                 onPress={() => setSelectedTab(item)}
               >
-                <Text style={[
+                <AppText style={[
                   styles.tabText,
                   isActive ? styles.tabTextActive : styles.tabTextInactive
                 ]}>
-                  {item}
-                </Text>
+                  {t(`notifications.${item.toLowerCase()}`)}
+                </AppText>
               </TouchableOpacity>
             );
           }}
@@ -219,17 +228,17 @@ export default function NotificationsScreen({ navigation }) {
             <View style={styles.emptyIconCircle}>
               <MaterialCommunityIcons name="bell-off-outline" size={48} color="#94A3B8" />
             </View>
-            <Text style={styles.emptyTitle}>No notifications yet</Text>
-            <Text style={styles.emptySubtitle}>
-              You are completely up to date. We will notify you here when listings update or buyer messages arrive!
-            </Text>
+            <AppText style={styles.emptyTitle}>{t('notifications.noNotifications')}</AppText>
+            <AppText style={styles.emptySubtitle}>
+              {t('notifications.noNotificationsSub')}
+            </AppText>
             <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
               {isRefreshing ? (
                 <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
                 <>
                   <Ionicons name="refresh-outline" size={16} color="#FFFFFF" style={styles.refreshIcon} />
-                  <Text style={styles.refreshButtonText}>Refresh</Text>
+                  <AppText style={styles.refreshButtonText}>{t('common.retry')}</AppText>
                 </>
               )}
             </TouchableOpacity>
@@ -259,14 +268,14 @@ export default function NotificationsScreen({ navigation }) {
           <View style={styles.menuDropdownContainer}>
             <TouchableOpacity style={styles.dropdownItem} onPress={handleMarkAllAsRead}>
               <Ionicons name="checkmark-done-outline" size={18} color="#0F172A" style={styles.dropdownIcon} />
-              <Text style={styles.dropdownText}>Mark all read</Text>
+              <AppText style={styles.dropdownText}>{t('notifications.markAllRead')}</AppText>
             </TouchableOpacity>
 
             <View style={styles.dropdownDivider} />
 
             <TouchableOpacity style={[styles.dropdownItem, styles.deleteItem]} onPress={handleDeleteAll}>
               <Ionicons name="trash-outline" size={18} color="#EF4444" style={styles.dropdownIcon} />
-              <Text style={[styles.dropdownText, { color: '#EF4444' }]}>Clear all logs</Text>
+              <AppText style={[styles.dropdownText, { color: '#EF4444' }]}>{t('notifications.clearAll')}</AppText>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>

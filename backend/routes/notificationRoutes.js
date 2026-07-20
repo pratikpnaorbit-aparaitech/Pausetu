@@ -7,6 +7,7 @@ const router = express.Router();
 router.use(protect);
 
 router.route('/').get(notificationController.getMyNotifications);
+router.route('/read-all').patch(notificationController.markAllRead);
 router.route('/:id/read').patch(notificationController.markAsRead);
 router.route('/:id').delete(notificationController.deleteNotification);
 

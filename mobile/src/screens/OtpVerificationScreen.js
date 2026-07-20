@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { StyleSheet, View, Text, TextInput, TouchableOpacity, SafeAreaView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, TextInput, TouchableOpacity, SafeAreaView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AppContext } from '../context/AppContext';
 import { api } from '../api/api';
+import { useTranslation } from 'react-i18next';
+import AppText from '../components/AppText';
 
 export default function OtpVerificationScreen({ route, navigation }) {
   const { login } = useContext(AppContext);
+  const { t } = useTranslation();
   const { email } = route.params || { email: 'user@example.com' };
   const [otp, setOtp] = useState('');
   const [timer, setTimer] = useState(60);
@@ -13,6 +16,7 @@ export default function OtpVerificationScreen({ route, navigation }) {
   const [verifiedSuccess, setVerifiedSuccess] = useState(false);
 
   useEffect(() => {
+    console.log('[OTP DEBUG] OTP screen mounted with email:', email);
     const interval = setInterval(() => {
       setTimer((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
@@ -40,13 +44,13 @@ export default function OtpVerificationScreen({ route, navigation }) {
           throw new Error(body.message);
         }
       } catch (err) {
-        Alert.alert('त्रुटी / Error', err.message || 'OTP पडताळणी अयशस्वी झाली.');
+        Alert.alert(t('otp.errorTitle'), err.message || t('otp.verifyFailed'));
         setOtp('');
       } finally {
         setLoading(false);
       }
     } else {
-      Alert.alert('त्रुटी / Error', 'कृपया ६-अंकी कोड टाका. (Please enter a 6-digit verification code.)');
+      Alert.alert(t('otp.errorTitle'), t('otp.invalidCode'));
     }
   };
 
@@ -55,9 +59,9 @@ export default function OtpVerificationScreen({ route, navigation }) {
     try {
       await api.sendOtp(email);
       setTimer(60);
-      Alert.alert('यशस्वी (Success)', 'OTP यशस्वीरित्या पाठवला गेला आहे! (OTP sent successfully!)');
+      Alert.alert(t('otp.successTitle'), t('otp.resendSuccess'));
     } catch (err) {
-      Alert.alert('त्रुटी / Error', err.message || 'OTP पुन्हा पाठवण्यात अडचण आली.');
+      Alert.alert(t('otp.errorTitle'), err.message || t('otp.resendFailed'));
     } finally {
       setLoading(false);
     }
@@ -70,7 +74,7 @@ export default function OtpVerificationScreen({ route, navigation }) {
         style={styles.keyboardView}
       >
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} disabled={loading || verifiedSuccess}>
-          <Text style={styles.backButtonText}>← Back</Text>
+          <AppText style={styles.backButtonText}>{t('otp.back')}</AppText>
         </TouchableOpacity>
 
         <View style={styles.content}>
@@ -79,24 +83,29 @@ export default function OtpVerificationScreen({ route, navigation }) {
               <View style={[styles.iconCircle, { borderColor: '#16A34A', backgroundColor: '#DCFCE7' }]}>
                 <Ionicons name="checkmark-circle-outline" size={38} color="#16A34A" />
               </View>
-              <Text style={styles.title}>Verification Successful!</Text>
-              <Text style={[styles.subtitle, { color: '#16A34A', fontWeight: 'bold' }]}>
-                पडताळणी यशस्वी! logging you in...
-              </Text>
+              <AppText style={styles.title}>{t('otp.verificationSuccess')}</AppText>
+              <AppText style={[styles.subtitle, { color: '#16A34A', fontWeight: 'bold' }]}>
+                {t('otp.loggingIn')}
+              </AppText>
             </View>
           ) : (
             <>
               <View style={styles.iconCircle}>
                 <Ionicons name="lock-closed-outline" size={32} color="#16A34A" />
               </View>
-              <Text style={styles.title}>Enter Verification Code</Text>
-              <Text style={styles.subtitle}>
-                We have sent a 6-digit OTP to {email}
-              </Text>
+              <AppText style={styles.title}>{t('otp.enterCode')}</AppText>
+              <AppText style={styles.subtitle}>
+                {t('otp.sentTo')}
+              </AppText>
+              {email ? (
+                <AppText style={[styles.subtitle, { color: '#1E293B', fontWeight: 'bold', marginTop: 4 }]}>
+                  {email}
+                </AppText>
+              ) : null}
 
               <TextInput
                 style={styles.otpInput}
-                placeholder="Enter 6-Digit Code"
+                placeholder={t('otp.codePlaceholder')}
                 placeholderTextColor="#90A4AE"
                 keyboardType="number-pad"
                 maxLength={6}
@@ -111,16 +120,16 @@ export default function OtpVerificationScreen({ route, navigation }) {
                 {loading ? (
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.verifyButtonText}>Verify & Proceed</Text>
+                  <AppText style={styles.verifyButtonText}>{t('otp.verifyProceed')}</AppText>
                 )}
               </TouchableOpacity>
 
               <View style={styles.resendContainer}>
                 {timer > 0 ? (
-                  <Text style={styles.timerText}>Resend OTP in {timer}s</Text>
+                  <AppText style={styles.timerText}>{t('otp.resendIn', { timer })}</AppText>
                 ) : (
                   <TouchableOpacity onPress={handleResend} disabled={loading}>
-                    <Text style={styles.resendText}>Resend OTP</Text>
+                    <AppText style={styles.resendText}>{t('otp.resend')}</AppText>
                   </TouchableOpacity>
                 )}
               </View>

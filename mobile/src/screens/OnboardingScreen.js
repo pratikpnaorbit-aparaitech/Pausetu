@@ -1,26 +1,28 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Dimensions, SafeAreaView } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, Dimensions, SafeAreaView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
+import AppText from '../components/AppText';
 
 const { width } = Dimensions.get('window');
 
 const SLIDES = [
   {
-    title: 'Welcome to PashuSetu',
-    description: 'Bridging the gap in the animal husbandry ecosystem. Connecting farmers, doctors, and businesses.',
+    titleKey: 'onboarding.slide1_title',
+    descKey: 'onboarding.slide1_desc',
     iconName: 'paw',
     colors: ['#FFFFFF', '#F0FDF4'],
   },
   {
-    title: 'Expert Veterinary Care',
-    description: 'Get direct access to certified veterinarians, consultations, and health resources for your livestock.',
+    titleKey: 'onboarding.slide2_title',
+    descKey: 'onboarding.slide2_desc',
     iconName: 'hospital-building',
     colors: ['#FFFFFF', '#ECFDF5'],
   },
   {
-    title: 'Trade & Grow Safely',
-    description: 'Buy and sell livestock, dairy products, and feed directly in a trusted, transparent marketplace.',
+    titleKey: 'onboarding.slide3_title',
+    descKey: 'onboarding.slide3_desc',
     iconName: 'trending-up',
     colors: ['#FFFFFF', '#F0FDF4'],
   },
@@ -28,6 +30,7 @@ const SLIDES = [
 
 export default function OnboardingScreen({ navigation }) {
   const [currentSlide, setCurrentSlide] = useState(0);
+  const { t } = useTranslation();
 
   const handleNext = () => {
     if (currentSlide < SLIDES.length - 1) {
@@ -48,7 +51,7 @@ export default function OnboardingScreen({ navigation }) {
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
           <TouchableOpacity onPress={handleSkip}>
-            <Text style={styles.skipText}>Skip</Text>
+            <AppText style={styles.skipText}>{t('onboarding.skip')}</AppText>
           </TouchableOpacity>
         </View>
 
@@ -56,8 +59,8 @@ export default function OnboardingScreen({ navigation }) {
           <View style={styles.iconCircle}>
             <MaterialCommunityIcons name={slide.iconName} size={80} color="#16A34A" />
           </View>
-          <Text style={styles.title}>{slide.title}</Text>
-          <Text style={styles.description}>{slide.description}</Text>
+          <AppText style={styles.title}>{t(slide.titleKey)}</AppText>
+          <AppText style={styles.description}>{t(slide.descKey)}</AppText>
         </View>
 
         <View style={styles.footer}>
@@ -76,9 +79,9 @@ export default function OnboardingScreen({ navigation }) {
 
           {/* Button */}
           <TouchableOpacity style={styles.button} onPress={handleNext}>
-            <Text style={styles.buttonText}>
-              {currentSlide === SLIDES.length - 1 ? 'Get Started' : 'Next'}
-            </Text>
+            <AppText style={styles.buttonText}>
+              {currentSlide === SLIDES.length - 1 ? t('onboarding.getStarted') : t('onboarding.next')}
+            </AppText>
           </TouchableOpacity>
         </View>
       </SafeAreaView>

@@ -16,6 +16,7 @@ export const buyerApi = {
             state: u.state || 'N/A',
             interestedListings: 0,
             status: u.isBlocked ? 'Blocked' : 'Active',
+            isPremium: u.isPremium || false,
             isDeleted: false,
             photo: u.profilePhoto || 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=120&q=80'
           };
@@ -28,5 +29,8 @@ export const buyerApi = {
   },
   toggleBlock: async (id) => {
     return axios.patch(`/admin/manage-user/${id}`, { action: 'toggleBlock' });
+  },
+  togglePremium: async (id) => {
+    return axios.patch(`/admin/manage-premium/${id}`);
   }
 };

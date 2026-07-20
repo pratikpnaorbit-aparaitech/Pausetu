@@ -1,98 +1,225 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
+import { StyleSheet, View, Platform, Animated } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 
 // Import Screens
 import BuyScreen from '../screens/BuyScreen';
 import SellScreen from '../screens/SellScreen';
 import BidScreen from '../screens/BidScreen';
-import PostScreen from '../screens/PostScreen';
+import FeedPlannerScreen from '../screens/PremiumAdvisor/FeedPlannerScreen';
 
 const Tab = createBottomTabNavigator();
 
+function AnimatedTabIcon({ focused, iconName }) {
+  const scaleAnim = useRef(new Animated.Value(focused ? 1 : 0.85)).current;
+  const bgScale = useRef(new Animated.Value(focused ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(scaleAnim, {
+        toValue: focused ? 1 : 0.85,
+        duration: 220,
+        useNativeDriver: true,
+      }),
+      Animated.timing(bgScale, {
+        toValue: focused ? 1 : 0,
+        duration: 220,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [focused]);
+
+  return (
+    <View style={styles.iconWrapper}>
+      <Animated.View style={[
+        styles.iconBg,
+        {
+          transform: [{ scale: bgScale }],
+          opacity: bgScale,
+        }
+      ]} />
+      <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+        <MaterialCommunityIcons
+          name={iconName}
+          size={focused ? 24 : 26}
+          color={focused ? '#FFFFFF' : '#64748B'}
+        />
+      </Animated.View>
+    </View>
+  );
+}
+
+function AnimatedTabLabel({ focused, labelText }) {
+  const opacityAnim = useRef(new Animated.Value(focused ? 1 : 0.85)).current;
+
+  useEffect(() => {
+    Animated.timing(opacityAnim, {
+      toValue: focused ? 1 : 0.85,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
+  }, [focused]);
+
+  return (
+    <Animated.Text
+      style={[
+        styles.label,
+        focused ? styles.activeLabel : styles.inactiveLabel,
+        { opacity: opacityAnim }
+      ]}
+      numberOfLines={1}
+      adjustsFontSizeToFit
+    >
+      {labelText}
+    </Animated.Text>
+  );
+}
+
 export default function BottomTabNavigator() {
+  const { t } = useTranslation();
+
   return (
     <Tab.Navigator
-      screenOptions={{
-        headerShown: true,
+      screenOptions={({ route }) => ({
+        headerShown: false,
         headerStyle: {
           backgroundColor: '#FFFFFF',
           borderBottomWidth: 1,
-          borderBottomColor: '#F1F5F9', // Softer border line
+          borderBottomColor: '#F1F5F9',
         },
         headerTintColor: '#0F172A',
         headerTitleStyle: {
           fontWeight: '700',
         },
+
         tabBarStyle: {
-          position: 'absolute',
-          bottom: 16,
-          left: 16,
-          right: 16,
+          height: Platform.OS === 'ios' ? 96 : 84,
           backgroundColor: '#FFFFFF',
-          borderRadius: 24,
-          height: 66,
-          borderTopWidth: 0,
+          borderTopWidth: 1,
+          borderTopColor: '#E2E8F0',
+          borderTopLeftRadius: 24,
+          borderTopRightRadius: 24,
           shadowColor: '#0F172A',
-          shadowOffset: { width: 0, height: 8 },
+          shadowOffset: { width: 0, height: -4 },
           shadowOpacity: 0.06,
-          shadowRadius: 16,
-          elevation: 8,
-          paddingBottom: 8,
+          shadowRadius: 12,
+          elevation: 12,
+          paddingBottom: Platform.OS === 'ios' ? 24 : 12,
           paddingTop: 8,
+          paddingHorizontal: 16,
         },
+
         tabBarActiveTintColor: '#16A34A',
         tabBarInactiveTintColor: '#64748B',
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '600',
-          marginTop: 2,
+
+        tabBarIcon: ({ focused }) => {
+          let iconName;
+          switch (route.name) {
+            case 'Buy':
+              iconName = 'shopping';
+              break;
+            case 'Sell':
+              iconName = 'cash-plus';
+              break;
+            case 'Bid':
+              iconName = 'trending-up';
+              break;
+            case 'Post':
+              iconName = 'sprout';
+              break;
+            default:
+              iconName = 'circle';
+          }
+          return <AnimatedTabIcon focused={focused} iconName={iconName} />;
         },
-        tabBarIconStyle: {
-          marginBottom: -2,
-        },
-      }}
+
+        tabBarLabel: ({ focused }) => {
+          let labelKey;
+          switch (route.name) {
+            case 'Buy':
+              labelKey = 'tabs.buy';
+              break;
+            case 'Sell':
+              labelKey = 'tabs.sell';
+              break;
+            case 'Bid':
+              labelKey = 'tabs.marketPrice';
+              break;
+            case 'Post':
+              labelKey = 'tabs.feedPlanner';
+              break;
+            default:
+              labelKey = '';
+          }
+          return <AnimatedTabLabel focused={focused} labelText={t(labelKey)} />;
+        }
+      })}
     >
       <Tab.Screen
         name="Buy"
         component={BuyScreen}
         options={{
-          title: 'Buy',
-          tabBarIcon: ({ color }) => (
-            <MaterialCommunityIcons name="shopping" size={22} color={color} />
-          ),
+          title: t('tabs.buy'),
         }}
       />
+
       <Tab.Screen
         name="Sell"
         component={SellScreen}
         options={{
-          title: 'Sell',
-          tabBarIcon: ({ color }) => (
-            <MaterialCommunityIcons name="cash-plus" size={22} color={color} />
-          ),
+          title: t('tabs.sell'),
         }}
       />
+
       <Tab.Screen
         name="Bid"
         component={BidScreen}
         options={{
-          title: 'Bid',
-          tabBarIcon: ({ color }) => (
-            <MaterialCommunityIcons name="gavel" size={22} color={color} />
-          ),
+          title: t('tabs.marketPrice'),
         }}
       />
+
       <Tab.Screen
         name="Post"
-        component={PostScreen}
+        component={FeedPlannerScreen}
         options={{
-          title: 'Post',
-          tabBarIcon: ({ color }) => (
-            <MaterialCommunityIcons name="plus-circle-outline" size={22} color={color} />
-          ),
+          title: t('tabs.feedPlanner'),
         }}
       />
     </Tab.Navigator>
   );
 }
+
+const styles = StyleSheet.create({
+  iconWrapper: {
+    width: 60,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+    marginBottom: 2,
+  },
+  iconBg: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    borderRadius: 16,
+    backgroundColor: '#16A34A',
+  },
+  label: {
+    fontSize: 12.5,
+    textAlign: 'center',
+    marginTop: 2,
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
+  },
+  activeLabel: {
+    fontWeight: '800',
+    color: '#16A34A',
+  },
+  inactiveLabel: {
+    fontWeight: '500',
+    color: '#64748B',
+  }
+});

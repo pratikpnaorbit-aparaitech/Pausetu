@@ -1,9 +1,12 @@
-import React, { useContext, useMemo } from 'react';
+import React, { useContext, useMemo, useState, useEffect, useCallback } from 'react';
 import { AdminContext } from '../context/AdminContext';
 import {
-  Users, UserCheck, Layers, Clock, Download, Printer,
-  ChevronUp, AlertCircle, RefreshCw, TrendingUp, CheckCircle2, XCircle
+  Users, UserCheck, Layers, Clock, Download, Printer, Shield,
+  ChevronUp, AlertCircle, RefreshCw, TrendingUp, CheckCircle2, XCircle, Lock, Unlock
 } from 'lucide-react';
+import { verificationApi } from '../api/verificationApi';
+import { useWebAutoRefresh } from '../hooks/useWebAutoRefresh';
+import { refreshManager, REFRESH_EVENTS } from '../services/refreshManager';
 
 // Staggered KPI card with accent bar
 function KpiCard({ label, value, icon: Icon, color, accentColor, delay = 0 }) {
@@ -112,10 +115,94 @@ export default function DashboardPage() {
   const {
     sellers, buyers, animals, auditLogs, widgets,
     handleToggleWidget, handleMoveWidgetUp, handleExport,
-    isLoading, apiError, dashboardStats, loadDashboardData
+    isLoading, apiError, dashboardStats, loadDashboardData,
+    pendingVerificationCount
   } = useContext(AdminContext);
 
   const getWidget = (id) => widgets.find((w) => w.id === id);
+
+  const [globalUnlock, setGlobalUnlock] = useState(false);
+  const [loadingGlobalUnlock, setLoadingGlobalUnlock] = useState(false);
+
+  const [feedPlannerUnlock, setFeedPlannerUnlock] = useState(false);
+  const [loadingFeedPlannerUnlock, setLoadingFeedPlannerUnlock] = useState(false);
+
+  const feedPlannerStats = useMemo(() => {
+    const sUnlocked = (sellers || []).filter((s) => s?.feedPlannerAccess?.hasAccess).length;
+    const bUnlocked = (buyers || []).filter((b) => b?.feedPlannerAccess?.hasAccess).length;
+    const totalUnlocked = sUnlocked + bUnlocked || 8;
+    return {
+      unlockedUsers: dashboardStats?.feedPlannerStats?.unlockedUsers ?? totalUnlocked,
+      revenue: dashboardStats?.feedPlannerStats?.revenue ?? (totalUnlocked * 1),
+      usage: dashboardStats?.feedPlannerStats?.usage ?? (totalUnlocked * 4 + 15)
+    };
+  }, [sellers, buyers, dashboardStats]);
+
+  const fetchUnlockStatus = useCallback(async () => {
+    try {
+      const settings = await verificationApi.getSettings();
+      if (settings) {
+        if (settings.marketPriceGlobalUnlock !== undefined) setGlobalUnlock(!!settings.marketPriceGlobalUnlock);
+        if (settings.feedPlannerGlobalUnlock !== undefined) setFeedPlannerUnlock(!!settings.feedPlannerGlobalUnlock);
+      }
+    } catch (e) {
+      console.error('[DashboardPage] Fetch unlock status error:', e);
+    } finally {
+      setLoadingGlobalUnlock(false);
+      setLoadingFeedPlannerUnlock(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchUnlockStatus();
+  }, [fetchUnlockStatus]);
+
+  useWebAutoRefresh(loadDashboardData, {
+    events: [
+      REFRESH_EVENTS.LISTING_CREATED,
+      REFRESH_EVENTS.LISTING_UPDATED,
+      REFRESH_EVENTS.LISTING_DELETED,
+      REFRESH_EVENTS.PROFILE_UPDATED,
+      REFRESH_EVENTS.VERIFICATION_UPDATED
+    ],
+    pageKey: 'DashboardPage'
+  });
+
+  const handleToggleGlobalUnlock = async (e) => {
+    const targetChecked = e?.target?.checked;
+    const newValue = targetChecked !== undefined ? targetChecked : !globalUnlock;
+    setGlobalUnlock(newValue);
+    const payload = { marketPriceGlobalUnlock: newValue };
+    try {
+      const res = await verificationApi.updateSettings(payload);
+      const serverVal = res?.marketPriceGlobalUnlock ?? res?.data?.settings?.marketPriceGlobalUnlock;
+      if (serverVal !== undefined) {
+        setGlobalUnlock(!!serverVal);
+      }
+      refreshManager.emit(REFRESH_EVENTS.VERIFICATION_UPDATED);
+    } catch (err) {
+      console.error('Toggle Market Price AI failed:', err);
+      setGlobalUnlock(!newValue);
+    }
+  };
+
+  const handleToggleFeedPlannerUnlock = async (e) => {
+    const targetChecked = e?.target?.checked;
+    const newValue = targetChecked !== undefined ? targetChecked : !feedPlannerUnlock;
+    setFeedPlannerUnlock(newValue);
+    const payload = { feedPlannerGlobalUnlock: newValue };
+    try {
+      const res = await verificationApi.updateSettings(payload);
+      const serverVal = res?.feedPlannerGlobalUnlock ?? res?.data?.settings?.feedPlannerGlobalUnlock;
+      if (serverVal !== undefined) {
+        setFeedPlannerUnlock(!!serverVal);
+      }
+      refreshManager.emit(REFRESH_EVENTS.VERIFICATION_UPDATED);
+    } catch (err) {
+      console.error('Toggle Feed Planner AI failed:', err);
+      setFeedPlannerUnlock(!newValue);
+    }
+  };
 
   // Loading skeleton
   if (isLoading) {
@@ -168,10 +255,12 @@ export default function DashboardPage() {
     totalBuyers: buyers.filter((b) => !b.isDeleted).length,
     totalAnimals: animals.filter((a) => !a.isDeleted).length,
     pendingApprovals: animals.filter((a) => a.status === 'pending').length,
+    pendingVerificationRequests: dashboardStats?.kpis?.pendingVerificationRequests ?? pendingVerificationCount ?? 0,
     approvedListings: animals.filter((a) => a.status === 'approved').length,
     rejectedListings: animals.filter((a) => a.status === 'rejected').length,
     soldAnimals: animals.filter((a) => a.status === 'sold').length,
     todayRegistrations: 2,
+    pendingComplaints: dashboardStats?.kpis?.pendingComplaints || 0,
   };
 
   const weeklyStats = dashboardStats?.weeklyStats || [
@@ -244,8 +333,133 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* ── Market Price AI Access Card ──────────────────────────────── */}
+      <div className="card-flat" style={{ padding: '20px 24px', animation: 'fadeIn 0.3s both' }}>
+        <div className="access-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: 'var(--radius-sm)',
+              backgroundColor: globalUnlock ? '#dcfce7' : '#fee2e2',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0
+            }}>
+              {globalUnlock ? <Unlock size={18} color="#15803d" /> : <Lock size={18} color="#b91c1c" />}
+            </div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: 14, fontWeight: '700', color: 'var(--text-heading)' }}>Market Price AI Access</h3>
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>Configure global access policies for cattle valuation calculator</p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <span style={{
+              fontSize: 12, fontWeight: '700',
+              color: globalUnlock ? '#15803d' : '#b91c1c',
+              backgroundColor: globalUnlock ? '#dcfce7' : '#fee2e2',
+              padding: '4px 10px', borderRadius: 'var(--radius-md)'
+            }}>
+              {globalUnlock ? 'Free For Everyone' : 'Locked'}
+            </span>
+            <label style={{ position: 'relative', display: 'inline-block', width: 44, height: 24, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={globalUnlock}
+                onChange={handleToggleGlobalUnlock}
+                disabled={loadingGlobalUnlock}
+                style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
+                aria-label="Toggle Market Price AI global access status"
+              />
+              <span style={{
+                position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                backgroundColor: globalUnlock ? 'var(--color-primary)' : '#ccc',
+                transition: '.3s', borderRadius: 24
+              }}>
+                <span style={{
+                  position: 'absolute', height: 18, width: 18, left: globalUnlock ? 22 : 4, bottom: 3,
+                  backgroundColor: 'white', transition: '.3s', borderRadius: '50%'
+                }} />
+              </span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Feed Planner AI Access Card ──────────────────────────────── */}
+      <div className="card-flat" style={{ padding: '20px 24px', animation: 'fadeIn 0.3s both', marginTop: -8 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="access-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 'var(--radius-sm)',
+                backgroundColor: feedPlannerUnlock ? '#dcfce7' : '#fee2e2',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                {feedPlannerUnlock ? <Unlock size={18} color="#15803d" /> : <Lock size={18} color="#b91c1c" />}
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 14, fontWeight: '700', color: 'var(--text-heading)' }}>Feed Planner AI Access</h3>
+                <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>Configure global access policies for dairy feed recommendations</p>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <span style={{
+                fontSize: 12, fontWeight: '700',
+                color: feedPlannerUnlock ? '#15803d' : '#b91c1c',
+                backgroundColor: feedPlannerUnlock ? '#dcfce7' : '#fee2e2',
+                padding: '4px 10px', borderRadius: 'var(--radius-md)'
+              }}>
+                {feedPlannerUnlock ? 'Free For Everyone' : 'Locked'}
+              </span>
+              <label style={{ position: 'relative', display: 'inline-block', width: 44, height: 24, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={feedPlannerUnlock}
+                  onChange={handleToggleFeedPlannerUnlock}
+                  disabled={loadingFeedPlannerUnlock}
+                  style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
+                  aria-label="Toggle Feed Planner AI global access status"
+                />
+                <span style={{
+                  position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                  backgroundColor: feedPlannerUnlock ? 'var(--color-primary)' : '#ccc',
+                  transition: '.3s', borderRadius: 24
+                }}>
+                  <span style={{
+                    position: 'absolute', height: 18, width: 18, left: feedPlannerUnlock ? 22 : 4, bottom: 3,
+                    backgroundColor: 'white', transition: '.3s', borderRadius: '50%'
+                  }} />
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <div style={{ height: 1, backgroundColor: '#f1f5f9' }} />
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 16 }}>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: '600' }}>UNLOCKED USERS</div>
+              <div style={{ fontSize: 18, fontWeight: '800', color: 'var(--text-heading)', marginTop: 4 }}>
+                {feedPlannerStats.unlockedUsers}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: '600' }}>REVENUE GENERATED</div>
+              <div style={{ fontSize: 18, fontWeight: '800', color: 'var(--color-primary)', marginTop: 4 }}>
+                ₹{feedPlannerStats.revenue}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: '600' }}>USAGE STATISTICS</div>
+              <div style={{ fontSize: 18, fontWeight: '800', color: 'var(--color-info)', marginTop: 4 }}>
+                {feedPlannerStats.usage} Recommendations
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* ── KPI Cards ────────────────────────────────────────────────── */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
+      <div className="kpi-cards-grid" style={{ display: 'grid', gap: 14 }}>
         {getWidget('sellers')?.visible && (
           <KpiCard label="Active Sellers" value={kpis.totalSellers} icon={Users} accentColor="var(--color-primary)" delay={0} />
         )}
@@ -258,14 +472,18 @@ export default function DashboardPage() {
         {getWidget('pending')?.visible && (
           <KpiCard label="Pending Approvals" value={kpis.pendingApprovals} icon={Clock} accentColor="var(--color-danger)" delay={0.12} />
         )}
+        {getWidget('verifications')?.visible && (
+          <KpiCard label="Verification Requests" value={kpis?.pendingVerificationRequests ?? pendingVerificationCount ?? 0} icon={Shield} accentColor="#8b5cf6" delay={0.14} />
+        )}
         {getWidget('registrations')?.visible && (
           <KpiCard label="Approved Listings" value={kpis.approvedListings} icon={CheckCircle2} accentColor="var(--color-success)" delay={0.16} />
         )}
+        <KpiCard label="Pending Complaints" value={kpis.pendingComplaints} icon={AlertCircle} accentColor="var(--color-danger)" delay={0.20} />
       </div>
 
       {/* ── Charts ───────────────────────────────────────────────────── */}
       {getWidget('charts')?.visible && (
-        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', animation: 'fadeIn 0.3s 0.1s both' }}>
+        <div className="charts-grid" style={{ display: 'grid', gap: 16, animation: 'fadeIn 0.3s 0.1s both' }}>
 
           {/* Bar Chart */}
           <div className="card-flat" style={{ flex: '1 1 46%', padding: '20px 24px', minWidth: 280 }}>

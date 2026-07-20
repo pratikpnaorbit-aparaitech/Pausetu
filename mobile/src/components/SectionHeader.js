@@ -1,13 +1,18 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import AppText from './AppText';
+import { useTranslation } from 'react-i18next';
 
-export default function SectionHeader({ title, actionText = 'View All', onActionPress }) {
+export default function SectionHeader({ title, actionText, onActionPress }) {
+  const { t } = useTranslation();
+  const displayActionText = actionText || t('common.viewAll');
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{title}</Text>
+      <AppText style={styles.title}>{title}</AppText>
       {onActionPress && (
         <TouchableOpacity onPress={onActionPress}>
-          <Text style={styles.actionText}>{actionText}</Text>
+          <AppText style={styles.actionText}>{displayActionText}</AppText>
         </TouchableOpacity>
       )}
     </View>

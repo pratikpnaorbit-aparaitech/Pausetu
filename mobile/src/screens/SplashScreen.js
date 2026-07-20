@@ -1,21 +1,65 @@
-import React from 'react';
-import { StyleSheet, View, Text, ActivityIndicator } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { StyleSheet, View, ActivityIndicator, Animated, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import AppText from '../components/AppText';
 
 export default function SplashScreen() {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.95)).current;
+  const [dots, setDots] = useState('...');
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scaleAnim, {
+        toValue: 1.0,
+        tension: 40,
+        friction: 7,
+        useNativeDriver: true,
+      })
+    ]).start();
+  }, [fadeAnim, scaleAnim]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setDots(prev => (prev.length >= 3 ? '' : prev + '.'));
+    }, 500);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <LinearGradient
-      colors={['#F0FDF4', '#DCFCE7']}
+      colors={['#F4FBF7', '#FFFFFF']}
       style={styles.container}
     >
-      <View style={styles.content}>
-        <View style={styles.logoCircle}>
-          <Text style={styles.logoText}>PS</Text>
+      <Animated.View 
+        style={[
+          styles.content, 
+          { 
+            opacity: fadeAnim,
+            transform: [{ scale: scaleAnim }]
+          }
+        ]}
+      >
+        <Image
+          source={require('../../assets/logo-icon.png')}
+          style={styles.logo}
+          resizeMode="contain"
+        />
+        
+        <AppText style={styles.brandAppTitle}>पशुसेतू</AppText>
+        <AppText style={styles.brandTitle}>जनावर बाजार</AppText>
+        <AppText style={styles.brandSubtitle}>शेतकऱ्यांसाठी सुरक्षित जनावर खरेदी-विक्री</AppText>
+
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="large" color="#16A34A" />
+          <AppText style={styles.loadingText}>लोड होत आहे{dots}</AppText>
         </View>
-        <Text style={styles.title}>PashuSetu</Text>
-        <Text style={styles.subtitle}>Connecting Husbandry Ecosystems</Text>
-        <ActivityIndicator size="large" color="#16A34A" style={styles.loader} />
-      </View>
+      </Animated.View>
     </LinearGradient>
   );
 }
@@ -28,41 +72,42 @@ const styles = StyleSheet.create({
   },
   content: {
     alignItems: 'center',
+    width: '100%',
+    paddingHorizontal: 40,
   },
-  logoCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2.5,
-    borderColor: '#16A34A',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-    shadowColor: '#16A34A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
+  logo: {
+    width: 140,
+    height: 140,
+    marginBottom: 12,
   },
-  logoText: {
-    fontSize: 42,
-    fontWeight: 'bold',
-    color: '#16A34A',
-  },
-  title: {
+  brandAppTitle: {
     fontSize: 32,
-    fontWeight: 'bold',
-    color: '#111827',
-    letterSpacing: 1,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 6,
   },
-  subtitle: {
-    fontSize: 16,
-    color: '#6B7280',
+  brandTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#64748B',
+    marginBottom: 6,
+  },
+  brandSubtitle: {
+    fontSize: 13,
+    color: '#94A3B8',
+    fontWeight: '400',
+    textAlign: 'center',
+    marginBottom: 32,
+  },
+  loaderContainer: {
+    alignItems: 'center',
+  },
+  loadingText: {
     marginTop: 8,
-    marginBottom: 40,
-  },
-  loader: {
-    marginTop: 20,
+    fontSize: 14,
+    color: '#94A3B8',
+    fontWeight: '500',
+    minWidth: 90,
+    textAlign: 'center',
   },
 });

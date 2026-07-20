@@ -75,8 +75,15 @@ instance.interceptors.response.use(
   (response) => response.data,
   async (error) => {
     const status = error.response ? error.response.status : null;
+    const requestUrl = error.config?.url || 'unknown';
+    const requestMethod = (error.config?.method || 'unknown').toUpperCase();
 
-    if (status === 401 || status === 403) {
+    console.log(`[API Interceptor] ${requestMethod} ${requestUrl} → ${status}`);
+
+    // Only logout on 401 (token invalid/expired) — NOT on 403 (access denied/ownership check).
+    // A 403 means the token is valid but the user lacks permission; that is NOT a session expiry.
+    const token = await secureStorage.getItem('userToken');
+    if (status === 401 && token && token !== 'guest') {
       console.warn('[Session Expiry] Token is unauthorized or expired, logging out...');
       if (logoutCallback) {
         await logoutCallback();
@@ -87,12 +94,12 @@ instance.interceptors.response.use(
     let message = 'API request failed';
     if (!error.response) {
       message = 'Network error. Please check your internet connection.';
+    } else if (error.response.data && error.response.data.message) {
+      message = error.response.data.message;
     } else if (status === 500) {
       message = 'Internal server error. Please try again later.';
     } else if (status === 404) {
       message = 'Requested resources not found.';
-    } else if (error.response.data && error.response.data.message) {
-      message = error.response.data.message;
     }
 
     return Promise.reject(new Error(message));
@@ -105,7 +112,7 @@ export const api = {
     const email = phoneNumberOrEmail.includes('@') 
       ? phoneNumberOrEmail 
       : `${phoneNumberOrEmail}@pashusetu.com`;
-    return instance.post('/auth/send-otp', { email });
+    return instance.post('/auth/send-otp', { email }, { timeout: 25000 });
   },
 
   verifyOtp: async (phoneNumberOrEmail, otp) => {
@@ -151,6 +158,15 @@ export const api = {
     return instance.get(`/animals?${query}`);
   },
 
+  getRecommendedAnimals: async () => {
+    return instance.get('/animals/recommended');
+  },
+  
+  // Submit a complaint for an animal listing
+  submitComplaint: async (data) => {
+    return instance.post('/complaints', data);
+  },
+
   getAnimalById: async (id) => {
     return instance.get(`/animals/${id}`);
   },
@@ -176,8 +192,21 @@ export const api = {
     return instance.patch(`/notifications/${id}/read`);
   },
 
+  markAllAsRead: async () => {
+    return instance.patch('/notifications/read-all');
+  },
+
   deleteNotification: async (id) => {
     return instance.delete(`/notifications/${id}`);
+  },
+
+  // Favorites
+  getFavorites: async () => {
+    return instance.get('/buyers/favorites');
+  },
+
+  toggleFavorite: async (animalId) => {
+    return instance.post('/buyers/favorites', { animalId });
   }
 };
 

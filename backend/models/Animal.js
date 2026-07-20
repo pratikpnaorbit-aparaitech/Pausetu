@@ -103,6 +103,12 @@ const animalSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Village is required']
     },
+    pincode: {
+      type: String
+    },
+    formattedAddress: {
+      type: String
+    },
     latitude: {
       type: Number
     },

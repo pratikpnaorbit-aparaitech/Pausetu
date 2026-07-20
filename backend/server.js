@@ -24,6 +24,9 @@ const buyerRoutes = require('./routes/buyerRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const verificationRoutes = require('./routes/verificationRoutes');
+const premiumRoutes = require('./routes/premiumRoutes');
+const complaintRoutes = require('./routes/complaintRoutes');
 const masterRoutes = require('./routes/masterRoutes');
 const autoSeed = require('./config/seed');
 
@@ -77,6 +80,9 @@ app.use('/api/buyers', buyerRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/uploads', uploadRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/verification', verificationRoutes);
+app.use('/api/premium', premiumRoutes);
+app.use('/api/complaints', complaintRoutes);
 app.use('/api', masterRoutes);
 
 // Fallback for unhandled routes

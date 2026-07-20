@@ -2,6 +2,7 @@ const User = require('../models/User');
 const Animal = require('../models/Animal');
 const Category = require('../models/Category');
 const Seller = require('../models/Seller');
+const Complaint = require('../models/Complaint');
 const asyncHandler = require('../utils/asyncHandler');
 const { AppError } = require('../middleware/errorHandler');
 
@@ -9,14 +10,17 @@ const { AppError } = require('../middleware/errorHandler');
  * Get dashboard stats
  */
 exports.getDashboardStats = asyncHandler(async (req, res, next) => {
-  const totalSellers = await User.countDocuments({ role: 'seller' });
+  const activeSellerIds = await Animal.distinct('sellerId', { isDeleted: false });
+  const totalSellers = activeSellerIds.length;
   const totalBuyers = await User.countDocuments({ role: 'buyer' });
   const totalAnimals = await Animal.countDocuments({ isDeleted: false });
   const pendingApprovals = await Animal.countDocuments({ status: 'pending', isDeleted: false });
   const approvedListings = await Animal.countDocuments({ status: 'approved', isDeleted: false });
   const rejectedListings = await Animal.countDocuments({ status: 'rejected', isDeleted: false });
   const soldAnimals = await Animal.countDocuments({ status: 'sold', isDeleted: false });
-  
+  const pendingComplaints = await Complaint.countDocuments({ status: 'pending' });
+  const pendingVerificationRequests = await User.countDocuments({ 'verification.status': 'pending' });
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const todayRegistrations = await User.countDocuments({ createdAt: { $gte: today } });
@@ -62,7 +66,9 @@ exports.getDashboardStats = asyncHandler(async (req, res, next) => {
         approvedListings,
         rejectedListings,
         soldAnimals,
-        todayRegistrations
+        todayRegistrations,
+        pendingComplaints,
+        pendingVerificationRequests
       },
       weeklyStats,
       categoryDistribution: distribution
@@ -118,6 +124,32 @@ exports.manageUserStatus = asyncHandler(async (req, res, next) => {
   }
   
   user.isBlocked = !user.isBlocked;
+  await user.save();
+  
+  res.status(200).json({
+    status: 'success',
+    data: {
+      user
+    }
+  });
+});
+
+/**
+ * Toggle Premium status for a user
+ */
+exports.togglePremiumStatus = asyncHandler(async (req, res, next) => {
+  const user = await User.findById(req.params.id);
+  if (!user) {
+    return next(new AppError('User not found', 404));
+  }
+  
+  user.isPremium = !user.isPremium;
+  if (user.isPremium) {
+    user.premiumExpiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // 1 year expiration
+  } else {
+    user.premiumExpiresAt = undefined;
+  }
+  
   await user.save();
   
   res.status(200).json({

@@ -1,6 +1,8 @@
 import React, { useState, useContext } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, SafeAreaView } from 'react-native';
 import { AppContext } from '../context/AppContext';
+import { useTranslation } from 'react-i18next';
+import AppText from '../components/AppText';
 
 const LANGUAGES = [
   { code: 'en', label: 'English', subLabel: 'English' },
@@ -10,6 +12,7 @@ const LANGUAGES = [
 
 export default function LanguageSelectionScreen() {
   const { completeOnboarding } = useContext(AppContext);
+  const { t } = useTranslation();
   const [selectedLang, setSelectedLang] = useState('en');
 
   const handleConfirm = () => {
@@ -20,8 +23,8 @@ export default function LanguageSelectionScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.safeArea}>
         <View style={styles.header}>
-          <Text style={styles.title}>Choose Language</Text>
-          <Text style={styles.subtitle}>Select your preferred language for PashuSetu</Text>
+          <AppText style={styles.title}>{t('language.chooseLanguage')}</AppText>
+          <AppText style={styles.subtitle}>{t('language.subtitle')}</AppText>
         </View>
 
         <View style={styles.listContainer}>
@@ -34,12 +37,12 @@ export default function LanguageSelectionScreen() {
                 onPress={() => setSelectedLang(lang.code)}
               >
                 <View style={styles.cardInfo}>
-                  <Text style={[styles.langLabel, isSelected && styles.selectedText]}>
+                  <AppText style={[styles.langLabel, isSelected && styles.selectedText]}>
                     {lang.label}
-                  </Text>
-                  <Text style={[styles.langSubLabel, isSelected && styles.selectedSubText]}>
+                  </AppText>
+                  <AppText style={[styles.langSubLabel, isSelected && styles.selectedSubText]}>
                     {lang.subLabel}
-                  </Text>
+                  </AppText>
                 </View>
                 <View style={[styles.radioButton, isSelected && styles.radioButtonSelected]}>
                   {isSelected && <View style={styles.radioInner} />}
@@ -51,7 +54,7 @@ export default function LanguageSelectionScreen() {
 
         <View style={styles.footer}>
           <TouchableOpacity style={styles.confirmButton} onPress={handleConfirm}>
-            <Text style={styles.confirmButtonText}>Confirm & Continue</Text>
+            <AppText style={styles.confirmButtonText}>{t('language.confirmContinue')}</AppText>
           </TouchableOpacity>
         </View>
       </View>

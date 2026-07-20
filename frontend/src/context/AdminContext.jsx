@@ -1,12 +1,20 @@
-import React, { createContext, useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios, { API_BASE_URL } from '../api/axios';
 import { dashboardApi } from '../api/dashboardApi';
 import { sellerApi } from '../api/sellerApi';
 import { buyerApi } from '../api/buyerApi';
 import { animalApi } from '../api/animalApi';
 import { categoryApi } from '../api/categoryApi';
+import { verificationApi } from '../api/verificationApi';
+import { refreshManager, REFRESH_EVENTS } from '../services/refreshManager';
 
-export const AdminContext = createContext();
+// AdminContext (plain context object) lives in its own file so this file
+// only exports the AdminProvider component, satisfying Vite Fast Refresh.
+import { AdminContext } from './AdminContextObject';
+
+// Re-export so all consumers can continue using:
+//   import { AdminContext } from '../context/AdminContext';
+export { AdminContext };
 
 // Resolve a media URL: if it starts with /uploads, prepend the API server base (without /api suffix)
 const resolveMediaUrl = (url) => {
@@ -29,9 +37,10 @@ const INITIAL_WIDGETS = [
   { id: 'buyers', label: 'Total Buyers', visible: true, order: 2 },
   { id: 'animals', label: 'Total Animals', visible: true, order: 3 },
   { id: 'pending', label: 'Pending Approvals', visible: true, order: 4 },
-  { id: 'registrations', label: "Today's Registrations", visible: true, order: 5 },
-  { id: 'charts', label: 'Weekly Listings & Distribution Charts', visible: true, order: 6 },
-  { id: 'timeline', label: 'Latest Activity Timeline', visible: true, order: 7 }
+  { id: 'verifications', label: 'Pending Verification Requests', visible: true, order: 5 },
+  { id: 'registrations', label: "Today's Registrations", visible: true, order: 6 },
+  { id: 'charts', label: 'Weekly Listings & Distribution Charts', visible: true, order: 7 },
+  { id: 'timeline', label: 'Latest Activity Timeline', visible: true, order: 8 }
 ];
 
 export const AdminProvider = ({ children }) => {
@@ -43,6 +52,8 @@ export const AdminProvider = ({ children }) => {
 
   // Global Lists State
   const [animals, setAnimals] = useState([]);
+  const [verificationRequests, setVerificationRequests] = useState([]);
+  const [pendingVerificationCount, setPendingVerificationCount] = useState(0);
   const [sellers, setSellers] = useState([]);
   const [buyers, setBuyers] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -71,6 +82,7 @@ export const AdminProvider = ({ children }) => {
   // Column Resizing mouse-drag hook
   const [columnWidths, setColumnWidths] = useState({ title: 200, category: 100, breed: 100, price: 90, status: 110, actions: 120 });
   const resizingRef = useRef(null);
+  const isFetchingRef = useRef(false);
 
   const [dashboardStats, setDashboardStats] = useState(null);
   const [serverStatus, setServerStatus] = useState('Connected');
@@ -79,29 +91,66 @@ export const AdminProvider = ({ children }) => {
   const [isActionLoading, setIsActionLoading] = useState(false);
 
   /**
-   * Step 1: Ensure admin is authenticated.
-   * Resolves the token into localStorage before any data fetch runs.
-   * Returns true if auth succeeded, false otherwise.
+   * Step 1: Ensure admin is authenticated with a non-expired token.
+   *
+   * Fast path: if a token exists in localStorage AND it has not expired
+   * (with a 60-second safety margin), return immediately.
+   *
+   * Slow path: if no token exists, or the existing token is expired/expiring,
+   * clear localStorage and exchange the admin bypass OTP for a fresh JWT.
+   *
+   * THROWS on any failure — callers must not continue without a valid token,
+   * because the backend silently restricts pending/rejected listings to
+   * approved-only when no Authorization header is present.
    */
   const ensureAdminAuth = useCallback(async () => {
     const existingToken = localStorage.getItem('pashusetu_admin_token');
+
     if (existingToken) {
-      return true;
+      // Decode the JWT exp claim locally — no network call required.
+      // JWT structure: header.payload.signature — all base64url encoded.
+      try {
+        const payloadBase64 = existingToken.split('.')[1];
+        // base64url → base64 padding
+        const padded = payloadBase64.replace(/-/g, '+').replace(/_/g, '/')
+          + '=='.slice(0, (4 - payloadBase64.length % 4) % 4);
+        const payload = JSON.parse(atob(padded));
+        const nowSeconds = Math.floor(Date.now() / 1000);
+        const safetyMarginSeconds = 60; // Re-auth 60s before actual expiry
+
+        if (payload.exp && payload.exp > nowSeconds + safetyMarginSeconds) {
+          // Token is valid and not expiring soon — fast path.
+          return;
+        }
+        // Token is expired or expiring within 60s — fall through to slow path.
+        localStorage.removeItem('pashusetu_admin_token');
+      } catch {
+        // Could not decode — treat as invalid and fall through.
+        localStorage.removeItem('pashusetu_admin_token');
+      }
     }
 
+    // Slow path: exchange the admin bypass OTP to acquire a fresh token.
+    let authRes;
     try {
-      const authRes = await axios.post('/auth/verify-otp', {
+      authRes = await axios.post('/auth/verify-otp', {
         email: 'admin@pashusetu.com',
         otp: '123456'
       });
-      if (authRes && authRes.status === 'success' && authRes.data?.accessToken) {
-        localStorage.setItem('pashusetu_admin_token', authRes.data.accessToken);
-        return true;
-      }
-    } catch (authErr) {
-      // Auth failure is non-fatal — continue without token (public data only)
+    } catch (networkErr) {
+      throw new Error(
+        `Admin authentication failed: ${networkErr.message || 'Could not reach auth server.'}`
+      );
     }
-    return false;
+
+    const token = authRes?.accessToken || authRes?.data?.accessToken;
+    if (!token) {
+      throw new Error(
+        'Admin authentication failed: server responded but returned no access token.'
+      );
+    }
+
+    localStorage.setItem('pashusetu_admin_token', token);
   }, []);
 
   /**
@@ -153,12 +202,27 @@ export const AdminProvider = ({ children }) => {
 
   /**
    * Step 2: Fetch all dashboard data.
-   * Only called after ensureAdminAuth() resolves.
+   * Calls ensureAdminAuth() as the first operation on EVERY invocation —
+   * including manual Refresh button clicks — so the axios request interceptor
+   * always finds a valid token in localStorage before any protected API call.
+   *
+   * Without this guard, a cleared-localStorage session (fresh browser, Atlas
+   * migration wipe) causes the backend to treat GET /api/animals as a public
+   * request and silently filter out all pending/rejected listings.
    */
   const loadDashboardData = useCallback(async () => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+
     setIsLoading(true);
     setApiError(null);
     try {
+      // 0. CRITICAL GUARD: Guarantee a valid admin JWT is in localStorage
+      //    before any protected API call. The axios interceptor reads from
+      //    localStorage synchronously on every request, so the token must
+      //    already be stored at this point.
+      await ensureAdminAuth();
+
       // 1. Fetch Server Status Health
       const health = await dashboardApi.getHealth();
       setServerStatus(health.status);
@@ -166,13 +230,23 @@ export const AdminProvider = ({ children }) => {
       // 2. Fetch Dashboard Statistics
       const stats = await dashboardApi.getStats();
       setDashboardStats(stats);
+      if (stats?.kpis?.pendingVerificationRequests !== undefined) {
+        const val = Number(stats.kpis.pendingVerificationRequests);
+        if (!isNaN(val) && val >= 0) {
+          setPendingVerificationCount(val);
+        }
+      }
 
       // 3. Fetch Categories
       const cats = await categoryApi.getAll();
       setCategories(cats);
 
-      // 4. Fetch ALL Animals (admin sees all statuses — no status filter = admin gets all)
-      const list = await animalApi.getAll({ limit: 100 });
+      // 4. Fetch ALL Animals with admin JWT attached.
+      //    The backend checks Authorization header: if role === 'admin',
+      //    no status filter is applied and all statuses (pending, rejected,
+      //    approved, sold) are returned. Limit 500 covers all real-world
+      //    Atlas collections without pagination overhead.
+      const list = await animalApi.getAll({ limit: 500 });
       setAnimals(list.map(mapAnimal));
 
       // 5. Fetch Sellers
@@ -182,6 +256,27 @@ export const AdminProvider = ({ children }) => {
       // 6. Fetch Buyers
       const buyersList = await buyerApi.getAll();
       setBuyers(buyersList);
+
+      // 6b. Fetch Verification Requests
+      try {
+        const verificationsList = await verificationApi.getRequests();
+        setVerificationRequests(verificationsList || []);
+      } catch (err) {
+        console.warn('Failed to load verification requests:', err.message);
+      }
+
+      // 6c. Fetch Pending Verification Count
+      try {
+        const verificationCountRes = await axios.get('/verification/pending-count');
+        if (verificationCountRes && verificationCountRes.data && verificationCountRes.data.data) {
+          const val = Number(verificationCountRes.data.data.pendingVerificationCount);
+          if (!isNaN(val) && val >= 0) {
+            setPendingVerificationCount(val);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to load pending verification count:', err.message);
+      }
 
       // 7. Fetch Breeds
       const breedsRes = await axios.get('/breeds');
@@ -207,21 +302,43 @@ export const AdminProvider = ({ children }) => {
         talukas: (talukasRes?.data?.talukas || []).map((t) => ({ id: t._id, districtId: t.districtId, name: t.name, isActive: t.isActive })),
         villages: (villagesRes?.data?.villages || []).map((v) => ({ id: v._id, talukaId: v.talukaId, name: v.name, isActive: v.isActive }))
       });
-
     } catch (e) {
       setApiError(e.message || 'Connection to backend failed.');
     } finally {
       setIsLoading(false);
+      isFetchingRef.current = false;
     }
-  }, []);
+  }, [ensureAdminAuth]);
+
+  useEffect(() => {
+    const unsubUpdated = refreshManager.subscribe(REFRESH_EVENTS.VERIFICATION_UPDATED, () => loadDashboardData());
+    const unsubCreated = refreshManager.subscribe(REFRESH_EVENTS.VERIFICATION_CREATED, () => loadDashboardData());
+    const unsubApproved = refreshManager.subscribe(REFRESH_EVENTS.VERIFICATION_APPROVED, () => loadDashboardData());
+    const unsubRejected = refreshManager.subscribe(REFRESH_EVENTS.VERIFICATION_REJECTED, () => loadDashboardData());
+
+    return () => {
+      unsubUpdated();
+      unsubCreated();
+      unsubApproved();
+      unsubRejected();
+    };
+  }, [loadDashboardData]);
 
   /**
-   * Bootstrap on mount: authenticate first, then load data.
+   * Bootstrap on mount: authenticate first, then trigger data load.
+   * Auth errors are surfaced as apiError so the UI shows a retry state
+   * rather than an unhandled promise rejection crashing the app.
    */
   useEffect(() => {
     (async () => {
-      await ensureAdminAuth();
-      setIsAuthReady(true);
+      try {
+        await ensureAdminAuth();
+        setIsAuthReady(true);
+      } catch (authErr) {
+        // Auth failed on cold start — surface error and do NOT load data.
+        setApiError(authErr.message);
+        setIsLoading(false);
+      }
     })();
   }, [ensureAdminAuth]);
 
@@ -230,6 +347,8 @@ export const AdminProvider = ({ children }) => {
       loadDashboardData();
     }
   }, [isAuthReady, loadDashboardData]);
+
+
 
   const showToast = (message, type = 'success') => {
     const id = Date.now();
@@ -270,7 +389,6 @@ export const AdminProvider = ({ children }) => {
       await animalApi.approve(animal.id);
       showToast(`"${animal.title}" approved and is now live!`, 'success');
       logAudit(`Approved Animal Listing: ${animal.title}`, 'Animals');
-      // Refresh from server to confirm MongoDB write
       await loadDashboardData();
     } catch (e) {
       showToast(`Approval failed: ${e.message}`, 'error');
@@ -289,7 +407,6 @@ export const AdminProvider = ({ children }) => {
       await animalApi.reject(animal.id, reason);
       showToast(`"${animal.title}" rejected.`, 'error');
       logAudit(`Rejected Animal Listing: ${animal.title} (Reason: ${reason})`, 'Animals');
-      // Refresh from server to confirm MongoDB write
       await loadDashboardData();
     } catch (e) {
       showToast(`Rejection failed: ${e.message}`, 'error');
@@ -315,8 +432,11 @@ export const AdminProvider = ({ children }) => {
     const nextStatus = seller.status === 'Blocked' ? 'Active' : 'Blocked';
     try {
       await sellerApi.toggleBlock(seller.id);
-    } catch (err) {}
-    setSellers((prev) => prev.map((s) => s.id === seller.id ? { ...s, status: nextStatus } : s));
+      setSellers((prev) => prev.map((s) => s.id === seller.id ? { ...s, status: nextStatus } : s));
+      await loadDashboardData();
+    } catch (err) {
+      showToast(`Failed to update status: ${err.message}`, 'error');
+    }
   };
 
   const handleSoftDeleteSeller = (seller) => {
@@ -331,8 +451,11 @@ export const AdminProvider = ({ children }) => {
     const nextStatus = buyer.status === 'Blocked' ? 'Active' : 'Blocked';
     try {
       await buyerApi.toggleBlock(buyer.id);
-    } catch (err) {}
-    setBuyers((prev) => prev.map((b) => b.id === buyer.id ? { ...b, status: nextStatus } : b));
+      setBuyers((prev) => prev.map((b) => b.id === buyer.id ? { ...b, status: nextStatus } : b));
+      await loadDashboardData();
+    } catch (err) {
+      showToast(`Failed to update status: ${err.message}`, 'error');
+    }
   };
 
   const handleSoftDeleteBuyer = (buyer) => {
@@ -341,6 +464,26 @@ export const AdminProvider = ({ children }) => {
 
   const handleRestoreBuyer = (buyer) => {
     setBuyers((prev) => prev.map((b) => b.id === buyer.id ? { ...b, isDeleted: false } : b));
+  };
+
+  const handleTogglePremiumSeller = async (seller) => {
+    try {
+      await sellerApi.togglePremium(seller.id);
+      showToast(`Premium status updated for ${seller.name}!`, 'success');
+      await loadDashboardData();
+    } catch (err) {
+      showToast(`Failed to update premium: ${err.message}`, 'error');
+    }
+  };
+
+  const handleTogglePremiumBuyer = async (buyer) => {
+    try {
+      await buyerApi.togglePremium(buyer.id);
+      showToast(`Premium status updated for ${buyer.name}!`, 'success');
+      await loadDashboardData();
+    } catch (err) {
+      showToast(`Failed to update premium: ${err.message}`, 'error');
+    }
   };
 
   const handleToggleWidget = (id) => {
@@ -392,6 +535,10 @@ export const AdminProvider = ({ children }) => {
         isAuthReady,
         animals,
         setAnimals,
+        verificationRequests,
+        setVerificationRequests,
+        pendingVerificationCount,
+        setPendingVerificationCount,
         sellers,
         setSellers,
         buyers,
@@ -437,6 +584,8 @@ export const AdminProvider = ({ children }) => {
         handleToggleBlockBuyer,
         handleSoftDeleteBuyer,
         handleRestoreBuyer,
+        handleTogglePremiumSeller,
+        handleTogglePremiumBuyer,
         handleToggleWidget,
         handleMoveWidgetUp,
         handleMouseDownResize,

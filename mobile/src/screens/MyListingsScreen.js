@@ -1,14 +1,19 @@
 import React, { useState, useEffect, useContext, useMemo } from 'react';
-import { StyleSheet, View, Text, SafeAreaView, FlatList, TouchableOpacity, Image, Modal, Share, Alert, ActivityIndicator, TextInput } from 'react-native';
+import { StyleSheet, View, SafeAreaView, FlatList, TouchableOpacity, Image, Modal, Share, Alert, ActivityIndicator, TextInput } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppContext } from '../context/AppContext';
 import { animalApi } from '../api/animalApi';
 import { resolveMediaUrl } from '../api/api';
+import { useTranslation } from 'react-i18next';
+import AppText from '../components/AppText';
+import { useAutoRefresh } from '../hooks/useAutoRefresh';
+import { REFRESH_EVENTS } from '../services/refreshManager';
 
 const TABS = ['All', 'Active', 'Pending', 'Sold', 'Rejected'];
 
 export default function MyListingsScreen({ navigation }) {
   const { userProfile, userToken } = useContext(AppContext);
+  const { t } = useTranslation();
   const [selectedTab, setSelectedTab] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchActive, setIsSearchActive] = useState(false);
@@ -19,15 +24,13 @@ export default function MyListingsScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    fetchMyListings();
-
-    const unsubscribe = navigation.addListener('focus', () => {
-      fetchMyListings();
-    });
-
-    return unsubscribe;
-  }, [navigation, userProfile]);
+  useAutoRefresh(
+    () => fetchMyListings(),
+    {
+      events: [REFRESH_EVENTS.LISTING_CREATED, REFRESH_EVENTS.LISTING_UPDATED, REFRESH_EVENTS.LISTING_DELETED],
+      screenKey: 'MyListingsScreen'
+    }
+  );
 
   const fetchMyListings = async () => {
     if (!userProfile || !userProfile.id || userToken === 'guest') {
@@ -39,13 +42,12 @@ export default function MyListingsScreen({ navigation }) {
     setLoading(true);
     setError(null);
     try {
-      // Query animal listings by sellerId
       const res = await animalApi.getMyListings(userProfile.id);
       if (res.status === 'success' && res.data.animals) {
         setListings(res.data.animals);
       }
     } catch (err) {
-      setError(err.message || 'Failed to load seller listings.');
+      setError(err.message || t('myListings.connectionFailed'));
     } finally {
       setLoading(false);
     }
@@ -63,20 +65,20 @@ export default function MyListingsScreen({ navigation }) {
 
   const handleDeleteListing = (id) => {
     Alert.alert(
-      'Delete Listing',
-      'Are you sure you want to permanently delete this listing?',
+      t('myListings.deleteListing'),
+      t('myListings.deleteConfirm'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
               await animalApi.deleteAnimal(id);
-              Alert.alert('Success', 'Listing deleted successfully.');
+              Alert.alert(t('common.success'), t('myListings.deleteSuccess'));
               fetchMyListings();
             } catch (err) {
-              Alert.alert('Delete Failed', err.message || 'Could not delete listing.');
+              Alert.alert(t('myListings.deleteFailed'), err.message || t('myListings.deleteFailed'));
             }
             setActiveMenuListing(null);
           },
@@ -88,10 +90,10 @@ export default function MyListingsScreen({ navigation }) {
   const handleMarkAsSold = async (id) => {
     try {
       await animalApi.updateAnimal(id, { status: 'sold' });
-      Alert.alert('Listing Updated', 'Your listing is now marked as Sold.');
+      Alert.alert(t('common.success'), t('myListings.markSoldSuccess'));
       fetchMyListings();
     } catch (err) {
-      Alert.alert('Update Failed', err.message || 'Could not update listing.');
+      Alert.alert(t('myListings.updateFailed'), err.message || t('myListings.updateFailed'));
     }
     setActiveMenuListing(null);
   };
@@ -103,7 +105,6 @@ export default function MyListingsScreen({ navigation }) {
   // Filtering Logic
   const filteredListings = useMemo(() => {
     return listings.filter((item) => {
-      // 1. Tab Status Mapping
       const status = item.status?.toLowerCase();
       let matchesTab = false;
       if (selectedTab === 'All') {
@@ -118,7 +119,6 @@ export default function MyListingsScreen({ navigation }) {
         matchesTab = true;
       }
 
-      // 2. Search Query Mapping
       const breedName = item.breedId?.name || '';
       const catName = item.categoryId?.name || '';
       const matchesQuery =
@@ -136,32 +136,32 @@ export default function MyListingsScreen({ navigation }) {
       case 'approved':
         bg = '#DCFCE7';
         color = '#16A34A';
-        label = 'Active';
+        label = t('myListings.active');
         break;
       case 'pending':
         bg = '#FEF3C7';
         color = '#D97706';
-        label = 'Pending';
+        label = t('myListings.pending');
         break;
       case 'sold':
         bg = '#DBEAFE';
         color = '#2563EB';
-        label = 'Sold';
+        label = t('myListings.sold');
         break;
       case 'rejected':
         bg = '#FEE2E2';
         color = '#EF4444';
-        label = 'Rejected';
+        label = t('myListings.rejected');
         break;
       default:
         bg = '#F1F5F9';
         color = '#64748B';
-        label = status || 'Draft';
+        label = status || t('myListings.draft');
     }
 
     return (
       <View style={[styles.statusBadge, { backgroundColor: bg }]}>
-        <Text style={[styles.statusBadgeText, { color }]}>{label}</Text>
+        <AppText style={[styles.statusBadgeText, { color }]}>{label}</AppText>
       </View>
     );
   };
@@ -170,11 +170,11 @@ export default function MyListingsScreen({ navigation }) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>My Listings</Text>
+          <AppText style={styles.headerTitle}>{t('myListings.title')}</AppText>
         </View>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <ActivityIndicator size="large" color="#16A34A" />
-          <Text style={{ marginTop: 12, color: 'var(--text-muted)' }}>Loading your listings...</Text>
+          <AppText style={{ marginTop: 12, color: '#64748B' }}>{t('myListings.loading')}</AppText>
         </View>
       </SafeAreaView>
     );
@@ -184,14 +184,14 @@ export default function MyListingsScreen({ navigation }) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>My Listings</Text>
+          <AppText style={styles.headerTitle}>{t('myListings.title')}</AppText>
         </View>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
-          <Ionicons name="cloud-offline-outline" size={48} color="var(--color-danger)" />
-          <Text style={{ fontSize: 16, fontWeight: '700', marginTop: 16 }}>Connection Failed</Text>
-          <Text style={{ textAlign: 'center', color: '#64748B', marginTop: 8, marginBottom: 20 }}>{error}</Text>
+          <Ionicons name="cloud-offline-outline" size={48} color="#EF4444" />
+          <AppText style={{ fontSize: 16, fontWeight: '700', marginTop: 16 }}>{t('myListings.connectionFailed')}</AppText>
+          <AppText style={{ textAlign: 'center', color: '#64748B', marginTop: 8, marginBottom: 20 }}>{error}</AppText>
           <TouchableOpacity style={styles.addAnimalBtn} onPress={fetchMyListings}>
-            <Text style={styles.addAnimalBtnText}>Retry Connection</Text>
+            <AppText style={styles.addAnimalBtnText}>{t('myListings.retryConnection')}</AppText>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -200,6 +200,7 @@ export default function MyListingsScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
+
       {/* Top Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.headerBackBtn} onPress={() => navigation.goBack()}>
@@ -209,14 +210,14 @@ export default function MyListingsScreen({ navigation }) {
         {isSearchActive ? (
           <TextInput
             style={styles.searchInput}
-            placeholder="Search listings..."
+            placeholder={t('myListings.searchPlaceholder')}
             placeholderTextColor="#94A3B8"
             autoFocus={true}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
         ) : (
-          <Text style={styles.headerTitle}>My Listings</Text>
+          <AppText style={styles.headerTitle}>{t('myListings.title')}</AppText>
         )}
 
         <View style={styles.headerActions}>
@@ -240,7 +241,9 @@ export default function MyListingsScreen({ navigation }) {
             style={[styles.tabButton, selectedTab === tab && styles.tabButtonActive]}
             onPress={() => setSelectedTab(tab)}
           >
-            <Text style={[styles.tabText, selectedTab === tab && styles.tabTextActive]}>{tab}</Text>
+            <AppText style={[styles.tabText, selectedTab === tab && styles.tabTextActive]}>
+              {t(`myListings.${tab.toLowerCase()}`)}
+            </AppText>
           </TouchableOpacity>
         ))}
       </View>
@@ -256,10 +259,10 @@ export default function MyListingsScreen({ navigation }) {
             <View style={styles.emptyIconCircle}>
               <MaterialCommunityIcons name="clipboard-text-search-outline" size={50} color="#94A3B8" />
             </View>
-            <Text style={styles.emptyTitle}>You haven't listed any animals yet.</Text>
-            <Text style={styles.emptySubtitle}>Start selling your animal on PashuSetu today!</Text>
+            <AppText style={styles.emptyTitle}>{t('myListings.noListings')}</AppText>
+            <AppText style={styles.emptySubtitle}>{t('myListings.noListingsSub')}</AppText>
             <TouchableOpacity style={styles.addAnimalBtn} onPress={handleNavigateToAddAnimal}>
-              <Text style={styles.addAnimalBtnText}>Add Animal</Text>
+              <AppText style={styles.addAnimalBtnText}>{t('sell.addAnimal')}</AppText>
             </TouchableOpacity>
           </View>
         }
@@ -272,7 +275,7 @@ export default function MyListingsScreen({ navigation }) {
                 <Image source={{ uri: mainImage }} style={styles.cardThumbnail} />
                 <View style={styles.cardDetails}>
                   <View style={styles.titleRow}>
-                    <Text style={styles.cardTitle}>{item.title}</Text>
+                    <AppText style={styles.cardTitle}>{item.title}</AppText>
                     <TouchableOpacity
                       style={styles.threeDotBtn}
                       onPress={() => setActiveMenuListing(item)}
@@ -280,20 +283,20 @@ export default function MyListingsScreen({ navigation }) {
                       <Ionicons name="ellipsis-vertical" size={18} color="#64748B" />
                     </TouchableOpacity>
                   </View>
-                  <Text style={styles.cardSubtitle}>{item.breedId?.name || 'Other Breed'} • {item.categoryId?.name || 'Cattle'}</Text>
-                  <Text style={styles.cardPrice}>₹{Number(item.price).toLocaleString()}</Text>
+                  <AppText style={styles.cardSubtitle}>{item.breedId?.name || t('animalDetails.na')} • {item.categoryId?.name || t('buy.categories')}</AppText>
+                  <AppText style={styles.cardPrice}>₹{Number(item.price).toLocaleString()}</AppText>
                   
                   <View style={styles.locationRow}>
                     <Ionicons name="location" size={12} color="#64748B" />
-                    <Text style={styles.locationText} numberOfLines={1}>{item.village}, {item.district}</Text>
+                    <AppText style={styles.locationText} numberOfLines={1}>{item.village}, {item.district}</AppText>
                   </View>
                 </View>
               </View>
 
               {item.status === 'rejected' && item.rejectionReason && (
                 <View style={styles.rejectionCard}>
-                  <Text style={styles.rejectionLabel}>Rejection Reason:</Text>
-                  <Text style={styles.rejectionText}>{item.rejectionReason}</Text>
+                  <AppText style={styles.rejectionLabel}>{t('myListings.rejectionReason')}</AppText>
+                  <AppText style={styles.rejectionText}>{item.rejectionReason}</AppText>
                 </View>
               )}
 
@@ -303,7 +306,7 @@ export default function MyListingsScreen({ navigation }) {
               <View style={styles.cardPerformanceRow}>
                 <View style={styles.perfStat}>
                   <Ionicons name="eye-outline" size={14} color="#64748B" />
-                  <Text style={styles.perfStatText}>{item.views || 0} Views</Text>
+                  <AppText style={styles.perfStatText}>{item.views || 0} {t('sell.views')}</AppText>
                 </View>
                 {renderStatusBadge(item.status)}
               </View>
@@ -312,12 +315,12 @@ export default function MyListingsScreen({ navigation }) {
               <View style={styles.cardActionsRow}>
                 <TouchableOpacity style={styles.cardActionBtn} onPress={() => handleShareListing(item)}>
                   <Ionicons name="share-social-outline" size={16} color="#64748B" />
-                  <Text style={styles.cardActionBtnLabel}>Share</Text>
+                  <AppText style={styles.cardActionBtnLabel}>{t('common.share')}</AppText>
                 </TouchableOpacity>
                 {item.status?.toLowerCase() !== 'sold' && (
                   <TouchableOpacity style={styles.cardActionBtn} onPress={() => handleMarkAsSold(item.id || item._id)}>
                     <Ionicons name="checkmark-done-circle-outline" size={16} color="#2563EB" />
-                    <Text style={[styles.cardActionBtnLabel, { color: '#2563EB' }]}>Mark Sold</Text>
+                    <AppText style={[styles.cardActionBtnLabel, { color: '#2563EB' }]}>{t('myListings.markSold')}</AppText>
                   </TouchableOpacity>
                 )}
               </View>
@@ -340,7 +343,7 @@ export default function MyListingsScreen({ navigation }) {
         >
           <View style={styles.bottomSheetContainer}>
             <View style={styles.dragHandle} />
-            <Text style={styles.bottomSheetTitle}>Manage Listing</Text>
+            <AppText style={styles.bottomSheetTitle}>{t('myListings.manageListing')}</AppText>
             {activeMenuListing && (
               <View style={styles.bottomSheetMetaRow}>
                  <Image
@@ -348,8 +351,8 @@ export default function MyListingsScreen({ navigation }) {
                   style={styles.bottomSheetThumb}
                 />
                 <View>
-                  <Text style={styles.bottomSheetListingName}>{activeMenuListing.title}</Text>
-                  <Text style={styles.bottomSheetListingPrice}>₹{Number(activeMenuListing.price).toLocaleString()}</Text>
+                  <AppText style={styles.bottomSheetListingName}>{activeMenuListing.title}</AppText>
+                  <AppText style={styles.bottomSheetListingPrice}>₹{Number(activeMenuListing.price).toLocaleString()}</AppText>
                 </View>
               </View>
             )}
@@ -358,13 +361,13 @@ export default function MyListingsScreen({ navigation }) {
               {activeMenuListing && activeMenuListing.status?.toLowerCase() !== 'sold' && (
                 <TouchableOpacity style={styles.bottomSheetAction} onPress={() => handleMarkAsSold(activeMenuListing.id || activeMenuListing._id)}>
                   <Ionicons name="checkmark-done" size={20} color="#2563EB" style={styles.actionIcon} />
-                  <Text style={[styles.actionText, { color: '#2563EB' }]}>Mark as Sold</Text>
+                  <AppText style={[styles.actionText, { color: '#2563EB' }]}>{t('myListings.markSold')}</AppText>
                 </TouchableOpacity>
               )}
 
               <TouchableOpacity style={styles.bottomSheetAction} onPress={() => activeMenuListing && handleShareListing(activeMenuListing)}>
                 <Ionicons name="share-social-outline" size={20} color="#0F172A" style={styles.actionIcon} />
-                <Text style={styles.actionText}>Share Listing</Text>
+                <AppText style={styles.actionText}>{t('myListings.shareListing')}</AppText>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -372,7 +375,7 @@ export default function MyListingsScreen({ navigation }) {
                 onPress={() => activeMenuListing && handleDeleteListing(activeMenuListing.id || activeMenuListing._id)}
               >
                 <Ionicons name="trash-outline" size={20} color="#EF4444" style={styles.actionIcon} />
-                <Text style={[styles.actionText, { color: '#EF4444' }]}>Delete Listing</Text>
+                <AppText style={[styles.actionText, { color: '#EF4444' }]}>{t('myListings.deleteListing')}</AppText>
               </TouchableOpacity>
             </View>
           </View>
@@ -701,4 +704,5 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     marginTop: 6,
   },
+
 });

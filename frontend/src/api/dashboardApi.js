@@ -8,6 +8,15 @@ export const dashboardApi = {
         return res.data;
       }
     } catch (e) {
+      // Re-throw authentication errors so the caller (loadDashboardData) can
+      // surface them and ensureAdminAuth can refresh the token on retry.
+      // Do NOT fall to the offline fallback on auth failures — the fallback
+      // calls /api/animals without a valid token, which returns only approved
+      // listings and incorrectly computes pendingApprovals = 0.
+      const status = e?.response?.status;
+      if (status === 401 || status === 403) {
+        throw e;
+      }
       console.warn('[Dashboard API Warning] stats endpoint failed, compiling live stats from listing endpoints...');
     }
 

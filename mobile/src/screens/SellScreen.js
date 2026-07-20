@@ -1,93 +1,132 @@
 import React, { useContext, useEffect, useState } from 'react';
-import { StyleSheet, View, Text, SafeAreaView, ScrollView, Image, TouchableOpacity, Dimensions, FlatList, Share, Alert, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, SafeAreaView, ScrollView, Image, TouchableOpacity, Dimensions, FlatList, Share, Alert, ActivityIndicator, Animated, Platform, AppState } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppContext } from '../context/AppContext';
 import { api, resolveMediaUrl } from '../api/api';
+import { useTranslation } from 'react-i18next';
+import AppText from '../components/AppText';
+import { LinearGradient } from 'expo-linear-gradient';
+import { isUserVerified } from '../utils/verificationUtils';
 
 const { width } = Dimensions.get('window');
 
-const STATS_DATA = [
-  { id: '1', count: '8', label: 'Active Listings', icon: 'checkbox-marked-circle-outline', color: '#16A34A', trend: '+2 this week' },
-  { id: '2', count: '2', label: 'Pending Approval', icon: 'clock-outline', color: '#F59E0B', trend: 'In review' },
-  { id: '3', count: '12', label: 'Sold Animals', icon: 'check-decagram-outline', color: '#3B82F6', trend: '₹1.85L Sales' },
-  { id: '4', count: '2.4K', label: 'Total Views', icon: 'eye-outline', color: '#8B5CF6', trend: '+12.4% views' },
-];
+const SellerCtaCard = React.memo(({ listingsCount, onPress, t }) => {
+  const scaleValue = React.useRef(new Animated.Value(1)).current;
+  const hasListings = listingsCount > 0;
 
-const RECENT_LISTINGS = [
-  {
-    id: 'l1',
-    name: 'Sahiwal Cow',
-    breed: 'Sahiwal',
-    price: '₹48,000',
-    status: 'Active',
-    views: 312,
-    postedDate: 'Posted 2 days ago',
-    image: 'https://images.unsplash.com/photo-1546445317-29f4545e6d52?auto=format&fit=crop&w=300&q=80',
-  },
-  {
-    id: 'l2',
-    name: 'Jafarabadi Buffalo',
-    breed: 'Jafarabadi',
-    price: '₹95,000',
-    status: 'Active',
-    views: 450,
-    postedDate: 'Posted 5 days ago',
-    image: 'https://images.unsplash.com/photo-1570042225831-d98fa7577f1e?auto=format&fit=crop&w=300&q=80',
-  },
-  {
-    id: 'l3',
-    name: 'Gir Cow',
-    breed: 'Gir',
-    price: '₹62,000',
-    status: 'Active',
-    views: 289,
-    postedDate: 'Posted 1 week ago',
-    image: 'https://images.unsplash.com/photo-1527153857715-3908f2bacb31?auto=format&fit=crop&w=300&q=80',
-  },
-];
+  const handlePressIn = () => {
+    Animated.spring(scaleValue, {
+      toValue: 0.98,
+      useNativeDriver: Platform.OS !== 'web',
+      tension: 120,
+      friction: 7,
+    }).start();
+  };
 
-const PENDING_LISTINGS = [
-  {
-    id: 'p1',
-    name: 'Tharparkar Cow',
-    breed: 'Tharparkar',
-    price: '₹55,000',
-    status: 'Pending Approval',
-  },
-  {
-    id: 'p2',
-    name: 'Beetal Goat',
-    breed: 'Beetal',
-    price: '₹14,500',
-    status: 'Pending Approval',
-  },
-];
+  const handlePressOut = () => {
+    Animated.spring(scaleValue, {
+      toValue: 1,
+      useNativeDriver: Platform.OS !== 'web',
+      tension: 120,
+      friction: 7,
+    }).start();
+  };
 
-const RECENT_ENQUIRIES = [
-  {
-    id: 'e1',
-    buyerName: 'Amit Sharma',
-    animal: 'Sahiwal Cow',
-    time: '10 mins ago',
-  },
-  {
-    id: 'e2',
-    buyerName: 'Vijay Kadam',
-    animal: 'Jafarabadi Buffalo',
-    time: '1 hour ago',
-  },
-  {
-    id: 'e3',
-    buyerName: 'Sanjay Deshmukh',
-    animal: 'Gir Cow',
-    time: '3 hours ago',
-  },
-];
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      activeOpacity={0.9}
+      style={styles.ctaCardContainer}
+    >
+      <Animated.View style={[styles.ctaCardAnimated, { transform: [{ scale: scaleValue }] }]}>
+        <LinearGradient
+          colors={['#FFFFFF', '#F2FBF0']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.ctaGradient}
+        >
+          {/* Subtle Decorative Pattern */}
+          <View style={styles.ctaPatternCircle1} />
+          <View style={styles.ctaPatternCircle2} />
+
+          <View style={styles.ctaTopRow}>
+            {/* Outline icon in circular box */}
+            <View style={styles.ctaIconCircle}>
+              <MaterialCommunityIcons
+                name={hasListings ? 'bullhorn-outline' : 'cow'}
+                size={18}
+                color="#16A34A"
+              />
+            </View>
+          </View>
+
+          <View style={styles.ctaContentBody}>
+            <AppText style={styles.ctaTitle}>
+              {hasListings ? t('sell.postAnimal') : t('sell.addAnimal')}
+            </AppText>
+            <AppText style={styles.ctaSubtitle} numberOfLines={2}>
+              {t('sell.subtitle')}
+            </AppText>
+          </View>
+
+          {/* Premium CTA Button */}
+          <View style={styles.ctaButton}>
+            {hasListings ? (
+              <Ionicons name="megaphone-outline" size={12} color="#FFFFFF" style={{ marginRight: 4 }} />
+            ) : (
+              <Ionicons name="add" size={13} color="#FFFFFF" style={{ marginRight: 4 }} />
+            )}
+            <AppText style={styles.ctaButtonText}>
+              {hasListings ? t('sell.postAnimal') : t('sell.addAnimal')}
+            </AppText>
+          </View>
+        </LinearGradient>
+      </Animated.View>
+    </TouchableOpacity>
+  );
+});
 
 export default function SellScreen({ navigation }) {
   const { userProfile, userToken, exitGuestSession } = useContext(AppContext);
   const isGuest = userToken === 'guest';
   const name = isGuest ? 'Guest' : userProfile?.name || 'User';
+  const { t } = useTranslation();
+
+  const [greetingKey, setGreetingKey] = useState('sell.greeting.morning');
+
+  useEffect(() => {
+    const updateGreeting = () => {
+      const hour = new Date().getHours();
+      let newKey = 'sell.greeting.morning';
+      if (hour >= 5 && hour < 12) newKey = 'sell.greeting.morning';
+      else if (hour >= 12 && hour < 17) newKey = 'sell.greeting.afternoon';
+      else if (hour >= 17 && hour < 21) newKey = 'sell.greeting.evening';
+      else newKey = 'sell.greeting.night';
+      
+      setGreetingKey(prev => prev !== newKey ? newKey : prev);
+    };
+
+    updateGreeting();
+
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (nextAppState === 'active') {
+        updateGreeting();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  const getInitial = (nameStr) => {
+    if (!nameStr || typeof nameStr !== 'string' || !nameStr.trim()) return '?';
+    return nameStr.trim().charAt(0).toUpperCase();
+  };
+  const userInitial = getInitial(name);
+  const profileImageUrl = (userProfile?.profilePhoto || userProfile?.photo) ? resolveMediaUrl(userProfile.profilePhoto || userProfile.photo) : null;
 
   const [listings, setListings] = useState([]);
   const [notifications, setNotifications] = useState([]);
@@ -124,11 +163,65 @@ export default function SellScreen({ navigation }) {
       <SafeAreaView style={styles.container}>
         <View style={styles.guestContainer}>
           <Ionicons name="lock-closed-outline" size={64} color="#94A3B8" />
-          <Text style={styles.guestTitle}>Seller Portal is Locked</Text>
-          <Text style={styles.guestSubtitle}>Please login or signup with your email to list and sell your cattle.</Text>
+          <AppText style={styles.guestTitle}>{t('sell.portalLocked')}</AppText>
+          <AppText style={styles.guestSubtitle}>{t('sell.loginToSell')}</AppText>
           <TouchableOpacity style={styles.guestLoginButton} onPress={exitGuestSession}>
-            <Text style={styles.guestLoginButtonText}>Login / Signup</Text>
+            <AppText style={styles.guestLoginButtonText}>{t('sell.loginSignup')}</AppText>
           </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const verification = userProfile?.verification || { status: 'unverified' };
+  const verificationStatus = verification.status || 'unverified';
+  const isVerified = isUserVerified(userProfile);
+
+  if (!isGuest && !isVerified) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.guestContainer}>
+          <MaterialCommunityIcons
+            name={
+              verificationStatus === 'pending'
+                ? 'clock-outline'
+                : verificationStatus === 'rejected'
+                  ? 'alert-decagram-outline'
+                  : 'shield-alert-outline'
+            }
+            size={64}
+            color={
+              verificationStatus === 'pending'
+                ? '#D97706'
+                : verificationStatus === 'rejected'
+                  ? '#DC2626'
+                  : '#94A3B8'
+            }
+          />
+          <AppText style={styles.guestTitle}>
+            {verificationStatus === 'pending'
+              ? t('verification.pending')
+              : verificationStatus === 'rejected'
+                ? t('verification.rejected')
+                : t('verification.title')}
+          </AppText>
+          <AppText style={styles.guestSubtitle}>
+            {verificationStatus === 'pending'
+              ? t('verification.pendingDesc')
+              : verificationStatus === 'rejected'
+                ? t('verification.rejectedDesc', { reason: verification.rejectedReason || 'No reason specified' })
+                : t('verification.unverifiedDesc')}
+          </AppText>
+          {(verificationStatus === 'unverified' || verificationStatus === 'rejected') && (
+            <TouchableOpacity
+              style={styles.guestLoginButton}
+              onPress={() => navigation.navigate('Verification')}
+            >
+              <AppText style={styles.guestLoginButtonText}>
+                {t('verification.uploadNewBtn')}
+              </AppText>
+            </TouchableOpacity>
+          )}
         </View>
       </SafeAreaView>
     );
@@ -152,10 +245,10 @@ export default function SellScreen({ navigation }) {
   const totalSales = listings.filter(a => a.status === 'sold' && !a.isDeleted).reduce((acc, a) => acc + a.price, 0);
 
   const statsData = [
-    { id: '1', count: String(activeCount), label: 'Active Listings', icon: 'checkbox-marked-circle-outline', color: '#16A34A', trend: 'Live' },
-    { id: '2', count: String(pendingCount), label: 'Pending Approval', icon: 'clock-outline', color: '#F59E0B', trend: 'In review' },
-    { id: '3', count: String(soldCount), label: 'Sold Animals', icon: 'check-decagram-outline', color: '#3B82F6', trend: `₹${(totalSales/1000).toFixed(1)}k Sales` },
-    { id: '4', count: totalViews >= 1000 ? `${(totalViews/1000).toFixed(1)}K` : String(totalViews), label: 'Total Views', icon: 'eye-outline', color: '#8B5CF6', trend: 'Views' },
+    { id: '1', count: String(activeCount), label: t('sell.activeListing'), icon: 'checkbox-marked-circle-outline', color: '#16A34A', trend: t('sell.live') },
+    { id: '2', count: String(pendingCount), label: t('sell.pendingApproval'), icon: 'clock-outline', color: '#F59E0B', trend: t('sell.inReview') },
+    { id: '3', count: String(soldCount), label: t('sell.soldListing'), icon: 'check-decagram-outline', color: '#3B82F6', trend: `₹${(totalSales/1000).toFixed(1)}k Sales` },
+    { id: '4', count: totalViews >= 1000 ? `${(totalViews/1000).toFixed(1)}K` : String(totalViews), label: t('sell.totalViews'), icon: 'eye-outline', color: '#8B5CF6', trend: t('sell.views') },
   ];
 
   const recentListings = listings
@@ -166,9 +259,9 @@ export default function SellScreen({ navigation }) {
       name: a.title,
       breed: a.breedId?.name || 'Breed',
       price: `₹${a.price.toLocaleString()}`,
-      status: 'Active',
+      status: t('sell.live'),
       views: a.views || 0,
-      postedDate: 'Posted ' + new Date(a.createdAt).toLocaleDateString(),
+      postedDate: t('sell.postedAgo', { time: new Date(a.createdAt).toLocaleDateString() }),
       image: a.photos && a.photos.length > 0 ? resolveMediaUrl(a.photos[0]) : 'https://images.unsplash.com/photo-1546445317-29f4545e6d52?auto=format&fit=crop&w=300&q=80'
     }));
 
@@ -180,7 +273,7 @@ export default function SellScreen({ navigation }) {
       name: a.title,
       breed: a.breedId?.name || 'Breed',
       price: `₹${a.price.toLocaleString()}`,
-      status: 'Pending'
+      status: t('sell.pending')
     }));
 
   const recentEnquiries = notifications
@@ -195,10 +288,9 @@ export default function SellScreen({ navigation }) {
         id: n._id || String(index),
         buyerName,
         animal: animalName,
-        time: 'Active'
+        time: t('sell.live')
       };
     });
-
 
   const handleShare = async (item) => {
     try {
@@ -211,7 +303,10 @@ export default function SellScreen({ navigation }) {
   };
 
   const handleContactBuyer = (buyerName, action) => {
-    Alert.alert(`${action} Buyer`, `UI placeholder: Opening ${action} interface for ${buyerName}.`);
+    Alert.alert(
+      t('sell.contactBuyerTitle', { action }),
+      t('sell.contactBuyerMsg', { action, buyerName })
+    );
   };
 
   return (
@@ -219,9 +314,9 @@ export default function SellScreen({ navigation }) {
       {/* Sticky Header block */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text style={styles.greetingText}>Good Morning,</Text>
-          <Text style={styles.sellerName}>{name}</Text>
-          <Text style={styles.headerSubtitle}>Here is your livestock summary today</Text>
+          <AppText style={styles.greetingText}>{t(greetingKey)}</AppText>
+          <AppText style={styles.sellerName}>{name}</AppText>
+          <AppText style={styles.headerSubtitle}>{t('sell.summarySubtitle')}</AppText>
         </View>
 
         <View style={styles.headerRight}>
@@ -233,11 +328,12 @@ export default function SellScreen({ navigation }) {
             <Ionicons name="notifications-outline" size={22} color="#0F172A" />
             <View style={styles.notificationDot} />
           </TouchableOpacity>
-          <TouchableOpacity activeOpacity={0.8} onPress={() => navigation.navigate('Profile')}>
-            <Image
-              source={{ uri: userProfile?.photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80' }}
-              style={styles.avatarImage}
-            />
+          <TouchableOpacity activeOpacity={0.8} onPress={() => navigation.navigate('Profile')} style={!profileImageUrl ? styles.avatarCircle : {}}>
+            {profileImageUrl ? (
+              <Image source={{ uri: profileImageUrl }} style={styles.avatarImage} />
+            ) : (
+              <AppText style={styles.avatarText}>{userInitial}</AppText>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -245,25 +341,42 @@ export default function SellScreen({ navigation }) {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Quick Statistics Grid */}
         <View style={styles.statsGrid}>
-          {statsData.map((item) => (
+          {statsData.slice(0, 3).map((item) => (
             <View key={item.id} style={styles.statCard}>
               <View style={styles.statCardHeader}>
-                <Text style={styles.statCount}>{item.count}</Text>
+                <AppText style={styles.statCount}>{item.count}</AppText>
                 <View style={[styles.statIconCircle, { backgroundColor: item.color + '12' }]}>
                   <MaterialCommunityIcons name={item.icon} size={18} color={item.color} />
                 </View>
               </View>
-              <Text style={styles.statLabel}>{item.label}</Text>
+              <AppText style={styles.statLabel}>{item.label}</AppText>
               <View style={styles.trendRow}>
                 <Ionicons name="trending-up-outline" size={12} color={item.color} />
-                <Text style={[styles.trendText, { color: item.color }]}>{item.trend}</Text>
+                <AppText style={[styles.trendText, { color: item.color }]}>{item.trend}</AppText>
               </View>
             </View>
           ))}
+
+          {/* Premium Call-To-Action Card */}
+          <SellerCtaCard
+            listingsCount={listings.length}
+            t={t}
+            onPress={() => {
+              if (listings.length > 0) {
+                Alert.alert(
+                  t('common.info', { defaultValue: 'Info' }),
+                  t('common.comingSoon'),
+                  [{ text: 'OK' }]
+                );
+              } else {
+                navigation.navigate('AddAnimal');
+              }
+            }}
+          />
         </View>
 
         {/* Quick Actions Row */}
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
+        <AppText style={styles.sectionTitle}>{t('home.quickActions')}</AppText>
         <View style={styles.actionsGrid}>
           <TouchableOpacity
             style={styles.actionBtn}
@@ -273,7 +386,7 @@ export default function SellScreen({ navigation }) {
             <View style={[styles.actionIconCircle, { backgroundColor: '#DCFCE7' }]}>
               <Ionicons name="add-circle" size={26} color="#16A34A" />
             </View>
-            <Text style={styles.actionLabel}>Add Animal</Text>
+            <AppText style={styles.actionLabel}>{t('sell.addAnimal')}</AppText>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -284,7 +397,7 @@ export default function SellScreen({ navigation }) {
             <View style={[styles.actionIconCircle, { backgroundColor: '#DBEAFE' }]}>
               <Ionicons name="list" size={26} color="#3B82F6" />
             </View>
-            <Text style={styles.actionLabel}>My Listings</Text>
+            <AppText style={styles.actionLabel}>{t('sell.myListings')}</AppText>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -296,7 +409,7 @@ export default function SellScreen({ navigation }) {
               <Ionicons name="chatbubbles" size={26} color="#EF4444" />
               <View style={styles.actionCounterDot} />
             </View>
-            <Text style={styles.actionLabel}>Messages</Text>
+            <AppText style={styles.actionLabel}>{t('sell.messages')}</AppText>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -307,46 +420,17 @@ export default function SellScreen({ navigation }) {
             <View style={[styles.actionIconCircle, { backgroundColor: '#F3E8FF' }]}>
               <Ionicons name="bar-chart" size={26} color="#8B5CF6" />
             </View>
-            <Text style={styles.actionLabel}>Analytics</Text>
+            <AppText style={styles.actionLabel}>{t('sell.analytics')}</AppText>
           </TouchableOpacity>
         </View>
 
-        {/* Monthly Analytics Overview Card */}
-        <Text style={styles.sectionTitle}>Monthly Overview</Text>
-        <View style={styles.overviewCard}>
-          <Text style={styles.overviewCardTitle}>June Summary</Text>
-          <View style={styles.overviewMetricsRow}>
-            <View style={styles.overviewMetric}>
-              <Text style={styles.metricLabel}>Revenue</Text>
-              <Text style={styles.metricValue}>₹1.85L</Text>
-              <Text style={styles.metricTrend}>+12.4%</Text>
-            </View>
-            <View style={styles.overviewVerticalDivider} />
-            <View style={styles.overviewMetric}>
-              <Text style={styles.metricLabel}>Views</Text>
-              <Text style={styles.metricValue}>2.4K</Text>
-              <Text style={styles.metricTrend}>+18.1%</Text>
-            </View>
-            <View style={styles.overviewVerticalDivider} />
-            <View style={styles.overviewMetric}>
-              <Text style={styles.metricLabel}>Enquiries</Text>
-              <Text style={styles.metricValue}>18</Text>
-              <Text style={styles.metricTrend}>+5 new</Text>
-            </View>
-            <View style={styles.overviewVerticalDivider} />
-            <View style={styles.overviewMetric}>
-              <Text style={styles.metricLabel}>Sold</Text>
-              <Text style={styles.metricValue}>4</Text>
-              <Text style={styles.metricTrend}>100% fill</Text>
-            </View>
-          </View>
-        </View>
+
 
         {/* Recent Listings Section */}
         <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Recent Listings</Text>
+          <AppText style={styles.sectionTitle}>{t('sell.recentListings')}</AppText>
           <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.navigate('MyListings')}>
-            <Text style={styles.viewAllText}>View All</Text>
+            <AppText style={styles.viewAllText}>{t('sell.viewAll')}</AppText>
           </TouchableOpacity>
         </View>
 
@@ -361,18 +445,18 @@ export default function SellScreen({ navigation }) {
               <View style={styles.listingImageContainer}>
                 <Image source={{ uri: item.image }} style={styles.listingImage} resizeMode="cover" />
                 <View style={styles.activeBadge}>
-                  <Text style={styles.activeBadgeText}>{item.status}</Text>
+                  <AppText style={styles.activeBadgeText}>{item.status}</AppText>
                 </View>
               </View>
 
               <View style={styles.listingMeta}>
-                <Text style={styles.listingName} numberOfLines={1}>{item.name}</Text>
-                <Text style={styles.listingBreed} numberOfLines={1}>{item.breed} • {item.postedDate}</Text>
-                <Text style={styles.listingPrice}>{item.price}</Text>
+                <AppText style={styles.listingName} numberOfLines={1}>{item.name}</AppText>
+                <AppText style={styles.listingBreed} numberOfLines={1}>{item.breed} • {item.postedDate}</AppText>
+                <AppText style={styles.listingPrice}>{item.price}</AppText>
 
                 <View style={styles.viewsRow}>
                   <Ionicons name="eye-outline" size={14} color="#64748B" />
-                  <Text style={styles.viewsText}>{item.views} views</Text>
+                  <AppText style={styles.viewsText}>{t('buy.animalsAvailable', { count: item.views })}</AppText>
                 </View>
 
                 {/* Edit & Share buttons */}
@@ -383,7 +467,7 @@ export default function SellScreen({ navigation }) {
                     onPress={() => navigation.navigate('MyListings')}
                   >
                     <Ionicons name="create-outline" size={13} color="#16A34A" />
-                    <Text style={styles.editButtonText}>Edit</Text>
+                    <AppText style={styles.editButtonText}>{t('sell.edit')}</AppText>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.shareButton}
@@ -399,7 +483,7 @@ export default function SellScreen({ navigation }) {
         />
 
         {/* Pending Approval Section */}
-        <Text style={styles.sectionTitle}>Pending Approval</Text>
+        <AppText style={styles.sectionTitle}>{t('sell.pendingApproval')}</AppText>
         <View style={styles.pendingContainer}>
           {pendingListings.map((item) => (
             <View key={item.id} style={styles.pendingCard}>
@@ -408,32 +492,32 @@ export default function SellScreen({ navigation }) {
                   <MaterialCommunityIcons name="image-outline" size={20} color="#94A3B8" />
                 </View>
                 <View style={styles.pendingDetails}>
-                  <Text style={styles.pendingName}>{item.name}</Text>
-                  <Text style={styles.pendingBreed}>{item.breed} • {item.price}</Text>
+                  <AppText style={styles.pendingName}>{item.name}</AppText>
+                  <AppText style={styles.pendingBreed}>{item.breed} • {item.price}</AppText>
                 </View>
               </View>
 
               <View style={styles.pendingBadge}>
                 <Ionicons name="time-outline" size={11} color="#D97706" style={styles.pendingBadgeIcon} />
-                <Text style={styles.pendingBadgeText}>Pending</Text>
+                <AppText style={styles.pendingBadgeText}>{item.status}</AppText>
               </View>
             </View>
           ))}
         </View>
 
         {/* Recent Enquiries Section */}
-        <Text style={styles.sectionTitle}>Recent Enquiries</Text>
+        <AppText style={styles.sectionTitle}>{t('sell.recentEnquiries')}</AppText>
         <View style={styles.enquiriesContainer}>
           {recentEnquiries.map((item) => (
             <View key={item.id} style={styles.enquiryCard}>
               <View style={styles.enquiryLeft}>
                 <View style={styles.enquiryAvatarCircle}>
-                  <Text style={styles.enquiryAvatarText}>{item.buyerName.charAt(0)}</Text>
+                  <AppText style={styles.enquiryAvatarText}>{(item.buyerName && typeof item.buyerName === 'string' && item.buyerName.trim()) ? item.buyerName.trim().charAt(0).toUpperCase() : '?'}</AppText>
                 </View>
                 <View style={styles.enquiryMeta}>
-                  <Text style={styles.enquiryBuyer}>{item.buyerName}</Text>
-                  <Text style={styles.enquiryTarget}>Interested in {item.animal}</Text>
-                  <Text style={styles.enquiryTime}>{item.time}</Text>
+                  <AppText style={styles.enquiryBuyer}>{item.buyerName}</AppText>
+                  <AppText style={styles.enquiryTarget}>{t('sell.interestedIn', { animal: item.animal })}</AppText>
+                  <AppText style={styles.enquiryTime}>{item.time}</AppText>
                 </View>
               </View>
 
@@ -500,21 +584,21 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '800',
     color: '#0F172A',
-    marginTop: 1,
+    marginTop: 2,
   },
   headerSubtitle: {
     fontSize: 11,
-    color: '#94A3B8',
-    marginTop: 2,
+    color: '#64748B',
+    marginTop: 4,
   },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   headerIconButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#F1F5F9',
@@ -525,30 +609,43 @@ const styles = StyleSheet.create({
   },
   notificationDot: {
     position: 'absolute',
-    top: 10,
-    right: 10,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    top: 8,
+    right: 8,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: '#EF4444',
-    borderWidth: 1.5,
-    borderColor: '#FFFFFF',
   },
   avatarImage: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#F1F5F9',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: '#16A34A',
+  },
+  avatarCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#DCFCE7',
+    borderWidth: 1.5,
+    borderColor: '#16A34A',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#16A34A',
   },
   scrollContent: {
-    paddingBottom: 140, // Increased spacing to clear Bottom Nav bar & floating FAB
+    paddingBottom: 160,
   },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     paddingHorizontal: 8,
-    paddingTop: 16,
-    justifyContent: 'space-between',
+    marginTop: 16,
   },
   statCard: {
     width: '46%',
@@ -560,33 +657,126 @@ const styles = StyleSheet.create({
     marginHorizontal: '2%',
     marginBottom: 16,
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 6 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.02,
     shadowRadius: 8,
     elevation: 2,
+    minHeight: 140,
+    justifyContent: 'space-between',
+  },
+  ctaCardContainer: {
+    width: '46%',
+    marginHorizontal: '2%',
+    marginBottom: 16,
+  },
+  ctaCardAnimated: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
+    overflow: 'hidden',
+    shadowColor: '#16A34A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
+    minHeight: 140,
+  },
+  ctaGradient: {
+    padding: 14,
+    minHeight: 140,
+    justifyContent: 'space-between',
+    position: 'relative',
+    height: '100%',
+  },
+  ctaPatternCircle1: {
+    position: 'absolute',
+    top: -10,
+    right: -10,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#E8F8E6',
+    opacity: 0.25,
+  },
+  ctaPatternCircle2: {
+    position: 'absolute',
+    bottom: -20,
+    left: -20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#E8F8E6',
+    opacity: 0.15,
+  },
+  ctaTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  ctaIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#E8F8E6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  ctaContentBody: {
+    flex: 1,
+    marginTop: 8,
+    justifyContent: 'center',
+  },
+  ctaTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#1E293B',
+    lineHeight: 18,
+  },
+  ctaSubtitle: {
+    fontSize: 9,
+    color: '#64748B',
+    fontWeight: '600',
+    lineHeight: 13,
+    marginTop: 2,
+  },
+  ctaButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#16A34A',
+    borderRadius: 12,
+    paddingVertical: 7,
+    shadowColor: '#16A34A',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.16,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  ctaButtonText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
   statCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
   },
   statCount: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '800',
     color: '#0F172A',
   },
   statIconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 30,
+    height: 30,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#64748B',
     fontWeight: '600',
+    marginTop: 8,
   },
   trendRow: {
     flexDirection: 'row',
@@ -596,14 +786,14 @@ const styles = StyleSheet.create({
   trendText: {
     fontSize: 10,
     fontWeight: '700',
-    marginLeft: 3,
+    marginLeft: 4,
   },
   sectionTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
     color: '#0F172A',
     marginLeft: 16,
-    marginTop: 14,
+    marginTop: 8,
     marginBottom: 12,
   },
   actionsGrid: {
@@ -613,91 +803,36 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   actionBtn: {
-    alignItems: 'center',
     width: '22%',
+    alignItems: 'center',
   },
   actionIconCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
     borderWidth: 1,
     borderColor: '#F1F5F9',
     position: 'relative',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.02,
-    shadowRadius: 6,
-    elevation: 1,
   },
   actionCounterDot: {
     position: 'absolute',
     top: 12,
     right: 12,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: '#EF4444',
   },
   actionLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
     color: '#475569',
     textAlign: 'center',
   },
-  overviewCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    padding: 16,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.01,
-    shadowRadius: 6,
-    elevation: 1,
-  },
-  overviewCardTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#0F172A',
-    marginBottom: 14,
-  },
-  overviewMetricsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  overviewMetric: {
-    width: '21%',
-    alignItems: 'center',
-  },
-  metricLabel: {
-    fontSize: 10,
-    color: '#64748B',
-    fontWeight: '600',
-  },
-  metricValue: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#0F172A',
-    marginTop: 4,
-  },
-  metricTrend: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#16A34A',
-    marginTop: 2,
-  },
-  overviewVerticalDivider: {
-    width: 1,
-    height: 36,
-    backgroundColor: '#F1F5F9',
-  },
+
   sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -705,35 +840,32 @@ const styles = StyleSheet.create({
     paddingRight: 16,
   },
   viewAllText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     color: '#16A34A',
-    marginTop: 8,
   },
   listingsList: {
     paddingHorizontal: 8,
-    marginBottom: 16,
+    paddingBottom: 4,
   },
   listingCard: {
-    width: 220,
+    width: 156,
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
     borderWidth: 1,
     borderColor: '#F1F5F9',
     marginHorizontal: 8,
+    paddingBottom: 12,
     overflow: 'hidden',
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.02,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.03,
+    shadowRadius: 10,
     elevation: 2,
   },
   listingImageContainer: {
     width: '100%',
-    height: 100,
-    backgroundColor: '#F8FAFC',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    height: 90,
     position: 'relative',
   },
   listingImage: {
@@ -744,34 +876,35 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 8,
     left: 8,
-    backgroundColor: '#16A34A',
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    borderRadius: 6,
+    backgroundColor: '#DCFCE7',
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 4,
   },
   activeBadgeText: {
     fontSize: 9,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
+    fontWeight: '800',
+    color: '#16A34A',
   },
   listingMeta: {
-    padding: 12,
+    paddingHorizontal: 10,
+    paddingTop: 10,
   },
   listingName: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '700',
     color: '#0F172A',
   },
   listingBreed: {
-    fontSize: 10,
+    fontSize: 9,
     color: '#64748B',
     marginTop: 2,
   },
   listingPrice: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '800',
     color: '#16A34A',
-    marginTop: 6,
+    marginTop: 4,
   },
   viewsRow: {
     flexDirection: 'row',
@@ -779,24 +912,26 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   viewsText: {
-    fontSize: 11,
+    fontSize: 9,
     color: '#64748B',
     marginLeft: 4,
+    fontWeight: '500',
   },
   listingButtonsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 10,
     justifyContent: 'space-between',
+    marginTop: 10,
   },
   editButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#DCFCE7',
-    borderRadius: 10,
-    paddingVertical: 6,
-    flex: 1,
+    borderWidth: 1,
+    borderColor: '#DCFCE7',
+    backgroundColor: '#F0FDF4',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 6,
     marginRight: 6,
   },
   editButtonText: {
@@ -1026,7 +1161,7 @@ const styles = StyleSheet.create({
   },
   floatingFab: {
     position: 'absolute',
-    bottom: 90,
+    bottom: 110,
     right: 16,
     width: 52,
     height: 52,
@@ -1039,6 +1174,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 10,
     elevation: 6,
+  },
+  scrollContent: {
+    paddingBottom: 150,
   },
   guestContainer: {
     flex: 1,

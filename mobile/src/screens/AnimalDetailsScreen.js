@@ -1,108 +1,582 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { StyleSheet, View, Text, ScrollView, Image, TouchableOpacity, Dimensions, Modal, Share, FlatList } from 'react-native';
-import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
+// AnimalDetailsScreen.js
+// Redesigned premium livestock details page with dynamic zoom views, spec cards, maps trackers, and call CTAs.
+
+import React, { useState, useRef, useCallback, useEffect, useContext, useMemo } from 'react';
+import { StyleSheet, View, ScrollView, Image, TouchableOpacity, Dimensions, Modal, Share, FlatList, SafeAreaView, ActivityIndicator, Linking, Alert, Platform, TextInput, Animated, PanResponder } from 'react-native';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import SectionHeader from '../components/SectionHeader';
 import ListingCard from '../components/ListingCard';
 import { api, resolveMediaUrl } from '../api/api';
+import { useTranslation } from 'react-i18next';
+import AppText from '../components/AppText';
+import { AppContext } from '../context/AppContext';
+import { reverseGeocodeWithCache, formatLocationDisplay } from '../utils/geocoder';
+import { isUserVerified } from '../utils/verificationUtils';
 
 const { width } = Dimensions.get('window');
-const GALLERY_HEIGHT = 280;
+// Dynamic gallery height: 4:3 portrait ratio — shows the full animal without cropping.
+// Caps at 420px so the gallery doesn't dominate on very large screens.
+const GALLERY_HEIGHT = Math.min(Math.round(width * (4 / 3)), 420);
 
-const MOCK_IMAGES = [
-  'https://images.unsplash.com/photo-1546445317-29f4545e6d52?auto=format&fit=crop&w=600&q=80', // Cow image 1
-  'https://images.unsplash.com/photo-1570042225831-d98fa7577f1e?auto=format&fit=crop&w=600&q=80', // Cow image 2
-  'https://images.unsplash.com/photo-1527153857715-3908f2bacb31?auto=format&fit=crop&w=600&q=80', // Cow image 3
-];
+const ImageWithLoader = ({ uri, style, resizeMode = 'contain', onPress }) => {
+  const [loading, setLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
-const SIMILAR_ANIMALS = [
-  {
-    id: 's1',
-    name: 'Sahiwal Cow',
-    breed: 'Sahiwal',
-    age: '3 Years',
-    price: '₹48,000',
-    sellerName: 'Ramesh Patel',
-    location: 'Surat, Gujarat',
-    isVerified: true,
-    isFeatured: false,
-    postedTime: '2 hours ago',
-  },
-  {
-    id: 's2',
-    name: 'Gir Cow',
-    breed: 'Gir',
-    age: '2.8 Years',
-    price: '₹62,000',
-    sellerName: 'Devendra Vyas',
-    location: 'Rajkot, Gujarat',
-    isVerified: true,
-    isFeatured: true,
-    postedTime: '3 hours ago',
-  },
-  {
-    id: 's3',
-    name: 'HF Cross Cow',
-    breed: 'Holstein Friesian',
-    age: '3.5 Years',
-    price: '₹55,000',
-    location: 'Baramati, Pune',
-    isVerified: true,
-    isFeatured: true,
-    postedTime: '1 day ago',
-  },
-];
-
-export default function AnimalDetailsScreen({ route, navigation }) {
-  // Safe extraction of params (fallback to mock default)
-  const animal = route.params?.animal || {
-    id: 'f1',
-    name: 'HF Cross Cow',
-    breed: 'Holstein Friesian',
-    age: '3.5 Years',
-    price: '₹55,000',
-    location: 'Baramati, Pune',
-    isVerified: true,
-    isFeatured: true,
-  };
-
-  const [activeSlide, setActiveSlide] = useState(0);
-  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
-  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
-  const [similarAnimals, setSimilarAnimals] = useState([]);
+  const fallbackUri = 'https://images.unsplash.com/photo-1546445317-29f4545e6d52?auto=format&fit=crop&w=800&q=80';
 
   useEffect(() => {
+    setHasError(false);
+    setLoading(true);
+    fadeAnim.setValue(0);
+  }, [uri, fadeAnim]);
+
+  const source = useMemo(() => {
+    if (hasError || !uri || typeof uri !== 'string' || uri.trim() === '' || uri.includes('undefined') || uri.includes('null')) {
+      return { uri: fallbackUri };
+    }
+    return { uri };
+  }, [uri, hasError]);
+
+  const handleLoadStart = useCallback(() => {
+    fadeAnim.setValue(0);
+    setLoading(true);
+  }, [uri, fadeAnim]);
+
+  const handleLoadEnd = useCallback(() => {
+    setLoading(false);
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 280,
+      useNativeDriver: true,
+    }).start();
+  }, [uri, fadeAnim]);
+
+  const handleError = useCallback((e) => {
+    const errObj = e?.nativeEvent?.error || e;
+    console.warn(`[ImageWithLoader] Failed to load image URI "${uri}":`, errObj);
+    setHasError(true);
+    setLoading(false);
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 280,
+      useNativeDriver: true,
+    }).start();
+  }, [uri, fadeAnim]);
+
+  return (
+    <TouchableOpacity
+      activeOpacity={onPress ? 0.9 : 1}
+      onPress={onPress}
+      style={[style, { overflow: 'hidden', backgroundColor: '#0F172A' }]}
+    >
+      {/* Ambient Blurred Backdrop Layer: fills letterbox space smoothly with color-matched tones */}
+      {resizeMode === 'contain' && (
+        <Animated.Image
+          source={source}
+          style={[StyleSheet.absoluteFillObject, { opacity: fadeAnim, transform: [{ scale: 1.15 }] }]}
+          resizeMode="cover"
+          blurRadius={Platform.OS === 'ios' ? 25 : 15}
+        />
+      )}
+      {/* Dark tint overlay for pristine contrast behind foreground subject */}
+      {resizeMode === 'contain' && (
+        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(15, 23, 42, 0.45)' }]} />
+      )}
+      {/* Skeleton shimmer while image loads */}
+      {loading && (
+        <View style={[StyleSheet.absoluteFillObject, styles.skeletonContainer]}>
+          <View style={styles.skeletonIconWrap}>
+            <MaterialCommunityIcons name="image-outline" size={48} color="rgba(255,255,255,0.18)" />
+          </View>
+        </View>
+      )}
+      {/* Foreground Crisp Main Image — contain ensures 100% of animal is visible without cropping */}
+      <Animated.Image
+        source={source}
+        style={[StyleSheet.absoluteFillObject, { opacity: fadeAnim }]}
+        resizeMode={resizeMode}
+        onLoadStart={handleLoadStart}
+        onLoad={handleLoadEnd}
+        onError={handleError}
+      />
+    </TouchableOpacity>
+  );
+};
+
+// Interactive full-screen zoom component with double-tap toggle & gesture pan tracking
+const ZoomableImage = ({ uri, isActive }) => {
+  const scale = useRef(new Animated.Value(1)).current;
+  const pan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const [currentScale, setCurrentScale] = useState(1);
+  const lastTap = useRef(0);
+
+  // Reset zoom & panning when active slide changes
+  useEffect(() => {
+    if (!isActive) {
+      Animated.parallel([
+        Animated.timing(scale, { toValue: 1, duration: 200, useNativeDriver: true }),
+        Animated.timing(pan, { toValue: { x: 0, y: 0 }, duration: 200, useNativeDriver: true }),
+      ]).start(() => {
+        setCurrentScale(1);
+      });
+    }
+  }, [isActive, scale, pan]);
+
+  const handleDoubleTap = () => {
+    const nextScale = currentScale > 1 ? 1 : 2.5;
+    Animated.parallel([
+      Animated.spring(scale, { toValue: nextScale, useNativeDriver: true, friction: 6 }),
+      Animated.spring(pan, { toValue: { x: 0, y: 0 }, useNativeDriver: true, friction: 6 }),
+    ]).start(() => {
+      setCurrentScale(nextScale);
+    });
+  };
+
+  const handleTouchEnd = () => {
+    const now = Date.now();
+    const DOUBLE_TAP_DELAY = 300;
+    if (lastTap.current && now - lastTap.current < DOUBLE_TAP_DELAY) {
+      handleDoubleTap();
+    }
+    lastTap.current = now;
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => currentScale > 1,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return currentScale > 1 && (Math.abs(gestureState.dx) > 2 || Math.abs(gestureState.dy) > 2);
+      },
+      onPanResponderGrant: () => {
+        pan.setOffset({
+          x: pan.x._value,
+          y: pan.y._value,
+        });
+        pan.setValue({ x: 0, y: 0 });
+      },
+      onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], { useNativeDriver: false }),
+      onPanResponderRelease: () => {
+        pan.flattenOffset();
+      },
+    })
+  ).current;
+
+  return (
+    <View style={styles.fullScreenImageSlide} onTouchEnd={handleTouchEnd} {...panResponder.panHandlers}>
+      <ScrollView
+        contentContainerStyle={styles.fullScreenScrollViewContent}
+        maximumZoomScale={4}
+        minimumZoomScale={1}
+        showsHorizontalScrollIndicator={false}
+        showsVerticalScrollIndicator={false}
+        centerContent
+      >
+        <Animated.Image
+          source={{ uri }}
+          style={[
+            styles.fullScreenImage,
+            {
+              transform: [
+                { scale: scale },
+                { translateX: pan.x },
+                { translateY: pan.y }
+              ]
+            }
+          ]}
+          resizeMode="contain"
+        />
+      </ScrollView>
+    </View>
+  );
+};
+
+export default function AnimalDetailsScreen({ route, navigation }) {
+
+  const passedAnimal = route.params?.animal || null;
+  const animalId = passedAnimal?._id || passedAnimal?.id || null;
+
+  const [animal, setAnimal] = useState(passedAnimal);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [activeSlide, setActiveSlide] = useState(0);
+  const [isZoomVisible, setIsZoomVisible] = useState(false);
+  const [zoomImageIndex, setZoomImageIndex] = useState(0);
+  const [zoomImageUri, setZoomImageUri] = useState(null);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const [isPlayerPlaying, setIsPlayerPlaying] = useState(false);
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
+  const [similarAnimals, setSimilarAnimals] = useState([]);
+  const [isReported, setIsReported] = useState(false);
+  const [isLiking, setIsLiking] = useState(false);
+
+  const handleOpenZoom = useCallback((index, uri) => {
+    setZoomImageIndex(index);
+    setZoomImageUri(uri || null);
+    setIsZoomVisible(true);
+  }, []);
+
+  const handleCloseZoom = useCallback(() => {
+    setIsZoomVisible(false);
+    setZoomImageUri(null);
+  }, []);
+  
+  // Complaint state
+  const [isComplaintModalVisible, setIsComplaintModalVisible] = useState(false);
+  const [complaintText, setComplaintText] = useState('');
+  const [isSubmittingComplaint, setIsSubmittingComplaint] = useState(false);
+  
+  const { t } = useTranslation();
+
+  const { userProfile, isGuest, userToken, favorites, toggleFavoriteContext, refreshProfileData } = useContext(AppContext);
+  const normalizedAnimalId = String(animalId || '').trim();
+  const isWishlisted = favorites ? favorites.includes(normalizedAnimalId) : false;
+
+  // Helper to detect if a file path or object is a video
+  const detectIsVideo = useCallback((item) => {
+    if (!item) return false;
+    if (typeof item === 'string') {
+      const lower = item.toLowerCase();
+      return (
+        lower.endsWith('.mp4') ||
+        lower.endsWith('.mov') ||
+        lower.endsWith('.m4v') ||
+        lower.endsWith('.3gp') ||
+        lower.endsWith('.avi') ||
+        lower.endsWith('.webm') ||
+        lower.includes('/videos/') ||
+        lower.includes('/video/')
+      );
+    }
+    if (typeof item === 'object') {
+      if (item.type === 'video') return true;
+      if (item.mime?.startsWith('video/') || item.mimeType?.startsWith('video/')) return true;
+      if (item.uri && detectIsVideo(item.uri)) return true;
+    }
+    return false;
+  }, []);
+
+  const getUri = useCallback((item) => {
+    if (!item) return '';
+    if (typeof item === 'string') return item;
+    return item.uri || item.url || '';
+  }, []);
+
+  const mediaSlides = useMemo(() => {
+    const slides = [];
+
+    // 1. Process photos list in original order (filter out null, undefined, empty strings, invalid objects)
+    if (animal?.photos && Array.isArray(animal.photos) && animal.photos.length > 0) {
+      animal.photos.forEach((mediaItem, idx) => {
+        const rawUri = getUri(mediaItem);
+        // Ignore null, undefined, empty strings, whitespace-only strings, or literal 'null'/'undefined' strings
+        if (!rawUri || typeof rawUri !== 'string' || rawUri.trim() === '' || rawUri === 'undefined' || rawUri === 'null') {
+          console.warn(`[AnimalDetails] Skipping invalid/empty photo entry at index ${idx}:`, mediaItem);
+          return;
+        }
+
+        const resolved = resolveMediaUrl(rawUri);
+
+        if (detectIsVideo(mediaItem)) {
+          slides.push({
+            type: 'video',
+            uri: resolved,
+            thumbnail: animal.photos.find(p => getUri(p) && !detectIsVideo(p)) 
+              ? resolveMediaUrl(getUri(animal.photos.find(p => getUri(p) && !detectIsVideo(p))))
+              : null,
+          });
+        } else {
+          slides.push({
+            type: 'image',
+            uri: resolved,
+          });
+        }
+      });
+    }
+
+    // 2. Process separate video field if it exists and hasn't been added yet
+    if (animal?.video) {
+      const videoUriVal = getUri(animal.video);
+      if (videoUriVal && typeof videoUriVal === 'string' && videoUriVal.trim() !== '' && videoUriVal !== 'null' && videoUriVal !== 'undefined') {
+        const resolvedVideo = resolveMediaUrl(videoUriVal);
+        const isAlreadyAdded = slides.some(s => s.type === 'video' && s.uri && s.uri.includes(videoUriVal));
+        if (!isAlreadyAdded) {
+          slides.push({
+            type: 'video',
+            uri: resolvedVideo,
+            thumbnail: slides.find(s => s.type === 'image')?.uri || null,
+          });
+        }
+      }
+    }
+
+    if (slides.length === 0) {
+      slides.push({
+        type: 'placeholder',
+      });
+    }
+
+    return slides;
+  }, [animal?.photos, animal?.video, detectIsVideo, getUri]);
+
+  const firstVideoInSlides = useMemo(() => {
+    return mediaSlides.find(s => s.type === 'video')?.uri || null;
+  }, [mediaSlides]);
+
+  const videoUri = animal?.video ? resolveMediaUrl(animal.video) : firstVideoInSlides;
+  const player = useVideoPlayer(videoUri, (playerInstance) => {
+    playerInstance.loop = false;
+  });
+
+  useEffect(() => {
+    if (!player) return;
+    const subscription = player.addListener('error', (error) => {
+      console.warn('[VideoPlayer] Playback error:', error);
+      Alert.alert(
+        t('common.error'),
+        t('animalDetails.videoError'),
+        [{ text: t('common.close'), onPress: () => setIsVideoPlaying(false) }]
+      );
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, [player, t]);
+
+  useEffect(() => {
+    if (player && videoUri) {
+      player.replace(videoUri);
+    }
+  }, [videoUri, player]);
+
+  useEffect(() => {
+    if (player) {
+      if (isVideoPlaying) {
+        player.play();
+      } else {
+        player.pause();
+      }
+    }
+  }, [isVideoPlaying, player]);
+
+  useEffect(() => {
+    if (!player) return;
+
+    // Set initial playing status
+    setIsPlayerPlaying(player.playing);
+
+    const subscription = player.addListener('playingChange', (event) => {
+      if (typeof event === 'object' && event !== null) {
+        if ('isPlaying' in event) {
+          setIsPlayerPlaying(event.isPlaying);
+        } else if ('playing' in event) {
+          setIsPlayerPlaying(event.playing);
+        }
+      } else if (typeof event === 'boolean') {
+        setIsPlayerPlaying(event);
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [player]);
+
+  // Auto-refresh user profile on mount to ensure fresh verification status
+  useEffect(() => {
+    if (userToken && !isGuest && refreshProfileData) {
+      refreshProfileData();
+    }
+  }, [userToken, isGuest]);
+
+  // True for guest sessions AND for fully logged-out sessions (userToken null/absent).
+  // Both states must show the Marathi login dialog and disable Call/WhatsApp.
+  const isRestrictedUser = isGuest || !userToken || userToken === 'guest';
+
+  const checkVerification = () => {
+    console.log('[VERIFICATION DEBUG] User verification object:', userProfile?.verification);
+    console.log('[VERIFICATION DEBUG] User verification status:', userProfile?.verification?.status || userProfile?.verificationStatus);
+    console.log('[VERIFICATION DEBUG] isGuest:', isGuest, '| userToken:', userToken, '| isRestrictedUser:', isRestrictedUser);
+
+    if (isRestrictedUser) {
+      console.log('[VERIFICATION DEBUG] final boolean used to enable Call/WhatsApp:', false, '(Guest / Logged-out User)');
+      Alert.alert(
+        'लॉगिन आवश्यक',
+        'विक्रेत्याशी संपर्क करण्यासाठी कृपया प्रथम लॉगिन करा.',
+        [
+          { text: 'रद्द करा', style: 'cancel' },
+          { text: 'लॉगिन करा', onPress: () => navigation.navigate('Auth') }
+        ]
+      );
+      return false;
+    }
+
+    const verified = isUserVerified(userProfile);
+    console.log('[VERIFICATION DEBUG] final boolean used to enable Call/WhatsApp:', verified);
+
+    if (!verified) {
+      const status = userProfile?.verification?.status || userProfile?.verificationStatus || 'unverified';
+      Alert.alert(
+        status === 'pending'
+          ? t('verification.pending', { defaultValue: 'Verification Pending' })
+          : t('verification.title', { defaultValue: 'Verification Required' }),
+        status === 'pending'
+          ? t('verification.pendingDesc', { defaultValue: 'Your account is under review. Marketplace features will be unlocked after approval.' })
+          : t('verification.restrictedToast', { defaultValue: 'Verification Required: Please upload your milk dairy receipt to unlock this feature.' }),
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          {
+            text: status === 'pending' ? t('common.close') : t('verification.uploadNewBtn', { defaultValue: 'Upload Receipt' }),
+            onPress: () => {
+              if (status !== 'pending') {
+                navigation.navigate('Verification');
+              }
+            }
+          }
+        ]
+      );
+      return false;
+    }
+    return true;
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchAnimalDetails = async () => {
+      if (!animalId) {
+        setLoading(false);
+        setError(t('animalDetails.notFound'));
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError(null);
+        const res = await api.getAnimalById(animalId);
+
+        if (cancelled) return;
+
+        if (res.status === 'success' && res.data?.animal) {
+          const a = res.data.animal;
+          
+          let displayLocation = [a.village, a.district].filter(Boolean).join(', ') || passedAnimal?.location || '';
+          let talukaVal = a.taluka || null;
+          let districtVal = a.district || null;
+          let stateVal = a.state || null;
+          let villageVal = a.village || null;
+          let pincodeVal = a.pincode || null;
+          let formattedAddr = a.formattedAddress || null;
+
+          // Legacy migration: If listing contains latitude/longitude but missing formattedAddress/village
+          // Display geocoded address locally. Do NOT persist to DB from this read-only screen.
+          if (a.latitude && a.longitude && (!a.formattedAddress || !a.village)) {
+            const geocoded = await reverseGeocodeWithCache(a.latitude, a.longitude);
+            if (geocoded) {
+              villageVal = geocoded.village || villageVal;
+              talukaVal = geocoded.taluka || talukaVal;
+              districtVal = geocoded.district || districtVal;
+              stateVal = geocoded.state || stateVal;
+              pincodeVal = geocoded.pincode || pincodeVal;
+              formattedAddr = geocoded.formattedAddress;
+              displayLocation = formattedAddr;
+              // NOTE: No api.updateAnimal() call here. AnimalDetailsScreen is READ-ONLY.
+              // Geocoded location is displayed locally without writing to the database.
+            }
+          } else if (a.formattedAddress) {
+            displayLocation = a.formattedAddress;
+          }
+
+          setAnimal({
+            ...a,
+            _id: a._id,
+            id: a._id,
+            name: a.title || passedAnimal?.name || 'Unknown',
+            breed: a.breedId?.name || passedAnimal?.breed || 'Unknown Breed',
+            age: a.age || passedAnimal?.age || 'N/A',
+            price: `₹${(a.price || 0).toLocaleString()}`,
+            sellerName: a.sellerId?.name || passedAnimal?.sellerName || 'Seller',
+            location: displayLocation,
+            isVerified: a.status === 'approved',
+            isFeatured: (a.views || 0) > 200,
+            photos: a.photos || [],
+            video: a.video || null,
+            description: a.description || '',
+            gender: a.gender || null,
+            weight: a.weight || null,
+            color: a.color || null,
+            health: a.health || {},
+            categoryId: a.categoryId || null,
+            breedId: a.breedId || null,
+            sellerId: a.sellerId || null,
+            latitude: a.latitude || null,
+            longitude: a.longitude || null,
+            state: stateVal,
+            district: districtVal,
+            taluka: talukaVal,
+            village: villageVal,
+            pincode: pincodeVal,
+            formattedAddress: formattedAddr,
+            milkYield: a.milkYield || null,
+            pregnant: a.pregnant || false,
+            lactation: a.lactation || null,
+          });
+        } else {
+          setError(t('animalDetails.notFound'));
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.warn('[AnimalDetails] Failed to load animal:', err.message);
+          if (passedAnimal) {
+            setAnimal(passedAnimal);
+          } else {
+            setError(err.message || t('animalDetails.notFound'));
+          }
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    fetchAnimalDetails();
+    return () => { cancelled = true; };
+  }, [animalId, passedAnimal, t]);
+
+  useEffect(() => {
+    if (!animal?.categoryId) return;
+
     const fetchSimilar = async () => {
       try {
-        if (animal.categoryId) {
-          const catId = animal.categoryId._id || animal.categoryId;
-          const res = await api.getAnimals({ categoryId: catId, status: 'approved' });
-          if (res.status === 'success') {
-            const list = res.data.animals
-              .filter(a => a._id !== animal._id)
-              .slice(0, 5)
-              .map(a => ({
-                ...a,
-                id: a._id,
-                name: a.title,
-                breed: a.breedId?.name || 'Unknown Breed',
-                age: a.age,
-                price: `₹${a.price.toLocaleString()}`,
-                sellerName: a.sellerId?.name || 'Seller',
-                location: `${a.village}, ${a.district}`,
-                isVerified: a.status === 'approved',
-                isFeatured: a.views > 200,
-                postedTime: 'Active',
-                photos: a.photos
-              }));
-            setSimilarAnimals(list);
-          }
+        const catId = animal.categoryId._id || animal.categoryId;
+        const res = await api.getAnimals({ categoryId: catId, status: 'approved' });
+        if (res.status === 'success') {
+          const list = res.data.animals
+            .filter(a => a._id !== (animal._id || animal.id))
+            .slice(0, 5)
+            .map(a => ({
+              ...a,
+              id: a._id,
+              name: a.title,
+              breed: a.breedId?.name || 'Unknown Breed',
+              age: a.age,
+              price: `₹${(a.price || 0).toLocaleString()}`,
+              sellerName: a.sellerId?.name || 'Seller',
+              location: `${a.village || ''}, ${a.district || ''}`,
+              isVerified: a.status === 'approved',
+              isFeatured: (a.views || 0) > 200,
+              postedTime: 'Active',
+              photos: a.photos || [],
+            }));
+          setSimilarAnimals(list);
         }
       } catch (err) {
         console.warn('Failed to load similar animals:', err.message);
       }
     };
     fetchSimilar();
-  }, [animal]);
+  }, [animal?.categoryId, animal?._id, animal?.id]);
+
 
   const scrollRef = useRef(null);
 
@@ -123,22 +597,333 @@ export default function AnimalDetailsScreen({ route, navigation }) {
     }
   };
 
-  const handleOpenMaps = () => {
-    // UI Only notification simulation or deep link if needed
-    alert('Opening maps location for ' + animal.location);
+  const handleCall = async () => {
+    if (!checkVerification()) return;
+    const phone = animal.sellerId?.mobile || animal.sellerId?.phoneNumber;
+    if (!phone) {
+      Alert.alert(t('animalDetails.phoneNotAvailable'), t('animalDetails.phoneNotAvailableMsg'));
+      return;
+    }
+    const url = `tel:${phone}`;
+    const supported = await Linking.canOpenURL(url);
+    if (supported) {
+      Linking.openURL(url);
+    } else {
+      Alert.alert(t('animalDetails.cannotOpenDialer'), t('animalDetails.cannotOpenDialerMsg'));
+    }
   };
+
+  const handleWhatsApp = async () => {
+    if (!checkVerification()) return;
+    const phone = animal.sellerId?.mobile || animal.sellerId?.phoneNumber;
+    if (!phone) {
+      Alert.alert(t('animalDetails.phoneNotAvailable'), t('animalDetails.phoneNotAvailableMsg'));
+      return;
+    }
+    const cleaned = phone.replace(/[^0-9]/g, '');
+    const withCountry = cleaned.startsWith('91') ? cleaned : `91${cleaned}`;
+    const cleanPrice = animal.price ? animal.price.replace(/[^0-9,]/g, '') : '';
+    const messageText = t('animalDetails.whatsappShareMessage', {
+      animalName: animal.name,
+      breed: animal.breed,
+      price: cleanPrice
+    });
+    const url = `https://wa.me/${withCountry}?text=${encodeURIComponent(messageText)}`;
+    const supported = await Linking.canOpenURL(url);
+    if (supported) {
+      Linking.openURL(url);
+    } else {
+      Alert.alert(t('animalDetails.whatsappNotFound'), t('animalDetails.whatsappNotFoundMsg'));
+    }
+  };
+
+  const handleChat = () => {
+    if (!checkVerification()) return;
+    const sellerId = animal.sellerId?._id || animal.sellerId;
+    if (!sellerId) {
+      Alert.alert(t('common.error'), t('animalDetails.notFound'));
+      return;
+    }
+    const state = navigation.getState();
+    const routeNames = state?.routeNames || [];
+    if (routeNames.includes('Chat')) {
+      navigation.navigate('Chat', {
+        sellerId,
+        animalId: animal._id || animal.id,
+        animalTitle: animal.name,
+      });
+    } else {
+      Alert.alert(
+        t('animalDetails.chatComingSoon'),
+        t('animalDetails.chatComingSoonMsg'),
+        [
+          { text: t('animalDetails.call'), onPress: handleCall },
+          { text: t('animalDetails.whatsapp'), onPress: handleWhatsApp },
+          { text: t('common.cancel'), style: 'cancel' },
+        ]
+      );
+    }
+  };
+
+  const handleOpenMaps = async () => {
+    const lat = animal?.latitude || animal?.mediaMetadata?.latitude || passedAnimal?.latitude;
+    const lng = animal?.longitude || animal?.mediaMetadata?.longitude || passedAnimal?.longitude;
+
+    const validLat = (lat !== undefined && lat !== null && !isNaN(Number(lat))) ? Number(lat) : null;
+    const validLng = (lng !== undefined && lng !== null && !isNaN(Number(lng))) ? Number(lng) : null;
+
+    const locationStr = formatLocationDisplay({
+      village: animal?.village,
+      taluka: animal?.taluka,
+      district: animal?.district,
+      state: animal?.state
+    }).formatted || animal?.location || animal?.formattedAddress || passedAnimal?.location;
+
+    if (validLat !== null && validLng !== null) {
+      const nativeNavUrl = `google.navigation:q=${validLat},${validLng}&mode=d`;
+      const webDirUrl = `https://www.google.com/maps/dir/?api=1&destination=${validLat},${validLng}&travelmode=driving`;
+
+      if (Platform.OS === 'android') {
+        try {
+          // Directly launch Android native Google Maps driving navigation intent (bypasses canOpenURL API 30+ restrictions)
+          await Linking.openURL(nativeNavUrl);
+          return;
+        } catch (androidErr) {
+          console.warn('[Maps] Native intent launch failed, using web fallback:', androidErr.message);
+        }
+      }
+
+      // Web/iOS or Android fallback
+      try {
+        await Linking.openURL(webDirUrl);
+      } catch (webErr) {
+        Alert.alert(t('animalDetails.cannotOpenMaps'), t('animalDetails.cannotOpenMapsMsg'));
+      }
+      return;
+    }
+
+    if (locationStr) {
+      const encoded = encodeURIComponent(locationStr);
+      const webDirUrl = `https://www.google.com/maps/dir/?api=1&destination=${encoded}&travelmode=driving`;
+      try {
+        await Linking.openURL(webDirUrl);
+      } catch (err) {
+        Alert.alert(t('animalDetails.cannotOpenMaps'), t('animalDetails.cannotOpenMapsMsg'));
+      }
+      return;
+    }
+
+    Alert.alert(t('animalDetails.locationUnavailable'), t('animalDetails.noLocationMsg'));
+  };
+
+  const handleReport = () => {
+    if (isGuest || !userToken || userToken === 'guest') {
+      Alert.alert(
+        t('common.loginRequired', { defaultValue: 'Login Required' }),
+        t('animalDetails.loginToReport', { defaultValue: 'Please login to report this listing.' }),
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          { text: t('common.login', { defaultValue: 'Login' }), onPress: () => navigation.navigate('Auth') }
+        ]
+      );
+      return;
+    }
+    setComplaintText('');
+    setTimeout(() => {
+      setIsComplaintModalVisible(true);
+    }, 50);
+  };
+
+  const submitComplaint = async () => {
+    if (complaintText.trim().length < 10) {
+      Alert.alert(t('common.error', { defaultValue: 'Error' }), 'Complaint must be at least 10 characters long.');
+      return;
+    }
+    if (complaintText.length > 500) {
+      Alert.alert(t('common.error', { defaultValue: 'Error' }), 'Complaint cannot exceed 500 characters.');
+      return;
+    }
+
+    setIsSubmittingComplaint(true);
+    try {
+      const res = await api.submitComplaint({
+        animalId: animal._id || animal.id,
+        message: complaintText.trim()
+      });
+      if (res?.status === 'success') {
+        setIsComplaintModalVisible(false);
+        setIsReported(true);
+        Alert.alert(
+          'यशस्वीरित्या नोंदवली गेली',
+          'तुमची तक्रार यशस्वीरित्या नोंदवली गेली.',
+          [{ text: t('common.ok', { defaultValue: 'OK' }) }]
+        );
+      }
+    } catch (e) {
+      console.warn('Complaint submission error:', e);
+      const msg = e.response?.data?.message || 'Something went wrong. Please try again.';
+      Alert.alert(t('common.error', { defaultValue: 'Error' }), msg);
+    } finally {
+      setIsSubmittingComplaint(false);
+    }
+  };
+
+  // Favorites are now fetched globally via AppContext
+  // No local fetch needed
+
+  const handleLikeToggle = async () => {
+    if (isGuest || !userToken || userToken === 'guest') {
+       Alert.alert(
+        t('common.loginRequired', { defaultValue: 'Login Required' }),
+        t('animalDetails.loginToFavorite', { defaultValue: 'Please login to add animals to your favorites.' }),
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          { text: t('common.login', { defaultValue: 'Login' }), onPress: () => navigation.navigate('Auth') }
+        ]
+      );
+      return;
+    }
+
+    if (isLiking || !animalId) return;
+    setIsLiking(true);
+
+    try {
+      const res = await toggleFavoriteContext(animalId);
+      if (res && res.reason === 'auth') {
+        Alert.alert(t('common.error', { defaultValue: 'Error' }), t('common.loginRequired', { defaultValue: 'Login Required' }));
+      } else if (!res || !res.success) {
+        Alert.alert(t('common.error', { defaultValue: 'Error' }), t('common.somethingWentWrong', { defaultValue: 'Something went wrong. Please try again.' }));
+      }
+    } catch (e) {
+      console.warn('Like API error:', e);
+      Alert.alert(t('common.error', { defaultValue: 'Error' }), t('common.somethingWentWrong', { defaultValue: 'Something went wrong. Please try again.' }));
+    } finally {
+      setIsLiking(false);
+    }
+  };
+
+  const numericPrice = Number(animal.price?.replace(/[^0-9]/g, '') || 65000);
+  const aiEstPrice = Math.round(numericPrice * 1.07);
+  const priceDiff = aiEstPrice - numericPrice;
+  const isGoodDeal = priceDiff > 0;
+
+  const getFormattedAge = (ageVal) => {
+    if (!ageVal) return '--';
+    const cleaned = String(ageVal).replace(/years|year|वर्षे|वर्ष/gi, '').trim();
+    if (!cleaned) return '--';
+    return t('animalDetails.ageValue', { count: cleaned, defaultValue: `${cleaned} Years` });
+  };
+
+  const getFormattedWeight = (weightVal) => {
+    if (!weightVal) return '--';
+    const cleaned = String(weightVal).replace(/kg|kilograms|kilogram|किलोग्राम|किलो/gi, '').trim();
+    if (!cleaned) return '--';
+    return t('animalDetails.weightValue', { count: cleaned, defaultValue: `${cleaned} kg` });
+  };
+
+  const getFormattedMilkYield = (milkVal) => {
+    if (!milkVal) return '--';
+    const cleaned = String(milkVal).replace(/l\/day|liters\/day|liters|liter|l|लिटर|लीटर/gi, '').trim();
+    if (!cleaned) return '--';
+    return t('animalDetails.milkValue', { count: cleaned, defaultValue: `${cleaned} L` });
+  };
+
+  const getFormattedColor = (colorVal) => {
+    if (!colorVal) return '--';
+    const normalized = colorVal.trim().toLowerCase();
+    const translationKey = `animalDetails.color_${normalized}`;
+    const translated = t(translationKey);
+    if (translated === translationKey) {
+      return colorVal.charAt(0).toUpperCase() + colorVal.slice(1);
+    }
+    return translated;
+  };
+
+  const getFormattedGender = (genderVal) => {
+    if (!genderVal) return t('animalDetails.female');
+    const normalized = genderVal.trim().toLowerCase();
+    return t(`animalDetails.${normalized}`, { defaultValue: genderVal });
+  };
+
+  // Compilation of detailed specifications layout list (9-item specifications grid)
+  const detailsItems = [
+    { label: t('buy.breedLabel', { defaultValue: 'Breed' }), value: animal.breed || 'Unknown', icon: 'cow' },
+    { label: t('buy.ageLabel', { defaultValue: 'Age' }), value: getFormattedAge(animal.age), icon: 'calendar-clock' },
+    { label: t('buy.milkLabel', { defaultValue: 'Milk Yield' }), value: getFormattedMilkYield(animal.milkYield), icon: 'water' },
+    { label: t('buy.weightLabel', { defaultValue: 'Weight' }), value: getFormattedWeight(animal.weight), icon: 'scale' },
+    { label: t('animalDetails.gender', { defaultValue: 'Gender' }), value: getFormattedGender(animal.gender), icon: 'gender-male-female' },
+    { label: t('animalDetails.color', { defaultValue: 'Color' }), value: getFormattedColor(animal.color), icon: 'palette' },
+    { label: t('buy.pregnantLabel', { defaultValue: 'Pregnancy' }), value: animal.pregnant ? t('animalDetails.yes') : t('animalDetails.no'), icon: 'baby-carriage' },
+    { label: t('buy.vaccinatedLabel', { defaultValue: 'Vaccinated' }), value: animal.health?.vaccinated || animal.vaccination === 'yes' ? t('animalDetails.yes') : t('animalDetails.no'), icon: 'needle' },
+    { label: t('buy.healthLabel', { defaultValue: 'Health Status' }), value: animal.health?.healthy || animal.health === 'yes' || !animal.health?.sick ? t('animalDetails.healthy') : t('animalDetails.treatment', { defaultValue: 'Treatment' }), icon: 'heart-pulse' },
+  ];
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.centerAlign]}>
+        <ActivityIndicator size="large" color="#16A34A" />
+        <AppText style={styles.loadingText}>
+          {t('animalDetails.loading')}
+        </AppText>
+      </View>
+    );
+  }
+
+  if (error || !animal) {
+    return (
+      <View style={[styles.container, styles.errorContainer]}>
+        <MaterialCommunityIcons name="alert-circle-outline" size={56} color="#94A3B8" />
+        <AppText style={styles.errorTitleText}>
+          {error || t('animalDetails.notFound')}
+        </AppText>
+        <AppText style={styles.errorSubText}>
+          {t('animalDetails.unavailable')}
+        </AppText>
+        <TouchableOpacity
+          style={styles.errorBtn}
+          onPress={() => navigation.goBack()}
+          activeOpacity={0.8}
+        >
+          <AppText style={styles.errorBtnText}>{t('animalDetails.goBack')}</AppText>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
       {/* Absolute Transparent Header Overlay */}
       <View style={styles.absoluteHeader}>
-        <TouchableOpacity style={styles.headerCircleButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={20} color="#0F172A" />
+        <TouchableOpacity style={styles.headerCircleButton} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+          <Ionicons name="arrow-back" size={22} color="#0F172A" />
         </TouchableOpacity>
 
         <View style={styles.headerRightButtons}>
-          <TouchableOpacity style={styles.headerCircleButton} onPress={handleShare}>
+          <TouchableOpacity style={styles.headerCircleButton} onPress={handleShare} activeOpacity={0.7}>
             <Ionicons name="share-social-outline" size={20} color="#0F172A" />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.headerCircleButton, styles.headerBtnMargin]} 
+            onPress={handleLikeToggle}
+            activeOpacity={0.7}
+            disabled={isLiking}
+          >
+            <Ionicons 
+              name={isWishlisted ? "heart" : "heart-outline"} 
+              size={22} 
+              color={isWishlisted ? "#EF4444" : "#0F172A"} 
+            />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.headerCircleButton, styles.headerBtnMargin]} 
+            onPress={handleReport}
+            activeOpacity={0.7}
+          >
+            <Ionicons 
+              name={isReported ? "flag" : "flag-outline"} 
+              size={20} 
+              color={isReported ? "#EF4444" : "#0F172A"} 
+            />
           </TouchableOpacity>
         </View>
       </View>
@@ -154,198 +939,325 @@ export default function AnimalDetailsScreen({ route, navigation }) {
             scrollEventThrottle={16}
             ref={scrollRef}
           >
-            {/* Images */}
-            {(animal.photos && animal.photos.length > 0 ? animal.photos : MOCK_IMAGES).map((imgUri, index) => (
-              <Image key={index} source={{ uri: resolveMediaUrl(imgUri) }} style={styles.galleryImage} resizeMode="cover" />
-            ))}
+            {mediaSlides.map((slide, index) => {
+              if (slide.type === 'image') {
+                return (
+                  <View key={index} style={styles.galleryImageWrap}>
+                    <ImageWithLoader
+                      uri={slide.uri}
+                      style={styles.galleryImage}
+                      resizeMode="contain"
+                      onPress={() => handleOpenZoom(index, slide.uri)}
+                    />
+                    <TouchableOpacity
+                      style={styles.zoomIndicatorOverlay}
+                      activeOpacity={0.8}
+                      onPress={() => handleOpenZoom(index, slide.uri)}
+                    >
+                      <Ionicons name="scan" size={16} color="#FFFFFF" />
+                    </TouchableOpacity>
+                  </View>
+                );
+              }
 
-            {/* Video Thumbnail Slide */}
-            <View style={styles.videoSlide}>
-              <Image source={{ uri: animal.photos && animal.photos.length > 0 ? resolveMediaUrl(animal.photos[0]) : MOCK_IMAGES[0] }} style={styles.galleryImage} blurRadius={3} resizeMode="cover" />
-              <View style={styles.videoOverlay}>
-                <TouchableOpacity style={styles.playButtonCircle} onPress={() => setIsVideoPlaying(true)}>
-                  <Ionicons name="play" size={28} color="#FFFFFF" style={styles.playIconOffset} />
-                </TouchableOpacity>
-                <Text style={styles.videoSlideLabel}>Tap to Watch Video</Text>
-              </View>
-            </View>
+              if (slide.type === 'video') {
+                const firstImage = mediaSlides.find(s => s.type === 'image')?.uri;
+                
+                const handlePlay = () => {
+                  if (player) {
+                    player.replace(slide.uri);
+                  }
+                  setIsVideoPlaying(true);
+                };
+                
+                return (
+                  <View key={index} style={styles.videoSlide}>
+                    <ImageWithLoader
+                      uri={slide.thumbnail || firstImage || resolveMediaUrl(null)}
+                      style={styles.galleryImage}
+                      resizeMode="contain"
+                      onPress={(e) => {
+                        console.log('[VideoPlayer] Play button/thumbnail tapped');
+                        handlePlay();
+                      }}
+                    />
+                    <View style={[styles.playButtonAbsoluteContainer, { pointerEvents: 'none' }]}>
+                      <View style={styles.playButtonCircle}>
+                        <Ionicons name="play" size={36} color="#FFFFFF" style={styles.playIconOffset} />
+                      </View>
+                      <AppText style={[styles.videoSlideLabel, { marginTop: 12 }]}>
+                        {t('animalDetails.watchVideo')}
+                      </AppText>
+                    </View>
+                  </View>
+                );
+              }
+
+              // Placeholder
+              return (
+                <View key={index} style={styles.placeholderSlide}>
+                  <MaterialCommunityIcons name="image-outline" size={64} color="#94A3B8" />
+                  <AppText style={styles.placeholderText}>
+                    {t('animalDetails.noPhotos', { defaultValue: 'No media available' })}
+                  </AppText>
+                </View>
+              );
+            })}
           </ScrollView>
 
-          {/* Pagination Indicators */}
-          <View style={styles.paginationContainer}>
-            {[...Array((animal.photos && animal.photos.length > 0 ? animal.photos.length : MOCK_IMAGES.length) + 1)].map((_, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.paginationDot,
-                  activeSlide === index ? styles.activeDot : styles.inactiveDot
-                ]}
-              />
-            ))}
-          </View>
+          {mediaSlides.length > 1 && (
+            <View style={styles.paginationContainer}>
+              {mediaSlides.map((_, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.paginationDot,
+                    activeSlide === index ? styles.activeDot : styles.inactiveDot
+                  ]}
+                />
+              ))}
+            </View>
+          )}
+
         </View>
 
         {/* Content Body */}
         <View style={styles.detailsBody}>
-          {/* Title and Price Info */}
+          
+          {/* 1. Header Information card */}
           <View style={styles.infoCard}>
             <View style={styles.titleRow}>
-              <Text style={styles.animalName}>{animal.name}</Text>
+              <AppText style={styles.animalName} numberOfLines={2}>{animal.name}</AppText>
               {animal.isVerified && (
                 <View style={styles.verifiedTextBadge}>
                   <MaterialCommunityIcons name="check-decagram" size={13} color="#FFFFFF" style={styles.verifiedIconMargin} />
-                  <Text style={styles.verifiedTextBadgeLabel}>Verified</Text>
+                  <AppText style={styles.verifiedTextBadgeLabel}>
+                    {t('common.verified', { defaultValue: 'Verified' })}
+                  </AppText>
                 </View>
               )}
             </View>
-            <Text style={styles.animalBreed}>{animal.breed}</Text>
-            <Text style={styles.animalPrice}>{animal.price}</Text>
+            
+            <AppText style={styles.animalBreed}>{animal.breed} • {getFormattedAge(animal.age)}</AppText>
+            
+            {/* Price dominating display */}
+            <AppText style={styles.animalPrice}>{animal.price}</AppText>
+
+            {/* AI Estimation Prominent Card inside Details */}
+            <View style={styles.aiEstimationDetailsBox}>
+              <View style={styles.aiDetailsHeader}>
+                <View style={styles.aiTitleWrap}>
+                  <MaterialCommunityIcons name="robot" size={16} color="#15803D" />
+                  <AppText style={styles.aiTitleText}>
+                    {t('buy.aiEstimatedValue', { defaultValue: 'AI Estimated Market Value' })}
+                  </AppText>
+                </View>
+                <AppText style={styles.aiDetailsValue}>₹{aiEstPrice.toLocaleString()}</AppText>
+              </View>
+              {isGoodDeal && (
+                <View style={styles.aiDetailsDealFooter}>
+                  <View style={styles.dealBadge}>
+                    <AppText style={styles.dealBadgeLabel}>{t('buy.goodDeal', { defaultValue: 'GOOD DEAL' })}</AppText>
+                  </View>
+                  <AppText style={styles.aiDetailsSavingsText}>
+                    {t('buy.aiSavingsText', { price: priceDiff.toLocaleString(), defaultValue: `Price is ₹${priceDiff.toLocaleString()} lower than estimated market value` })}
+                  </AppText>
+                </View>
+              )}
+            </View>
+
             <View style={styles.postedBadge}>
-              <Ionicons name="time-outline" size={12} color="#64748B" />
-              <Text style={styles.postedText}>Listed 5 hours ago</Text>
+              <Ionicons name="time-outline" size={14} color="#64748B" />
+              <AppText style={styles.postedText}>{t('animalDetails.listedAgo', { defaultValue: 'Listed recently' })}</AppText>
             </View>
           </View>
 
-          {/* Key Specifications Grid */}
-          <Text style={styles.sectionTitle}>Specifications</Text>
+          {/* 2. Key Specifications Grid (9 specifications) */}
+          <AppText style={styles.sectionTitle}>{t('animalDetails.specifications')}</AppText>
           <View style={styles.specsGrid}>
-            <View style={styles.specItem}>
-              <MaterialCommunityIcons name="calendar-range" size={18} color="#16A34A" />
-              <Text style={styles.specLabel}>Age</Text>
-              <Text style={styles.specValue}>{animal.age}</Text>
-            </View>
-            <View style={styles.specItem}>
-              <MaterialCommunityIcons name="gender-male-female" size={18} color="#16A34A" />
-              <Text style={styles.specLabel}>Gender</Text>
-              <Text style={styles.specValue}>{animal.gender || 'Female'}</Text>
-            </View>
-            <View style={styles.specItem}>
-              <MaterialCommunityIcons name="weight-kilogram" size={18} color="#16A34A" />
-              <Text style={styles.specLabel}>Weight</Text>
-              <Text style={styles.specValue}>{animal.weight ? `${animal.weight} kg` : 'N/A'}</Text>
-            </View>
-            <View style={styles.specItem}>
-              <MaterialCommunityIcons name="palette" size={18} color="#16A34A" />
-              <Text style={styles.specLabel}>Color</Text>
-              <Text style={styles.specValue}>{animal.color || 'N/A'}</Text>
-            </View>
-            <View style={styles.specItem}>
-              <MaterialCommunityIcons name="heart-pulse" size={18} color="#16A34A" />
-              <Text style={styles.specLabel}>Health</Text>
-              <Text style={styles.specValue}>{animal.health?.healthy ? 'Healthy' : 'N/A'}</Text>
-            </View>
-            <View style={styles.specItem}>
-              <MaterialCommunityIcons name="shield-check" size={18} color="#16A34A" />
-              <Text style={styles.specLabel}>Vaccinated</Text>
-              <Text style={styles.specValue}>{animal.health?.vaccinated ? 'Yes' : 'No'}</Text>
-            </View>
+            {detailsItems.map((spec, idx) => (
+              <View key={idx} style={styles.specItem}>
+                <View style={styles.specIconCircle}>
+                  <MaterialCommunityIcons name={spec.icon} size={20} color="#16A34A" />
+                </View>
+                <View style={styles.specContentWrap}>
+                  <AppText style={styles.specLabel}>{spec.label}</AppText>
+                  <AppText style={styles.specValue}>{spec.value}</AppText>
+                </View>
+              </View>
+            ))}
           </View>
 
-          {/* Description Section */}
+          {/* 3. Description Section */}
           <View style={styles.infoCard}>
-            <Text style={styles.cardSectionTitle}>Description</Text>
-            <Text style={styles.descriptionText} numberOfLines={descriptionExpanded ? undefined : 3}>
-              {animal.description || 'No description available for this livestock listing.'}
-            </Text>
-            <TouchableOpacity onPress={() => setDescriptionExpanded(!descriptionExpanded)}>
-              <Text style={styles.readMoreText}>
-                {descriptionExpanded ? 'Read Less' : 'Read More'}
-              </Text>
+            <AppText style={styles.cardSectionTitle}>{t('animalDetails.description')}</AppText>
+            <AppText style={styles.descriptionText} numberOfLines={descriptionExpanded ? undefined : 3}>
+              {animal.description || t('animalDetails.noDescription')}
+            </AppText>
+            <TouchableOpacity onPress={() => setDescriptionExpanded(!descriptionExpanded)} activeOpacity={0.7}>
+              <AppText style={styles.readMoreText}>
+                {descriptionExpanded ? t('animalDetails.readLess') : t('animalDetails.readMore')}
+              </AppText>
             </TouchableOpacity>
           </View>
 
-          {/* Seller Information */}
-          <Text style={styles.sectionTitle}>Seller Information</Text>
+          {/* 4. Seller Information */}
+          <AppText style={styles.sectionTitle}>{t('animalDetails.sellerInfo')}</AppText>
           <View style={styles.sellerCard}>
             <View style={styles.sellerMainInfo}>
               <View style={styles.avatarContainer}>
-                <Image
-                  source={{ uri: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80' }}
-                  style={styles.sellerAvatar}
-                />
-                <MaterialCommunityIcons name="check-decagram" size={16} color="#3B82F6" style={styles.sellerVerifyBadge} />
+                {animal.sellerId?.profilePhoto ? (
+                  <Image
+                    source={{ uri: resolveMediaUrl(animal.sellerId.profilePhoto) }}
+                    style={styles.sellerAvatar}
+                  />
+                ) : (
+                  <View style={[styles.sellerAvatar, styles.sellerPlaceholderAvatar]}>
+                    <Ionicons name="person" size={26} color="#94A3B8" />
+                  </View>
+                )}
+                {animal.isVerified && (
+                  <MaterialCommunityIcons name="check-decagram" size={16} color="#3B82F6" style={styles.sellerVerifyBadge} />
+                )}
               </View>
 
               <View style={styles.sellerMeta}>
-                <Text style={styles.sellerName}>Ramesh Patil</Text>
-                <Text style={styles.sellerSubtext}>Joined Dec 2024</Text>
+                <AppText style={styles.sellerName}>{animal.sellerId?.name || animal.sellerName || 'Seller'}</AppText>
+                <AppText style={styles.sellerRepliesText}>
+                  {t('buy.repliesWithin', { defaultValue: 'Usually replies within 15 minutes' })}
+                </AppText>
                 <View style={styles.ratingStarsRow}>
-                  <Ionicons name="star" size={12} color="#F59E0B" />
-                  <Text style={styles.ratingLabel}>4.8 (18 ratings)</Text>
+                  <Ionicons name="star" size={13} color="#F59E0B" />
+                  <AppText style={styles.ratingLabel}>4.8 • {t('animalDetails.verifiedSeller')}</AppText>
                 </View>
               </View>
             </View>
 
-            {/* Quick Action Contact Buttons */}
-            <View style={styles.sellerActionsRow}>
-              <TouchableOpacity style={[styles.sellerActionBtn, styles.callBtn]}>
-                <Ionicons name="call" size={16} color="#FFFFFF" />
-                <Text style={styles.sellerActionTextWhite}>Call</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={[styles.sellerActionBtn, styles.whatsappBtn]}>
-                <Ionicons name="logo-whatsapp" size={16} color="#FFFFFF" />
-                <Text style={styles.sellerActionTextWhite}>WhatsApp</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={[styles.sellerActionBtn, styles.chatBtn]}>
-                <Ionicons name="chatbubble-ellipses" size={16} color="#16A34A" />
-                <Text style={styles.sellerActionTextGreen}>Chat</Text>
-              </TouchableOpacity>
+            {/* Seller Statistics Grid */}
+            <View style={styles.sellerStatsRow}>
+              <View style={styles.statBox}>
+                <AppText style={styles.statVal}>96%</AppText>
+                <AppText style={styles.statLabel}>{t('buy.responseRate')}</AppText>
+              </View>
+              <View style={styles.dividerVertical} />
+              <View style={styles.statBox}>
+                <AppText style={styles.statVal}>{animal.sellerId?.views ? Math.round(animal.sellerId.views / 20) + 1 : 8}</AppText>
+                <AppText style={styles.statLabel}>{t('buy.animalsSold')}</AppText>
+              </View>
+              <View style={styles.dividerVertical} />
+              <View style={styles.statBox}>
+                <AppText style={styles.statVal}>2024</AppText>
+                <AppText style={styles.statLabel}>{t('buy.memberSince')}</AppText>
+              </View>
             </View>
           </View>
 
-          {/* Location details */}
-          <Text style={styles.sectionTitle}>Location</Text>
+          {/* 5. Location Details & Map Selector */}
+          <AppText style={styles.sectionTitle}>{t('animalDetails.location')}</AppText>
           <View style={styles.infoCard}>
             <View style={styles.locationHeaderRow}>
-              <Ionicons name="location" size={20} color="#16A34A" />
+              <View style={styles.locationIconWrap}>
+                <Ionicons name="location" size={20} color="#16A34A" />
+              </View>
               <View style={styles.locationMeta}>
-                <Text style={styles.locationPrimary}>{animal.location}</Text>
-                <Text style={styles.locationSecondary}>Taluka: Baramati, District: Pune, State: Maharashtra</Text>
+                <AppText style={styles.locationPrimary}>
+                  📍 {animal.formattedAddress || animal.location || t('animalDetails.locationUnavailable')}
+                </AppText>
+                <AppText style={styles.locationSecondary}>
+                  {[
+                    animal.village && `${t('profile.village')}: ${animal.village}`,
+                    animal.taluka && `${t('profile.taluka')}: ${animal.taluka}`,
+                    animal.district && `${t('profile.district')}: ${animal.district}`,
+                    animal.state && `${t('profile.state')}: ${animal.state}`
+                  ].filter(Boolean).join(' | ') || t('animalDetails.locationUnavailable')}
+                </AppText>
               </View>
             </View>
 
-            <TouchableOpacity style={styles.mapButton} onPress={handleOpenMaps}>
-              <Ionicons name="map-outline" size={16} color="#16A34A" />
-              <Text style={styles.mapButtonText}>Open in Google Maps</Text>
+            <TouchableOpacity style={styles.mapButton} onPress={handleOpenMaps} activeOpacity={0.8}>
+              <Ionicons name="map-outline" size={18} color="#16A34A" />
+              <AppText style={styles.mapButtonText}>{t('animalDetails.openMaps')}</AppText>
             </TouchableOpacity>
           </View>
 
-          {/* Similar Listing Section */}
-          <View style={styles.similarSection}>
-            <SectionHeader title="Similar Animals" onActionPress={() => {}} />
-            <FlatList
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              data={similarAnimals}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={styles.similarList}
-              renderItem={({ item }) => (
-                <ListingCard
-                  item={item}
-                  onViewDetailsPress={() => {
-                    // Navigate to details screen recursively with new item
-                    navigation.push('AnimalDetails', { animal: item });
-                  }}
-                  style={styles.similarCardOverride}
-                />
-              )}
-            />
-          </View>
+          {/* 6. Similar Listings Carousel Section */}
+          {similarAnimals.length > 0 && (
+            <View style={styles.similarSection}>
+              <SectionHeader title={t('animalDetails.similarAnimals')} onActionPress={() => {}} />
+              <View style={styles.similarVerticalList}>
+                {similarAnimals.map((item) => (
+                  <ListingCard
+                    key={item.id}
+                    item={item}
+                    onViewDetailsPress={() => {
+                      navigation.push('AnimalDetails', { animal: item });
+                    }}
+                    style={styles.similarCardVerticalOverride}
+                  />
+                ))}
+              </View>
+            </View>
+          )}
         </View>
       </ScrollView>
 
       {/* Sticky Bottom Actions Bar */}
+      {/* Guest / logged-out: buttons are visually muted and show a login dialog on tap */}
+      {/* Authenticated: existing handleCall / handleWhatsApp logic is unchanged */}
       <View style={styles.stickyBottomBar}>
-        <TouchableOpacity style={styles.stickyPrimaryBtn}>
-          <Ionicons name="chatbubble-ellipses" size={18} color="#FFFFFF" style={styles.primaryBtnIcon} />
-          <Text style={styles.stickyPrimaryBtnText}>Contact Seller</Text>
+        <TouchableOpacity
+          style={[styles.stickyCallBtn, isRestrictedUser && styles.guestDisabledBtn]}
+          activeOpacity={isRestrictedUser ? 1 : 0.8}
+          onPress={() => {
+            if (isRestrictedUser) {
+              Alert.alert(
+                'लॉगिन आवश्यक',
+                'विक्रेत्याशी संपर्क करण्यासाठी कृपया प्रथम लॉगिन करा.',
+                [
+                  { text: 'रद्द करा', style: 'cancel' },
+                  { text: 'लॉगिन करा', onPress: () => navigation.navigate('Auth') }
+                ]
+              );
+              return;
+            }
+            handleCall();
+          }}
+        >
+          {isRestrictedUser && (
+            <Ionicons name="lock-closed" size={14} color="rgba(255,255,255,0.85)" style={{ marginRight: 5 }} />
+          )}
+          <Ionicons name="call" size={20} color="#FFFFFF" style={styles.primaryBtnIcon} />
+          <AppText style={styles.stickyPrimaryBtnText}>{t('buy.callSeller')}</AppText>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.stickyWhatsappBtn, isRestrictedUser && styles.guestDisabledBtn]}
+          activeOpacity={isRestrictedUser ? 1 : 0.8}
+          onPress={() => {
+            if (isRestrictedUser) {
+              Alert.alert(
+                'लॉगिन आवश्यक',
+                'विक्रेत्याशी संपर्क करण्यासाठी कृपया प्रथम लॉगिन करा.',
+                [
+                  { text: 'रद्द करा', style: 'cancel' },
+                  { text: 'लॉगिन करा', onPress: () => navigation.navigate('Auth') }
+                ]
+              );
+              return;
+            }
+            handleWhatsApp();
+          }}
+        >
+          {isRestrictedUser && (
+            <Ionicons name="lock-closed" size={14} color="rgba(255,255,255,0.85)" style={{ marginRight: 5 }} />
+          )}
+          <Ionicons name="logo-whatsapp" size={20} color="#FFFFFF" style={styles.primaryBtnIcon} />
+          <AppText style={styles.stickyPrimaryBtnText}>{t('buy.whatsapp')}</AppText>
         </TouchableOpacity>
       </View>
 
-      {/* Full-Screen Video Player Modal Simulation */}
-      <Modal visible={isVideoPlaying} transparent={true} animationType="slide">
+      {/* Full-Screen Video Player Modal */}
+      <Modal visible={isVideoPlaying} transparent={false} animationType="slide" statusBarTranslucent>
         <View style={styles.videoPlayerContainer}>
           <SafeAreaView style={styles.videoSafeArea}>
             <TouchableOpacity style={styles.closeVideoBtn} onPress={() => setIsVideoPlaying(false)}>
@@ -353,14 +1265,233 @@ export default function AnimalDetailsScreen({ route, navigation }) {
             </TouchableOpacity>
           </SafeAreaView>
 
-          {/* Simulated Fullscreen Video Content */}
-          <View style={styles.simulatedVideoBox}>
-            <MaterialCommunityIcons name="video-vintage" size={80} color="rgba(255,255,255,0.4)" />
-            <Text style={styles.videoPlayerText}>Simulated Video Playback Stream</Text>
-            <View style={styles.videoControlsRow}>
-              <Ionicons name="play-back-sharp" size={24} color="#FFFFFF" />
-              <Ionicons name="pause" size={32} color="#FFFFFF" style={styles.controlMargin} />
-              <Ionicons name="play-forward-sharp" size={24} color="#FFFFFF" />
+          {videoUri ? (
+            <View style={styles.fullscreenVideoContainer}>
+              <VideoView
+                player={player}
+                style={styles.fullscreenVideo}
+                resizeMode="contain"
+                controls={isPlayerPlaying}
+              />
+              {!isPlayerPlaying && (
+                <TouchableOpacity 
+                  style={styles.videoOverlayPlayContainer}
+                  activeOpacity={0.85}
+                  onPress={() => {
+                    if (player) {
+                      player.play();
+                    }
+                  }}
+                >
+                  <View style={styles.centerPlayButtonCircle}>
+                    <Ionicons name="play" size={40} color="#FFFFFF" style={{ marginLeft: 6 }} />
+                  </View>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : (
+            <View style={styles.noVideoBox}>
+              <MaterialCommunityIcons name="video-off-outline" size={64} color="rgba(255,255,255,0.5)" />
+              <AppText style={styles.noVideoText}>{t('animalDetails.noVideo')}</AppText>
+            </View>
+          )}
+        </View>
+      </Modal>
+
+      {/* Full-Screen Interactive Image & Gallery Viewer Modal */}
+      <Modal
+        visible={isZoomVisible}
+        transparent={false}
+        animationType="fade"
+        onRequestClose={handleCloseZoom}
+        statusBarTranslucent
+      >
+        <SafeAreaView style={styles.fullScreenGalleryContainer}>
+          {/* Header Bar */}
+          <View style={styles.fullScreenGalleryHeader}>
+            <TouchableOpacity
+              style={styles.fullScreenCloseBtn}
+              onPress={handleCloseZoom}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="close" size={26} color="#FFFFFF" />
+            </TouchableOpacity>
+
+            <View style={styles.fullScreenTitleWrap}>
+              <AppText style={styles.fullScreenTitle} numberOfLines={1}>
+                {animal?.name || animal?.breed || 'Animal Gallery'}
+              </AppText>
+              <AppText style={styles.fullScreenSubtitle}>
+                {t('animalDetails.doubleTapZoom', { defaultValue: 'Double-tap or pinch to zoom' })}
+              </AppText>
+            </View>
+
+            {/* Slide Count Counter Badge */}
+            {mediaSlides.length > 0 && (
+              <View style={styles.fullScreenPageBadge}>
+                <AppText style={styles.fullScreenPageText}>
+                  {zoomImageIndex + 1} / {mediaSlides.length}
+                </AppText>
+              </View>
+            )}
+          </View>
+
+          {/* Swipeable Horizontal Gallery List */}
+          <FlatList
+            data={mediaSlides}
+            horizontal
+            pagingEnabled
+            initialScrollIndex={zoomImageIndex >= 0 && zoomImageIndex < mediaSlides.length ? zoomImageIndex : 0}
+            getItemLayout={(_, index) => ({ length: width, offset: width * index, index })}
+            keyExtractor={(_, index) => `fullscreen-slide-${index}`}
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={(e) => {
+              const newIdx = Math.round(e.nativeEvent.contentOffset.x / width);
+              if (newIdx !== zoomImageIndex && newIdx >= 0 && newIdx < mediaSlides.length) {
+                setZoomImageIndex(newIdx);
+                setActiveSlide(newIdx);
+                if (scrollRef.current) {
+                  scrollRef.current.scrollTo({ x: newIdx * width, animated: true });
+                }
+              }
+            }}
+            renderItem={({ item, index }) => {
+              if (item.type === 'image') {
+                return (
+                  <ZoomableImage
+                    uri={item.uri}
+                    isActive={zoomImageIndex === index}
+                  />
+                );
+              }
+
+              if (item.type === 'video') {
+                return (
+                  <View style={styles.fullScreenVideoSlide}>
+                    <Image
+                      source={{ uri: item.thumbnail || resolveMediaUrl(null) }}
+                      style={styles.fullScreenImage}
+                      resizeMode="contain"
+                    />
+                    <TouchableOpacity
+                      style={styles.fullScreenPlayOverlay}
+                      activeOpacity={0.8}
+                      onPress={() => {
+                        setIsZoomVisible(false);
+                        if (player) {
+                          player.replace(item.uri);
+                        }
+                        setIsVideoPlaying(true);
+                      }}
+                    >
+                      <View style={styles.playButtonCircle}>
+                        <Ionicons name="play" size={40} color="#FFFFFF" style={{ marginLeft: 4 }} />
+                      </View>
+                      <AppText style={[styles.videoSlideLabel, { marginTop: 12 }]}>
+                        {t('animalDetails.watchVideo')}
+                      </AppText>
+                    </TouchableOpacity>
+                  </View>
+                );
+              }
+
+              return (
+                <View style={styles.fullScreenPlaceholderSlide}>
+                  <MaterialCommunityIcons name="image-outline" size={72} color="#64748B" />
+                  <AppText style={styles.placeholderText}>
+                    {t('animalDetails.noPhotos', { defaultValue: 'No media available' })}
+                  </AppText>
+                </View>
+              );
+            }}
+          />
+
+          {/* Pagination dots overlay in full screen modal */}
+          {mediaSlides.length > 1 && (
+            <View style={styles.fullScreenPagination}>
+              {mediaSlides.map((_, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.fullScreenDot,
+                    zoomImageIndex === index ? styles.fullScreenActiveDot : styles.fullScreenInactiveDot
+                  ]}
+                />
+              ))}
+            </View>
+          )}
+        </SafeAreaView>
+      </Modal>
+
+      {/* Complaint Modal */}
+      <Modal
+        visible={isComplaintModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {
+          if (!isSubmittingComplaint) setIsComplaintModalVisible(false);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <AppText style={styles.modalTitle}>Report Listing</AppText>
+              <TouchableOpacity 
+                onPress={() => {
+                  setIsComplaintModalVisible(false);
+                }}
+                disabled={isSubmittingComplaint}
+                style={styles.closeModalButton}
+              >
+                <Ionicons name="close" size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+            
+            <AppText style={styles.modalSubtitle}>
+              Please describe the issue with this listing.
+            </AppText>
+            
+            <TextInput
+              style={styles.complaintInput}
+              multiline
+              numberOfLines={6}
+              placeholder="तुमची तक्रार लिहा... / Describe your complaint..."
+              placeholderTextColor="#94A3B8"
+              value={complaintText}
+              onChangeText={setComplaintText}
+              maxLength={500}
+              editable={!isSubmittingComplaint}
+              textAlignVertical="top"
+            />
+            <AppText style={styles.charCount}>
+              {complaintText.length}/500
+            </AppText>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity 
+                style={styles.cancelBtn} 
+                onPress={() => {
+                  setIsComplaintModalVisible(false);
+                }}
+                disabled={isSubmittingComplaint}
+              >
+                <AppText style={styles.cancelBtnText}>Cancel</AppText>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[
+                  styles.submitBtn,
+                  (complaintText.trim().length < 10 || isSubmittingComplaint) && styles.submitBtnDisabled
+                ]} 
+                onPress={submitComplaint}
+                disabled={complaintText.trim().length < 10 || isSubmittingComplaint}
+              >
+                {isSubmittingComplaint ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <AppText style={styles.submitBtnText}>Submit Complaint</AppText>
+                )}
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -372,11 +1503,51 @@ export default function AnimalDetailsScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFFFF',
+  },
+  centerAlign: {
+    justifyContent: 'center', 
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12, 
+    color: '#64748B', 
+    fontSize: 15, 
+    fontWeight: '700',
+  },
+  errorContainer: {
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    padding: 32,
+  },
+  errorTitleText: {
+    marginTop: 16, 
+    color: '#0F172A', 
+    fontSize: 18, 
+    fontWeight: '800', 
+    textAlign: 'center',
+  },
+  errorSubText: {
+    marginTop: 8, 
+    color: '#64748B', 
+    fontSize: 14, 
+    textAlign: 'center',
+  },
+  errorBtn: {
+    marginTop: 24, 
+    paddingHorizontal: 28, 
+    paddingVertical: 12, 
+    backgroundColor: '#16A34A', 
+    borderRadius: 16,
+  },
+  errorBtnText: {
+    color: '#FFFFFF', 
+    fontWeight: '900', 
+    fontSize: 15,
   },
   absoluteHeader: {
     position: 'absolute',
-    top: 48,
+    top: Platform.OS === 'ios' ? 52 : 36,
     left: 16,
     right: 16,
     zIndex: 10,
@@ -385,70 +1556,138 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   headerCircleButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#FFFFFF',
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.12,
     shadowRadius: 8,
-    elevation: 3,
+    elevation: 4,
   },
   headerRightButtons: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  favBtnMargin: {
+  headerBtnMargin: {
     marginLeft: 10,
   },
   scrollContent: {
-    paddingBottom: 100,
+    paddingBottom: 120,
   },
   galleryContainer: {
+    width: '100%',
+    height: GALLERY_HEIGHT,
+    position: 'relative',
+    // Dark background: letterbox bars are barely noticeable and look premium (OLX / Cars24 style)
+    backgroundColor: '#0F172A',
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    overflow: 'hidden',
+  },
+  galleryImageWrap: {
     width: width,
     height: GALLERY_HEIGHT,
     position: 'relative',
-    backgroundColor: '#F1F5F9',
+    overflow: 'hidden',
+    backgroundColor: '#0F172A',
   },
   galleryImage: {
     width: width,
     height: GALLERY_HEIGHT,
+    overflow: 'hidden',
+    backgroundColor: '#0F172A',
+  },
+  skeletonContainer: {
+    backgroundColor: '#1E293B',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  skeletonIconWrap: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loaderCenter: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(241, 245, 249, 0.4)',
+  },
+  placeholderSlide: {
+    width: width,
+    height: GALLERY_HEIGHT,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+  },
+  placeholderText: {
+    marginTop: 12,
+    color: '#94A3B8',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  zoomIndicatorOverlay: {
+    position: 'absolute',
+    bottom: 16,
+    left: 16,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   videoSlide: {
     width: width,
     height: GALLERY_HEIGHT,
     position: 'relative',
+    overflow: 'hidden',
   },
   videoOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingBottom: 24,
+  },
+  playButtonAbsoluteContainer: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(15, 23, 42, 0.4)',
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 5,
   },
   playButtonCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
     backgroundColor: 'rgba(22, 163, 74, 0.95)',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#16A34A',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 6,
-    marginBottom: 8,
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 8,
   },
   playIconOffset: {
     marginLeft: 4,
   },
   videoSlideLabel: {
     color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: -1, height: 1 },
+    textShadowRadius: 8,
   },
   paginationContainer: {
     position: 'absolute',
@@ -465,28 +1704,28 @@ const styles = StyleSheet.create({
     marginHorizontal: 3,
   },
   activeDot: {
-    width: 16,
+    width: 18,
     backgroundColor: '#16A34A',
   },
   inactiveDot: {
     width: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+    backgroundColor: 'rgba(255, 255, 255, 0.65)',
   },
   detailsBody: {
-    padding: 16,
+    padding: 14,
   },
   infoCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderColor: '#E2E8F0',
     padding: 16,
-    marginBottom: 16,
+    marginBottom: 14,
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.02,
-    shadowRadius: 8,
-    elevation: 1,
+    shadowOpacity: 0.03,
+    shadowRadius: 10,
+    elevation: 2,
   },
   titleRow: {
     flexDirection: 'row',
@@ -494,61 +1733,108 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   animalName: {
-    fontSize: 20,
-    fontWeight: '800',
+    fontSize: 22,
+    fontWeight: '900',
     color: '#0F172A',
     flex: 1,
     marginRight: 8,
   },
   verifiedTextBadge: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#16A34A',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 6,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 8,
   },
   verifiedIconMargin: {
-    marginRight: 3,
+    marginRight: 4,
   },
   verifiedTextBadgeLabel: {
-    fontSize: 10,
-    fontWeight: '700',
+    fontSize: 10.5,
+    fontWeight: '900',
     color: '#FFFFFF',
   },
   animalBreed: {
-    fontSize: 14,
-    color: '#64748B',
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#475569',
     marginTop: 4,
   },
   animalPrice: {
-    fontSize: 22,
-    fontWeight: '800',
+    fontSize: 26,
+    fontWeight: '950',
     color: '#16A34A',
     marginTop: 8,
+  },
+  aiEstimationDetailsBox: {
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1.5,
+    borderColor: '#DCFCE7',
+    borderRadius: 16,
+    padding: 12,
+    marginTop: 12,
+  },
+  aiDetailsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  aiDetailsValue: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#15803D',
+  },
+  aiDetailsDealFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#DCFCE7',
+    paddingTop: 8,
+    marginTop: 8,
+  },
+  dealBadge: {
+    backgroundColor: '#22C55E',
+    borderRadius: 6,
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+  },
+  dealBadgeLabel: {
+    fontSize: 8.5,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
+  aiDetailsSavingsText: {
+    fontSize: 11.5,
+    fontWeight: '750',
+    color: '#15803D',
+    flex: 1,
   },
   postedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: 12,
   },
   postedText: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#64748B',
+    fontWeight: '700',
     marginLeft: 4,
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '900',
     color: '#0F172A',
     marginLeft: 4,
-    marginBottom: 12,
+    marginBottom: 10,
     marginTop: 8,
   },
   specsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+    gap: 8,
     marginBottom: 8,
   },
   specItem: {
@@ -556,56 +1842,71 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
-    padding: 14,
+    borderColor: '#E2E8F0',
+    padding: 10,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
+    gap: 8,
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.02,
     shadowRadius: 6,
     elevation: 1,
   },
+  specIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#ECFDF5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  specContentWrap: {
+    flex: 1,
+  },
   specLabel: {
-    fontSize: 11,
+    fontSize: 9.5,
+    fontWeight: '800',
     color: '#64748B',
-    marginTop: 6,
+    textTransform: 'uppercase',
   },
   specValue: {
     fontSize: 13,
-    fontWeight: '700',
-    color: '#0F172A',
-    marginTop: 2,
+    fontWeight: '850',
+    color: '#1E293B',
+    marginTop: 1,
   },
   cardSectionTitle: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '855',
     color: '#0F172A',
     marginBottom: 8,
   },
   descriptionText: {
-    fontSize: 13,
+    fontSize: 13.5,
     color: '#475569',
-    lineHeight: 18,
+    lineHeight: 20,
+    fontWeight: '600',
   },
   readMoreText: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 12.5,
+    fontWeight: '800',
     color: '#16A34A',
     marginTop: 6,
   },
   sellerCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
-    padding: 16,
-    marginBottom: 16,
+    borderColor: '#E2E8F0',
+    padding: 14,
+    marginBottom: 14,
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.02,
+    shadowOpacity: 0.03,
     shadowRadius: 8,
-    elevation: 1,
+    elevation: 2,
   },
   sellerMainInfo: {
     flexDirection: 'row',
@@ -616,10 +1917,14 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   sellerAvatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
     backgroundColor: '#F1F5F9',
+  },
+  sellerPlaceholderAvatar: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   sellerVerifyBadge: {
     position: 'absolute',
@@ -633,111 +1938,93 @@ const styles = StyleSheet.create({
   },
   sellerName: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '850',
     color: '#0F172A',
   },
-  sellerSubtext: {
-    fontSize: 11,
-    color: '#94A3B8',
-    marginTop: 1,
+  sellerRepliesText: {
+    fontSize: 12,
+    color: '#15803D',
+    fontWeight: '800',
+    marginTop: 2,
   },
   ratingStarsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
+    marginTop: 2,
   },
   ratingLabel: {
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 11.5,
+    fontWeight: '700',
     color: '#F59E0B',
     marginLeft: 4,
   },
-  sellerActionsRow: {
+  sellerStatsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 16,
+    marginTop: 14,
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
-    paddingTop: 14,
+    paddingTop: 12,
   },
-  sellerActionBtn: {
-    width: '30%',
-    height: 38,
-    borderRadius: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  callBtn: {
-    backgroundColor: '#16A34A',
-  },
-  whatsappBtn: {
-    backgroundColor: '#25D366',
-  },
-  chatBtn: {
-    backgroundColor: '#DCFCE7',
-    borderWidth: 1,
-    borderColor: '#16A34A',
-  },
-  sellerActionTextWhite: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginLeft: 5,
-  },
-  sellerActionTextGreen: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#16A34A',
-    marginLeft: 5,
+  dividerVertical: {
+    width: 1,
+    height: 20,
+    backgroundColor: '#E2E8F0',
   },
   locationHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
+  },
+  locationIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#ECFDF5',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   locationMeta: {
     flex: 1,
-    marginLeft: 8,
   },
   locationPrimary: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 14.5,
+    fontWeight: '800',
     color: '#0F172A',
   },
   locationSecondary: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#64748B',
+    fontWeight: '600',
     marginTop: 2,
   },
   mapButton: {
     borderWidth: 1.5,
-    borderColor: '#F1F5F9',
-    borderRadius: 12,
-    paddingVertical: 10,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
+    paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
     marginTop: 14,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8FAFC',
   },
   mapButtonText: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '800',
     color: '#16A34A',
     marginLeft: 6,
   },
   similarSection: {
     marginTop: 16,
   },
-  similarList: {
-    paddingHorizontal: 8,
+  similarVerticalList: {
     paddingTop: 8,
   },
-  similarCardOverride: {
-    width: 230,
-    marginHorizontal: 8,
-    marginBottom: 0,
+  similarCardVerticalOverride: {
+    marginHorizontal: 0,
+    marginBottom: 16,
   },
   stickyBottomBar: {
     position: 'absolute',
@@ -752,13 +2039,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingBottom: 28, // Padded for iOS home bar safety
+    gap: 12,
+    paddingBottom: Platform.OS === 'ios' ? 32 : 16,
   },
-  stickyPrimaryBtn: {
+  stickyCallBtn: {
     flex: 1,
-    height: 46,
+    height: 60,
+    backgroundColor: '#0F172A',
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  stickyWhatsappBtn: {
+    flex: 1,
+    height: 60,
     backgroundColor: '#16A34A',
-    borderRadius: 14,
+    borderRadius: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -772,14 +2074,45 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   stickyPrimaryBtnText: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 14.5,
+    fontWeight: '900',
     color: '#FFFFFF',
   },
   videoPlayerContainer: {
     flex: 1,
     backgroundColor: '#000000',
     justifyContent: 'center',
+  },
+  fullscreenVideoContainer: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  videoOverlayPlayContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+  },
+  centerPlayButtonCircle: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    backgroundColor: 'rgba(22, 163, 74, 0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#16A34A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  fullscreenVideo: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
   },
   videoSafeArea: {
     position: 'absolute',
@@ -795,24 +2128,243 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  simulatedVideoBox: {
+  noVideoBox: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    flex: 1,
+    paddingHorizontal: 32,
   },
-  videoPlayerText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
+  noVideoText: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 15,
+    fontWeight: '600',
     marginTop: 16,
     textAlign: 'center',
   },
-  videoControlsRow: {
+  disabledBtn: {
+    opacity: 0.45,
+  },
+  // Applied to Call & WhatsApp buttons for guest/logged-out users: clearly muted, no press animation,
+  // but tap still fires — showing the Marathi login dialog rather than doing nothing.
+  guestDisabledBtn: {
+    opacity: 0.38,
+  },
+  fullScreenGalleryContainer: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
+  fullScreenGalleryHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 32,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'android' ? 40 : 12,
+    paddingBottom: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    zIndex: 10,
   },
-  controlMargin: {
-    marginHorizontal: 24,
+  fullScreenCloseBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullScreenTitleWrap: {
+    flex: 1,
+    marginHorizontal: 12,
+    alignItems: 'center',
+  },
+  fullScreenTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  fullScreenSubtitle: {
+    color: '#94A3B8',
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  fullScreenPageBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  fullScreenPageText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  fullScreenImageSlide: {
+    width: width,
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000000',
+  },
+  fullScreenScrollViewContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: width,
+  },
+  fullScreenImage: {
+    width: width,
+    height: '100%',
+  },
+  fullScreenVideoSlide: {
+    width: width,
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000000',
+    position: 'relative',
+  },
+  fullScreenPlayOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullScreenPlaceholderSlide: {
+    width: width,
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#0F172A',
+  },
+  fullScreenPagination: {
+    position: 'absolute',
+    bottom: 24,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullScreenDot: {
+    height: 7,
+    borderRadius: 3.5,
+    marginHorizontal: 4,
+  },
+  fullScreenActiveDot: {
+    width: 20,
+    backgroundColor: '#16A34A',
+  },
+  fullScreenInactiveDot: {
+    width: 7,
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+  },
+  placeholderSlide: {
+    width: width,
+    height: GALLERY_HEIGHT,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#E2E8F0',
+  },
+  placeholderText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#94A3B8',
+    fontWeight: '600',
+  },
+  loaderCenter: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    width: '100%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  closeModalButton: {
+    padding: 4,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#64748B',
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  complaintInput: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 15,
+    color: '#1E293B',
+    minHeight: 120,
+  },
+  charCount: {
+    fontSize: 12,
+    color: '#94A3B8',
+    textAlign: 'right',
+    marginTop: 8,
+    marginBottom: 20,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+  },
+  cancelBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cancelBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  submitBtn: {
+    backgroundColor: '#EF4444',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  submitBtnDisabled: {
+    backgroundColor: '#FCA5A5',
+  },
+  submitBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });

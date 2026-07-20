@@ -1,12 +1,13 @@
 import React, { useContext, useState } from 'react';
 import { AdminContext } from '../context/AdminContext';
-import { Ban, Unlock, Trash2, User, Eye, Edit2, Search, AlertCircle, RefreshCw, X, Save } from 'lucide-react';
+import { Ban, Unlock, Trash2, User, Eye, Edit2, Search, AlertCircle, RefreshCw, X, Save, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function BuyersPage() {
   const {
     buyers,
     setBuyers,
     handleToggleBlockBuyer,
+    handleTogglePremiumBuyer,
     triggerConfirm,
     handleSoftDeleteBuyer,
     isLoading,
@@ -170,9 +171,17 @@ export default function BuyersPage() {
                   <h3 style={{ margin: '0 0 2px', fontSize: 14, fontWeight: '800', color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{buyer.name}</h3>
                   <span style={{ fontSize: 12, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{buyer.email}</span>
                 </div>
+                {buyer.isPremium && (
+                  <span
+                    className="badge"
+                    style={{ backgroundColor: '#FEF3C7', color: '#D97706', border: '1px solid #FDE68A', fontWeight: '800', marginLeft: 'auto' }}
+                  >
+                    👑 Premium
+                  </span>
+                )}
                 <span
                   className={`badge ${buyer.status === 'Blocked' ? 'badge-rejected' : 'badge-approved'}`}
-                  style={{ marginLeft: 'auto', flexShrink: 0 }}
+                  style={{ marginLeft: buyer.isPremium ? 6 : 'auto', flexShrink: 0 }}
                 >
                   {buyer.status}
                 </span>
@@ -197,6 +206,18 @@ export default function BuyersPage() {
                   onClick={() => startEditBuyer(buyer)}
                 >
                   <Edit2 size={13} /> Edit
+                </button>
+                <button
+                  className={`btn btn-sm ${buyer.isPremium ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ 
+                    backgroundColor: buyer.isPremium ? '#F59E0B' : undefined, 
+                    color: buyer.isPremium ? '#FFFFFF' : undefined,
+                    border: buyer.isPremium ? '1px solid #D97706' : undefined
+                  }}
+                  onClick={() => handleTogglePremiumBuyer(buyer)}
+                  title="Toggle Premium Status"
+                >
+                  👑
                 </button>
                 <button
                   className={`btn btn-sm ${buyer.status === 'Blocked' ? 'btn-secondary' : 'btn-danger-soft'}`}

@@ -162,6 +162,8 @@ exports.createAnimal = asyncHandler(async (req, res, next) => {
     district,
     taluka,
     village,
+    pincode,
+    formattedAddress,
     latitude,
     longitude,
     mediaMetadata
@@ -205,6 +207,8 @@ exports.createAnimal = asyncHandler(async (req, res, next) => {
     district,
     taluka,
     village,
+    pincode,
+    formattedAddress,
     latitude: latitude ? Number(latitude) : undefined,
     longitude: longitude ? Number(longitude) : undefined,
     status: 'pending', // Default listing status

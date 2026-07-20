@@ -1,385 +1,508 @@
-import React, { useContext, useState, useCallback, useEffect } from 'react';
-import { StyleSheet, View, Text, SafeAreaView, TouchableOpacity, TextInput, FlatList, Image, ActivityIndicator } from 'react-native';
+import React, { useContext, useState, useCallback, useEffect, useRef } from 'react';
+import { StyleSheet, View, SafeAreaView, TouchableOpacity, TextInput, FlatList, Image, ActivityIndicator, Alert, Animated, Dimensions, Platform } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 import { AppContext } from '../context/AppContext';
 import { api, resolveMediaUrl } from '../api/api';
+import { useTranslation } from 'react-i18next';
+import { LinearGradient } from 'expo-linear-gradient';
+import AppText from '../components/AppText';
 
 // Import Reusable Components
 import SectionHeader from '../components/SectionHeader';
 import ListingCard from '../components/ListingCard';
+import LocationPicker from '../components/LocationPicker';
+import FilterBottomSheet from '../components/FilterBottomSheet';
+import LanguageSelector from '../components/LanguageSelector';
+import { formatLocationDisplay } from '../utils/geocoder';
 
 const CATEGORIES = [
-  { id: 'cow', name: 'Cow', image: require('../../assets/icons/cow.png') },
-  { id: 'buffalo', name: 'Buffalo', image: require('../../assets/icons/buffalo.png') },
-  { id: 'goat', name: 'Goat', image: require('../../assets/icons/goat.png') },
-  { id: 'sheep', name: 'Sheep', image: require('../../assets/icons/sheep.png') },
-  { id: 'horse', name: 'Horse', image: require('../../assets/icons/horse.png') },
-  { id: 'other', name: 'Other', image: require('../../assets/icons/other.png') },
+  { id: 'all', nameKey: 'buy.all', image: require('../../assets/icons/all.png') },
+  { id: 'cow', nameKey: 'buy.cow', image: require('../../assets/icons/cow.png') },
+  { id: 'buffalo', nameKey: 'buy.buffalo', image: require('../../assets/icons/buffalo.png') },
+  { id: 'goat', nameKey: 'buy.goat', image: require('../../assets/icons/goat.png') },
+  { id: 'sheep', nameKey: 'buy.sheep', image: require('../../assets/icons/sheep.png') },
+  { id: 'horse', nameKey: 'buy.horse', image: require('../../assets/icons/horse.png') },
+  { id: 'other', nameKey: 'buy.other', image: require('../../assets/icons/other.png') },
 ];
 
-const FEATURED_ANIMALS = [
-  {
-    id: 'f1',
-    name: 'HF Cross Cow',
-    breed: 'Holstein Friesian',
-    age: '3.5 Years',
-    price: '₹55,000',
-    location: 'Baramati, Pune',
-    isVerified: true,
-    isFeatured: true,
-  },
-  {
-    id: 'f2',
-    name: 'Murrah Buffalo',
-    breed: 'Pure Murrah',
-    age: '4 Years',
-    price: '₹85,000',
-    location: 'Hassan, Karnataka',
-    isVerified: true,
-    isFeatured: true,
-  },
-  {
-    id: 'f3',
-    name: 'Sirohi Goat',
-    breed: 'Sirohi',
-    age: '1.5 Years',
-    price: '₹12,500',
-    location: 'Sikar, Rajasthan',
-    isVerified: false,
-    isFeatured: true,
-  },
-];
 
-const LATEST_LISTINGS = [
-  {
-    id: 'l1',
-    name: 'Sahiwal Cow',
-    breed: 'Sahiwal',
-    age: '3 Years',
-    price: '₹48,000',
-    sellerName: 'Ramesh Patel',
-    location: 'Surat, Gujarat',
-    isVerified: true,
-    isFeatured: false,
-    postedTime: '2 hours ago',
-  },
-  {
-    id: 'l2',
-    name: 'Jafarabadi Buffalo',
-    breed: 'Jafarabadi',
-    age: '5 Years',
-    price: '₹95,000',
-    sellerName: 'Suresh Kumar',
-    location: 'Junagadh, Gujarat',
-    isVerified: true,
-    isFeatured: true,
-    postedTime: '5 hours ago',
-  },
-  {
-    id: 'l3',
-    name: 'Beetal Goat',
-    breed: 'Beetal',
-    age: '2 Years',
-    price: '₹15,000',
-    sellerName: 'Amit Singh',
-    location: 'Gurdaspur, Punjab',
-    isVerified: false,
-    isFeatured: false,
-    postedTime: '1 day ago',
-  },
-];
-
-const RECOMMENDED_ANIMALS = [
-  {
-    id: 'r1',
-    name: 'Gir Cow',
-    breed: 'Gir',
-    age: '2.8 Years',
-    price: '₹62,000',
-    sellerName: 'Devendra Vyas',
-    location: 'Rajkot, Gujarat',
-    isVerified: true,
-    isFeatured: true,
-    postedTime: '3 hours ago',
-  },
-  {
-    id: 'r2',
-    name: 'Bhadawari Buffalo',
-    breed: 'Bhadawari',
-    age: '3 Years',
-    price: '₹75,000',
-    sellerName: 'Rajesh Mishra',
-    location: 'Etawah, Uttar Pradesh',
-    isVerified: false,
-    isFeatured: false,
-    postedTime: '6 hours ago',
-  },
-  {
-    id: 'r3',
-    name: 'Jamnapari Goat',
-    breed: 'Jamnapari',
-    age: '1 Year',
-    price: '₹14,000',
-    sellerName: 'Vikas Dubey',
-    location: 'Kanpur, Uttar Pradesh',
-    isVerified: true,
-    isFeatured: true,
-    postedTime: '1 day ago',
-  },
-];
-
-const NEARBY_SELLERS = [
-  {
-    id: 's1',
-    name: 'Balaji Dairy Farm',
-    isVerified: true,
-    location: 'Hadapsar, Pune',
-    distance: '3.2 km',
-    rating: '4.8 (24)',
-    animalsCount: 8,
-  },
-  {
-    id: 's2',
-    name: 'Shankar Patil',
-    isVerified: true,
-    location: 'Saswad, Pune',
-    distance: '8.5 km',
-    rating: '4.6 (12)',
-    animalsCount: 3,
-  },
-  {
-    id: 's3',
-    name: 'Vikas Livestock',
-    isVerified: false,
-    location: 'Khed, Pune',
-    distance: '12.0 km',
-    rating: '4.2 (8)',
-    animalsCount: 5,
-  },
-];
 
 // Standalone React.memo components to prevent unmounting/remounting of list headers and footers
-const ListHeader = React.memo(({ selectedCategory, setSelectedCategory, onViewDetails, featuredAnimals }) => {
+const CategoryCardItem = React.memo(({ item, isSelected, onPress, t }) => {
+  const scaleAnim = React.useRef(new Animated.Value(isSelected ? 1.04 : 1)).current;
+
+  React.useEffect(() => {
+    Animated.spring(scaleAnim, {
+      toValue: isSelected ? 1.04 : 1,
+      useNativeDriver: true,
+      friction: 8,
+      tension: 40,
+    }).start();
+  }, [isSelected]);
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.8}
+      onPress={onPress}
+    >
+      <Animated.View
+        style={[
+          styles.categoryCardWrapper,
+          isSelected ? styles.selectedCardWrapper : styles.unselectedCardWrapper,
+          { transform: [{ scale: scaleAnim }] }
+        ]}
+      >
+        {/* Selected Checkmark Indicator */}
+        {isSelected && (
+          <View style={styles.selectedCheckmark}>
+            <Ionicons name="checkmark-circle" size={14} color="#16A34A" />
+          </View>
+        )}
+        <Image source={item.image} style={styles.categoryCardImage} resizeMode="contain" />
+        <AppText style={[
+          styles.categoryCardName,
+          isSelected ? styles.selectedCardName : styles.unselectedCardName
+        ]}>
+          {t(item.nameKey).replace(/[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]|➕|🐾/g, '').trim()}
+        </AppText>
+      </Animated.View>
+    </TouchableOpacity>
+  );
+});
+
+const FilterCardEntry = React.memo(({ onFilterPress, filterCount }) => {
+  const scaleValue = React.useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    Animated.spring(scaleValue, {
+      toValue: 0.98,
+      useNativeDriver: true,
+      tension: 120,
+      friction: 7,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleValue, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 120,
+      friction: 7,
+    }).start();
+  };
+
+  return (
+    <TouchableOpacity
+      onPress={onFilterPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      activeOpacity={0.9}
+      style={styles.farmerFilterCardContainer}
+    >
+      <Animated.View style={[styles.farmerFilterCard, { transform: [{ scale: scaleValue }] }]}>
+        <LinearGradient
+          colors={['#FFFFFF', '#F5FCF3']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.farmerFilterGradient}
+        >
+          <View style={styles.farmerFilterContent}>
+            <AppText style={styles.farmerFilterTitle}>तुम्हाला काय पाहिजे?</AppText>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <AppText style={styles.farmerFilterSubtitle}>योग्य जनावरे शोधा</AppText>
+              {filterCount > 0 && (
+                <View style={styles.filterBadge}>
+                  <AppText style={styles.filterBadgeText}>({filterCount})</AppText>
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* Circular Green Action Button */}
+          <View style={styles.farmerFilterActionBtn}>
+            <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+          </View>
+        </LinearGradient>
+      </Animated.View>
+    </TouchableOpacity>
+  );
+});
+
+const ListHeader = React.memo(({ 
+  selectedCategory, 
+  setSelectedCategory, 
+  onViewDetails, 
+  featuredAnimals, 
+  userProfile, 
+  onChangeLocation,
+  searchText,
+  setSearchText,
+  onFilterPress,
+  filterCount
+}) => {
+  const { t } = useTranslation();
+  const flatListRef = React.useRef(null);
+
+  const getDisplayLocation = () => {
+    if (!userProfile?.village && !userProfile?.taluka && !userProfile?.district) {
+      return {
+        title: t('buy.locationNotSet', { defaultValue: 'Location Not Set' }),
+        subtitle: t('buy.tapToDetect', { defaultValue: 'Tap to detect location' })
+      };
+    }
+
+    const { title, subtitle } = formatLocationDisplay(userProfile);
+    return {
+      title: title || t('buy.locationNotSet', { defaultValue: 'Location Not Set' }),
+      subtitle: subtitle || userProfile?.state || ''
+    };
+  };
+
+  const locDisplay = getDisplayLocation();
+
+  // Auto-center the selected category when it changes
+  React.useEffect(() => {
+    const index = CATEGORIES.findIndex(cat => cat.id === selectedCategory);
+    if (index !== -1 && flatListRef.current) {
+      const timer = setTimeout(() => {
+        try {
+          flatListRef.current.scrollToIndex({
+            index,
+            animated: true,
+            viewPosition: 0.5
+          });
+        } catch (e) {
+          console.warn('Category scroll centering failed:', e.message);
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedCategory]);
+
+  const displayFeatured = featuredAnimals || [];
+
   return (
     <View>
       {/* Location Card */}
-      <View style={styles.locationCard}>
+      <TouchableOpacity style={styles.locationCard} activeOpacity={0.7} onPress={onChangeLocation}>
         <View style={styles.locationInfo}>
-          <Ionicons name="location-outline" size={20} color="#16A34A" style={styles.locationPinIcon} />
+          <View style={styles.locationPinIconWrapper}>
+            <Ionicons name="location" size={18} color="#16A34A" />
+          </View>
           <View style={styles.locationTextContainer}>
-            <Text style={styles.locationCity}>Pune, Maharashtra</Text>
-            <Text style={styles.locationSubtitle}>Showing nearby cattle listings</Text>
+            <AppText style={styles.locationCity} numberOfLines={1}>
+              {locDisplay.title}
+            </AppText>
+            <AppText style={styles.locationSubtitle} numberOfLines={1}>
+              {locDisplay.subtitle}
+            </AppText>
           </View>
         </View>
-        <TouchableOpacity style={styles.changeButton}>
-          <Text style={styles.changeButtonText}>Change</Text>
-        </TouchableOpacity>
-      </View>
+        <View style={styles.changeButton}>
+          <AppText style={styles.changeButtonText}>{t('buy.change')}</AppText>
+        </View>
+      </TouchableOpacity>
 
-      {/* Search & Filter Bar */}
+      {/* Search Bar (Full Width) */}
       <View style={styles.searchSection}>
         <View style={styles.searchBarContainer}>
           <Ionicons name="search" size={18} color="#64748B" style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search cattle, breed, seller or location..."
+            placeholder={t('buy.searchCattle')}
             placeholderTextColor="#94A3B8"
             editable={true}
+            value={searchText}
+            onChangeText={setSearchText}
           />
         </View>
-        <TouchableOpacity style={styles.filterButton}>
-          <MaterialCommunityIcons name="tune-variant" size={20} color="#0F172A" />
-        </TouchableOpacity>
       </View>
+
+      {/* Farmer-Friendly Filter Card */}
+      <FilterCardEntry onFilterPress={onFilterPress} filterCount={filterCount} />
 
       {/* Browse Categories Section */}
       <View style={styles.categoriesSection}>
-        <Text style={styles.categoriesTitle}>Browse Categories</Text>
+        <AppText style={styles.categoriesTitle}>{t('buy.browseCategories')}</AppText>
         <FlatList
+          ref={flatListRef}
           horizontal
           showsHorizontalScrollIndicator={false}
           data={CATEGORIES}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.categoriesList}
-          renderItem={({ item }) => {
-            const isSelected = selectedCategory === item.id;
-            return (
-              <TouchableOpacity
-                activeOpacity={0.9}
-                style={[
-                  styles.categoryCardWrapper,
-                  isSelected ? styles.selectedCardWrapper : styles.unselectedCardWrapper
-                ]}
-                onPress={() => setSelectedCategory(item.id)}
-              >
-                <Image source={item.image} style={styles.categoryCardImage} resizeMode="contain" />
-                <Text style={[
-                  styles.categoryCardName,
-                  isSelected ? styles.selectedCardName : styles.unselectedCardName
-                ]}>
-                  {item.name}
-                </Text>
-              </TouchableOpacity>
-            );
-          }}
+          getItemLayout={(data, index) => (
+            { length: 98, offset: 98 * index, index }
+          )}
+          renderItem={({ item }) => (
+            <CategoryCardItem
+              item={item}
+              isSelected={selectedCategory === item.id}
+              onPress={() => setSelectedCategory(item.id)}
+              t={t}
+            />
+          )}
         />
       </View>
 
       {/* Featured Animals Section */}
-      <View style={styles.featuredSection}>
-        <SectionHeader title="Featured Animals" onActionPress={() => {}} />
+      {displayFeatured.length > 0 && (
+        <View style={styles.featuredSection}>
+          <SectionHeader title={t('buy.featuredAnimals')} onActionPress={() => { }} />
 
-        <FlatList
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          data={featuredAnimals && featuredAnimals.length > 0 ? featuredAnimals : FEATURED_ANIMALS}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.featuredList}
-          renderItem={({ item }) => {
-            return (
-              <View style={styles.animalCard}>
-                {/* Image Block */}
-                <View style={styles.imagePlaceholder}>
-                  {item.photos && item.photos.length > 0 ? (
-                    <Image source={{ uri: resolveMediaUrl(item.photos[0]) }} style={{ width: '100%', height: '100%', borderRadius: 12 }} />
-                  ) : (
-                    <MaterialCommunityIcons name="image-outline" size={38} color="#94A3B8" />
-                  )}
-                  {/* Badges Overlay (Featured & Verified) */}
-                  <View style={styles.badgeOverlayContainer}>
-                    <View style={styles.featuredBadge}>
-                      <Text style={styles.featuredBadgeText}>Featured</Text>
-                    </View>
-                    {item.isVerified && (
-                      <View style={styles.verifiedBadge}>
-                        <MaterialCommunityIcons name="check-decagram" size={11} color="#FFFFFF" style={styles.badgeIcon} />
-                        <Text style={styles.verifiedBadgeText}>Verified</Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
-
-                {/* Metadata Content */}
-                <View style={styles.cardDetails}>
-                  <View style={styles.titleRow}>
-                    <Text style={styles.animalName} numberOfLines={1}>
-                      {item.name}
-                    </Text>
-                    {item.isVerified && (
-                      <MaterialCommunityIcons name="check-decagram" size={15} color="#3B82F6" style={styles.verifiedIcon} />
-                    )}
-                  </View>
-                  <Text style={styles.breedText} numberOfLines={1}>
-                    {item.breed} • {item.age}
-                  </Text>
-                  <Text style={styles.priceText}>{item.price}</Text>
-
-                  {/* Location details */}
-                  <View style={styles.locationRow}>
-                    <Ionicons name="location" size={13} color="#64748B" />
-                    <Text style={styles.locationText} numberOfLines={1}>
-                      {item.location}
-                    </Text>
-                  </View>
-
-                  {/* Action Button */}
-                  <TouchableOpacity style={styles.detailsButton} onPress={() => onViewDetails(item)}>
-                    <Text style={styles.detailsButtonText}>View Details</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            );
-          }}
-        />
-      </View>
+          <View style={styles.featuredListVertical}>
+            {displayFeatured.map((item) => (
+              <ListingCard
+                key={item.id}
+                item={{ ...item, isFeatured: true }}
+                onViewDetailsPress={() => onViewDetails(item)}
+              />
+            ))}
+          </View>
+        </View>
+      )}
       {/* Latest Listings Header */}
-      <SectionHeader title="Latest Listings" onActionPress={() => {}} />
+      <SectionHeader title={t('buy.latestListings')} onActionPress={() => { }} />
     </View>
   );
 });
 
-const ListFooter = React.memo(({ onViewDetails, recommendedAnimals }) => {
+const ListFooter = React.memo(({ onViewDetails, recommendedAnimals, selectedCategory, searchText }) => {
+  const { t } = useTranslation();
+
+  const displayRecommended = recommendedAnimals || [];
+
+  if (displayRecommended.length === 0) return <View style={{ height: 24 }} />;
+
   return (
     <View style={styles.footerSection}>
       {/* Recommended For You */}
-      <SectionHeader title="Recommended For You" onActionPress={() => {}} />
-      <FlatList
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        data={recommendedAnimals && recommendedAnimals.length > 0 ? recommendedAnimals : RECOMMENDED_ANIMALS}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.recommendedList}
-        renderItem={({ item }) => (
+      <SectionHeader title={t('buy.recommendedForYou')} onActionPress={() => { }} />
+      <View style={styles.recommendedVerticalList}>
+        {displayRecommended.map((item) => (
           <ListingCard
+            key={item.id}
             item={item}
             onViewDetailsPress={() => onViewDetails(item)}
-            style={styles.recommendedCardOverride}
           />
-        )}
-      />
-
-      {/* Nearby Sellers */}
-      <SectionHeader title="Nearby Sellers" onActionPress={() => {}} />
-      <FlatList
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        data={NEARBY_SELLERS}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.sellersList}
-        renderItem={({ item }) => (
-          <View style={styles.sellerCard}>
-            {/* Avatar Container */}
-            <View style={styles.sellerAvatarContainer}>
-              <Ionicons name="person" size={24} color="#94A3B8" />
-              {item.isVerified && (
-                <MaterialCommunityIcons name="check-decagram" size={13} color="#3B82F6" style={styles.sellerVerifiedIcon} />
-              )}
-            </View>
-
-            {/* Name */}
-            <Text style={styles.sellerCardName} numberOfLines={1}>
-              {item.name}
-            </Text>
-
-            {/* Location & Distance */}
-            <View style={styles.sellerLocationRow}>
-              <Ionicons name="location" size={11} color="#64748B" style={styles.sellerLocationPin} />
-              <Text style={styles.sellerLocationText} numberOfLines={1}>
-                {item.location} ({item.distance})
-              </Text>
-            </View>
-
-            {/* Rating */}
-            <View style={styles.ratingRow}>
-              <Ionicons name="star" size={12} color="#F59E0B" />
-              <Text style={styles.ratingText}>{item.rating}</Text>
-            </View>
-
-            {/* Stock Count */}
-            <Text style={styles.animalsAvailableText}>{item.animalsCount} animals available</Text>
-
-            {/* Action - Outline details button style */}
-            <TouchableOpacity style={styles.contactButton}>
-              <Text style={styles.contactButtonText}>Contact</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      />
+        ))}
+      </View>
     </View>
   );
 });
 
 export default function BuyScreen({ navigation }) {
-  const { userProfile, userToken } = useContext(AppContext);
+  const { userProfile, userToken, updateLocation } = useContext(AppContext);
+  const [isLocationPickerVisible, setIsLocationPickerVisible] = useState(false);
+  const { t } = useTranslation();
   const isGuest = userToken === 'guest';
-  const name = isGuest ? 'Guest' : userProfile?.name || 'User';
+  const name = isGuest ? t('profile.guestUser') : userProfile?.name || 'User';
 
-  const [selectedCategory, setSelectedCategory] = useState('cow');
+  const getInitial = (nameStr) => {
+    if (!nameStr || typeof nameStr !== 'string' || !nameStr.trim()) return '?';
+    return nameStr.trim().charAt(0).toUpperCase();
+  };
+  const userInitial = getInitial(name);
+  const profileImageUrl = (userProfile?.profilePhoto || userProfile?.photo) ? resolveMediaUrl(userProfile.profilePhoto || userProfile.photo) : null;
+
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [searchText, setSearchText] = useState('');
   const [animalsList, setAnimalsList] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isFilterVisible, setIsFilterVisible] = useState(false);
+  const [activeFilters, setActiveFilters] = useState(null);
+  const mainListRef = useRef(null);
 
-  const fetchLiveListings = async () => {
-    setLoading(true);
+  const handleLocationTap = () => {
+    setIsLocationPickerVisible(true);
+  };
+
+  const getDistance = (lat1, lon1, lat2, lon2) => {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return Infinity;
+    const R = 6371; // km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
+
+  const handleApplyFilters = async (filters) => {
+    // Distance filter handling
+    if (filters.distance && filters.distance !== 'any') {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('लोकेशनची परवानगी नाही', 'तुमचे लोकेशन उपलब्ध नाही, त्यामुळे सर्व ठिकाणची जनावरे दाखवत आहोत.', [{ text: 'ठीक आहे' }]);
+        filters.distance = 'any';
+        filters.userLocation = null;
+      } else {
+        try {
+          // Use Balanced accuracy to get location quickly without delaying UI
+          const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          filters.userLocation = {
+            latitude: loc.coords.latitude,
+            longitude: loc.coords.longitude
+          };
+        } catch (error) {
+          Alert.alert('लोकेशन त्रुटी', 'लोकेशन मिळवता आले नाही, त्यामुळे सर्व ठिकाणची जनावरे दाखवत आहोत.', [{ text: 'ठीक आहे' }]);
+          filters.distance = 'any';
+          filters.userLocation = null;
+        }
+      }
+    }
+
+    setActiveFilters(filters);
+    if (filters.category) {
+      setSelectedCategory(filters.category);
+    }
+    setIsFilterVisible(false);
+
+    if (mainListRef.current) {
+      try {
+        mainListRef.current.scrollToOffset({ offset: 0, animated: true });
+      } catch (e) {
+        // ignore scroll error if list is empty
+      }
+    }
+  };
+
+  const getActiveFilterCount = () => {
+    let count = 0;
+    if (selectedCategory && selectedCategory !== 'all') count++;
+    if (!activeFilters) return count;
+    
+    if (activeFilters.budget && activeFilters.budget !== 'any') count++;
+    if (activeFilters.distance && activeFilters.distance !== 'any') count++;
+    if (activeFilters.gender && activeFilters.gender !== 'any') count++;
+    if (activeFilters.age && activeFilters.age !== 'any') count++;
+    if (activeFilters.breed && activeFilters.breed !== 'सर्व जाती') count++;
+    if (activeFilters.milkYield && activeFilters.milkYield !== 'any') count++;
+    return count;
+  };
+
+  const filteredAnimals = React.useMemo(() => {
+    let list = animalsList;
+
+    // Filter by selected category (from top bar or bottom sheet)
+    if (selectedCategory && selectedCategory !== 'all') {
+      if (selectedCategory === 'other') {
+        const knownSlugs = ['cow', 'buffalo', 'goat', 'sheep', 'horse'];
+        list = list.filter((animal) => {
+          const slug = animal.categorySlug || animal.categoryId?.slug?.toLowerCase();
+          return !slug || !knownSlugs.includes(slug);
+        });
+      } else {
+        list = list.filter((animal) => {
+          const slug = animal.categorySlug || animal.categoryId?.slug?.toLowerCase();
+          return slug === selectedCategory.toLowerCase();
+        });
+      }
+    }
+
+    // Filter by active filters from FilterBottomSheet
+    if (activeFilters) {
+      // Budget
+      if (activeFilters.budget && activeFilters.budget !== 'any') {
+        list = list.filter(animal => {
+          const p = animal.rawPrice || 0;
+          switch (activeFilters.budget) {
+            case '0-20k': return p <= 20000;
+            case '20-50k': return p > 20000 && p <= 50000;
+            case '50-1L': return p > 50000 && p <= 100000;
+            case '1-2L': return p > 100000 && p <= 200000;
+            case '2L+': return p > 200000;
+            default: return true;
+          }
+        });
+      }
+
+      // Distance
+      if (activeFilters.distance && activeFilters.distance !== 'any' && activeFilters.userLocation) {
+        const maxDist = parseInt(activeFilters.distance, 10);
+        list = list.filter(animal => {
+          if (!animal.latitude || !animal.longitude) return false;
+          const dist = getDistance(
+            activeFilters.userLocation.latitude,
+            activeFilters.userLocation.longitude,
+            animal.latitude,
+            animal.longitude
+          );
+          return dist <= maxDist;
+        });
+      }
+
+      // Gender
+      if (activeFilters.gender && activeFilters.gender !== 'any') {
+        list = list.filter(animal => {
+          if (!animal.gender) return false;
+          const g = animal.gender.toLowerCase();
+          const target = activeFilters.gender.toLowerCase();
+          return g === target || g === target.charAt(0);
+        });
+      }
+
+      // Age (simple mapping assuming animal.age is text like '3 Years', '5 Months' or numeric strings)
+      if (activeFilters.age && activeFilters.age !== 'any') {
+        list = list.filter(animal => {
+          const ageStr = (animal.age || '').toLowerCase();
+          const numMatch = ageStr.match(/(\d+(\.\d+)?)/);
+          if (!numMatch) return false;
+          let val = parseFloat(numMatch[1]);
+          if (ageStr.includes('month') || ageStr.includes('महिने') || ageStr.includes('महिना')) val = val / 12;
+
+          switch (activeFilters.age) {
+            case '0-2': return val < 2;
+            case '1-3': return val >= 1 && val <= 3;
+            case '3-5': return val > 3 && val <= 5;
+            case '5+': return val > 5;
+            default: return true;
+          }
+        });
+      }
+
+      // Breed
+      if (activeFilters.breed && activeFilters.breed !== 'सर्व जाती') {
+        list = list.filter(animal => animal.breed === activeFilters.breed);
+      }
+
+      // Milk Yield
+      if (activeFilters.milkYield && activeFilters.milkYield !== 'any') {
+        list = list.filter(animal => {
+          const capStr = (animal.health?.milkCapacity || '').toLowerCase();
+          const match = capStr.match(/(\d+(\.\d+)?)/);
+          if (!match) return false;
+          const val = parseFloat(match[1]);
+
+          switch (activeFilters.milkYield) {
+            case '0-5': return val <= 5;
+            case '5-10': return val > 5 && val <= 10;
+            case '10+': return val > 10;
+            default: return true;
+          }
+        });
+      }
+    }
+
+    // Filter by search text
+    if (searchText && searchText.trim() !== '') {
+      const query = searchText.toLowerCase().trim();
+      list = list.filter((animal) => {
+        const nameMatch = animal.name?.toLowerCase().includes(query);
+        const breedMatch = animal.breed?.toLowerCase().includes(query);
+        const locationMatch = animal.location?.toLowerCase().includes(query);
+        const descriptionMatch = animal.description?.toLowerCase().includes(query);
+        return nameMatch || breedMatch || locationMatch || descriptionMatch;
+      });
+    }
+
+    return list;
+  }, [animalsList, selectedCategory, activeFilters, searchText]);
+
+  const fetchLiveListings = async (showSpinner = true) => {
+    if (showSpinner) setLoading(true);
     try {
       const res = await api.getAnimals({ status: 'approved' });
       if (res.status === 'success') {
@@ -389,13 +512,16 @@ export default function BuyScreen({ navigation }) {
           name: a.title,
           breed: a.breedId?.name || 'Unknown Breed',
           age: a.age,
+          rawPrice: a.price,
           price: `₹${a.price.toLocaleString()}`,
           sellerName: a.sellerId?.name || 'Seller',
           location: `${a.village}, ${a.district}`,
           isVerified: a.status === 'approved',
           isFeatured: a.views > 200,
           postedTime: 'Active',
-          photos: a.photos
+          photos: a.photos,
+          video: a.video,
+          categorySlug: a.categoryId?.slug?.toLowerCase()
         }));
         setAnimalsList(mappedList);
       }
@@ -403,13 +529,13 @@ export default function BuyScreen({ navigation }) {
       console.warn('[BuyScreen API Warning] Offline or failed backend:', e.message);
       setAnimalsList([]);
     } finally {
-      setLoading(false);
+      if (showSpinner) setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchLiveListings();
-  }, []);
+  }, [userProfile?.district]);
 
   const handleNavigateToSell = useCallback(() => {
     navigation.navigate('Sell');
@@ -419,36 +545,65 @@ export default function BuyScreen({ navigation }) {
     navigation.navigate('AnimalDetails', { animal: item });
   }, [navigation]);
 
+  const handleLocationChange = useCallback(() => {
+    setIsLocationPickerVisible(true);
+  }, []);
+
+  const handleSelectLocation = useCallback(async (locationData) => {
+    setIsLocationPickerVisible(false);
+    if (updateLocation) {
+      await updateLocation(locationData);
+    }
+  }, [updateLocation]);
+
+  const handleViewAllAnimals = useCallback(() => {
+    setSelectedCategory('all');
+    setSearchText('');
+    fetchLiveListings(false);
+  }, []);
+
   return (
     <View style={styles.container}>
+      <LinearGradient
+        colors={['#F8FCF7', '#F4FAEE', '#EEF8EC']}
+        style={StyleSheet.absoluteFillObject}
+      />
+      <Image
+        source={require('../../assets/farmer-bg.webp')}
+        style={[StyleSheet.absoluteFillObject, { opacity: 0.025 }]}
+        resizeMode="cover"
+      />
       <SafeAreaView style={styles.safeArea}>
         {/* Main Body Wrap */}
         <View style={styles.contentWrapper}>
           {/* Header Section */}
           <View style={styles.header}>
             <View style={styles.logoAndBrand}>
-              {/* App Logo */}
               <View style={styles.logoCircle}>
-                <Text style={styles.logoText}>PS</Text>
+                <Image source={require('../../assets/logo-icon.png')} style={styles.logoIconImage} resizeMode="contain" />
               </View>
               {/* Title and Tagline */}
               <View style={styles.brandTextContainer}>
-                <Text style={styles.headerTitle}>PashuSetu</Text>
-                <Text style={styles.headerTagline}>Marketplace & Care</Text>
+                <AppText style={styles.headerTitle}>
+                  {t('app.name')}
+                </AppText>
+                <AppText style={styles.headerTagline}>{t('buy.marketplaceCare')}</AppText>
               </View>
             </View>
 
             {/* Right Controls */}
             <View style={styles.headerActions}>
-              <TouchableOpacity style={styles.sellButton} onPress={handleNavigateToSell}>
-                <Text style={styles.sellButtonText}>Sell +</Text>
-              </TouchableOpacity>
+              <LanguageSelector style={{ marginRight: 8 }} />
               <TouchableOpacity style={styles.notificationHeaderBtn} onPress={() => navigation.navigate('Notifications')}>
                 <Ionicons name="notifications-outline" size={20} color="#0F172A" />
                 <View style={styles.notificationHeaderBadge} />
               </TouchableOpacity>
               <TouchableOpacity style={styles.avatarCircle} onPress={() => navigation.navigate('Profile')}>
-                <Text style={styles.avatarText}>{name.charAt(0).toUpperCase()}</Text>
+                {profileImageUrl ? (
+                  <Image source={{ uri: profileImageUrl }} style={styles.avatarImage} resizeMode="cover" />
+                ) : (
+                  <AppText style={styles.avatarText}>{userInitial}</AppText>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -456,25 +611,50 @@ export default function BuyScreen({ navigation }) {
           {loading ? (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
               <ActivityIndicator size="large" color="#16A34A" />
-              <Text style={{ marginTop: 12, color: '#64748B', fontWeight: '600' }}>जाहिराती लोड होत आहेत... (Loading listings...)</Text>
+              <AppText style={{ marginTop: 12, color: '#64748B', fontWeight: '600' }}>{t('buy.loadingListings')}</AppText>
             </View>
           ) : (
             <FlatList
-              data={animalsList}
+              ref={mainListRef}
+              data={filteredAnimals}
               keyExtractor={(item) => item.id}
               ListHeaderComponent={
                 <ListHeader
                   selectedCategory={selectedCategory}
                   setSelectedCategory={setSelectedCategory}
                   onViewDetails={handleViewDetails}
-                  featuredAnimals={animalsList.slice(0, 3)}
+                  featuredAnimals={filteredAnimals.slice(0, 3)}
+                  userProfile={userProfile}
+                  onChangeLocation={handleLocationTap}
+                  searchText={searchText}
+                  setSearchText={setSearchText}
+                  onFilterPress={() => setIsFilterVisible(true)}
+                  filterCount={getActiveFilterCount()}
                 />
               }
               ListFooterComponent={
                 <ListFooter
                   onViewDetails={handleViewDetails}
-                  recommendedAnimals={animalsList.slice(2, 5)}
+                  recommendedAnimals={filteredAnimals.slice(2, 5)}
+                  selectedCategory={selectedCategory}
+                  searchText={searchText}
                 />
+              }
+              ListEmptyComponent={
+                <View style={styles.emptyStateContainer}>
+                  <View style={styles.emptyIconWrapper}>
+                    <Ionicons name="paw" size={48} color="#16A34A" />
+                  </View>
+                  <AppText style={styles.emptyStateTitle}>{t('buy.noAnimalsCategoryTitle')}</AppText>
+                  <AppText style={styles.emptyStateSubtitle}>{t('buy.noAnimalsCategorySubtitle')}</AppText>
+                  <TouchableOpacity
+                    style={styles.emptyStateButton}
+                    activeOpacity={0.8}
+                    onPress={handleViewAllAnimals}
+                  >
+                    <AppText style={styles.emptyStateButtonText}>{t('buy.noAnimalsCategoryButton')}</AppText>
+                  </TouchableOpacity>
+                </View>
               }
               contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={false}
@@ -490,10 +670,21 @@ export default function BuyScreen({ navigation }) {
           {/* Floating Action Button (FAB) */}
           <TouchableOpacity style={styles.fab} activeOpacity={0.85} onPress={handleNavigateToSell}>
             <MaterialCommunityIcons name="plus" size={22} color="#FFFFFF" />
-            <Text style={styles.fabLabel}>Sell Animal</Text>
+            <AppText style={styles.fabLabel}>{t('buy.sellAnimal')}</AppText>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
+      <LocationPicker
+        visible={isLocationPickerVisible}
+        onClose={() => setIsLocationPickerVisible(false)}
+        onSelectLocation={handleSelectLocation}
+      />
+      <FilterBottomSheet
+        visible={isFilterVisible}
+        onClose={() => setIsFilterVisible(false)}
+        initialFilters={activeFilters}
+        onApply={handleApplyFilters}
+      />
     </View>
   );
 }
@@ -501,7 +692,7 @@ export default function BuyScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: 'transparent',
   },
   safeArea: {
     flex: 1,
@@ -525,20 +716,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logoCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#DCFCE7',
-    borderWidth: 1.5,
-    borderColor: '#16A34A',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 8,
+    marginRight: 12,
+    overflow: 'visible',
+    shadowColor: '#16A34A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  logoText: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#16A34A',
+  logoIconImage: {
+    width: 58,
+    height: 58,
+    overflow: 'visible',
   },
   brandTextContainer: {
     justifyContent: 'center',
@@ -584,6 +779,11 @@ const styles = StyleSheet.create({
     borderColor: '#16A34A',
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   avatarText: {
     fontSize: 14,
@@ -619,26 +819,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: '#FFFFFF',
-    borderRadius: 20, // Consistent border radius
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#F1F5F9', // Softer borders
-    padding: 16,
+    borderColor: '#E2E8F0',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     marginHorizontal: 16,
-    marginTop: 16,
+    marginTop: 14,
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.03,
-    shadowRadius: 10,
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
     elevation: 2,
   },
   locationInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    marginRight: 12,
+    marginRight: 10,
   },
-  locationPinIcon: {
-    marginRight: 8,
+  locationPinIconWrapper: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F0FDF4',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
   },
   locationTextContainer: {
     flex: 1,
@@ -646,20 +853,20 @@ const styles = StyleSheet.create({
   locationCity: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#0F172A',
+    color: '#1E293B',
   },
   locationSubtitle: {
     fontSize: 12,
     color: '#64748B',
-    marginTop: 2,
+    marginTop: 1,
   },
   changeButton: {
-    borderWidth: 1.5,
-    borderColor: '#F1F5F9',
-    borderRadius: 12,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#16A34A',
+    borderRadius: 16,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    backgroundColor: '#F0FDF4',
   },
   changeButtonText: {
     fontSize: 12,
@@ -678,16 +885,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
-    paddingHorizontal: 12,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 16,
     height: 48,
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.02,
-    shadowRadius: 8,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.04,
+    shadowRadius: 16,
+    elevation: 2,
   },
   searchIcon: {
     marginRight: 8,
@@ -698,21 +905,91 @@ const styles = StyleSheet.create({
     fontSize: 14,
     height: '100%',
   },
-  filterButton: {
-    width: 48,
-    height: 48,
+  farmerFilterCardContainer: {
+    marginHorizontal: 16,
+    marginTop: 12,
+  },
+  farmerFilterCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 24,
+    overflow: 'hidden',
+    shadowColor: '#16A34A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.05,
+    shadowRadius: 16,
+    elevation: 3,
+  },
+  farmerFilterGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+  },
+  farmerFilterContent: {
+    flex: 1,
+  },
+  farmerFilterTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#0F172A',
+    letterSpacing: -0.2,
+  },
+  farmerFilterSubtitle: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '600',
+    marginTop: 3,
+  },
+  filterBadge: {
+    backgroundColor: '#DCFCE7',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginLeft: 6,
+  },
+  filterBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#16A34A',
+  },
+  farmerFilterMiniCardsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 14,
+    gap: 8,
+  },
+  farmerMiniCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0FDF4',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderColor: '#DCFCE7',
+  },
+  farmerMiniCardEmoji: {
+    fontSize: 14,
+    marginRight: 6,
+  },
+  farmerMiniCardText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#15803D',
+  },
+  farmerFilterActionBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#16A34A',
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 12,
-    shadowColor: '#0F172A',
+    shadowColor: '#16A34A',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.02,
-    shadowRadius: 8,
-    elevation: 1,
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 2,
   },
   categoriesSection: {
     marginTop: 24, // Consistent spacing 24px
@@ -727,20 +1004,23 @@ const styles = StyleSheet.create({
   },
   categoriesList: {
     paddingHorizontal: 8,
+    paddingTop: 8,
+    paddingBottom: 8,
   },
   categoryCardWrapper: {
-    width: 78, // Width 78
-    height: 96, // Height 96
-    borderRadius: 20,
+    width: 84, // Premium width
+    height: 112, // Premium height
+    borderRadius: 20, // Rounded corners 20px
     justifyContent: 'center',
     alignItems: 'center',
     padding: 8,
-    marginHorizontal: 7, // 14px horizontal spacing between cards (7 on left, 7 on right)
+    marginHorizontal: 7, // 14px equal spacing between card elements
     backgroundColor: '#FFFFFF',
+    position: 'relative', // Necessary for absolute positioning of checkmark
   },
   unselectedCardWrapper: {
     borderWidth: 1,
-    borderColor: '#E5E7EB', // Light grey border
+    borderColor: '#E5E7EB', // Light gray border
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.03,
@@ -749,28 +1029,47 @@ const styles = StyleSheet.create({
   },
   selectedCardWrapper: {
     borderWidth: 2,
-    borderColor: '#16A34A', // Subtle green border
+    borderColor: '#16A34A', // Green border
+    backgroundColor: '#F0FDF4', // Soft light green background
     shadowColor: '#16A34A', // Soft green shadow
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.12,
     shadowRadius: 10,
     elevation: 4,
   },
+  selectedCheckmark: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 7,
+    width: 14,
+    height: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+    shadowColor: '#16A34A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
+  },
   categoryCardImage: {
-    width: 48, // Size 48x48
-    height: 48,
+    width: 52, // Centered animal image larger size (approx 60-65%)
+    height: 52,
     marginBottom: 6,
   },
   categoryCardName: {
     fontSize: 13,
-    fontWeight: '600',
     textAlign: 'center',
   },
   unselectedCardName: {
     color: '#475569', // Dark grey text
+    fontWeight: '500', // Regular unselected text
   },
   selectedCardName: {
     color: '#16A34A', // Green text
+    fontWeight: 'bold', // Bold selected category name
   },
   featuredSection: {
     marginTop: 24, // Consistent spacing 24px
@@ -897,106 +1196,11 @@ const styles = StyleSheet.create({
     marginTop: 24, // Consistent spacing 24px
     marginBottom: 24,
   },
-  recommendedList: {
-    paddingHorizontal: 8,
-    marginBottom: 16,
+  featuredListVertical: {
+    marginBottom: 8,
   },
-  recommendedCardOverride: {
-    width: 240, // Increased recommended card width
-    marginHorizontal: 8,
-    marginBottom: 0,
-  },
-  sellersList: {
-    paddingHorizontal: 8,
-  },
-  sellerCard: {
-    width: 170,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20, // Consistent border radius
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-    padding: 14,
-    marginHorizontal: 8,
-    alignItems: 'center',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.04,
-    shadowRadius: 12,
-    elevation: 2,
-  },
-  sellerAvatarContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
-    position: 'relative',
-  },
-  sellerVerifiedIcon: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-  },
-  sellerCardName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#0F172A',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  sellerLocationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6,
-    width: '100%',
-  },
-  sellerLocationPin: {
-    marginRight: 2,
-  },
-  sellerLocationText: {
-    fontSize: 11,
-    color: '#64748B',
-    maxWidth: '85%',
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6,
-  },
-  ratingText: {
-    fontSize: 11,
-    color: '#F59E0B',
-    fontWeight: '700',
-    marginLeft: 4,
-  },
-  animalsAvailableText: {
-    fontSize: 11,
-    color: '#64748B',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  contactButton: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#16A34A',
-    borderRadius: 10,
-    paddingVertical: 6,
-    paddingHorizontal: 16,
-    width: '100%',
-    alignItems: 'center',
-  },
-  contactButtonText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#16A34A',
+  recommendedVerticalList: {
+    marginBottom: 8,
   },
   fab: {
     position: 'absolute',
@@ -1019,5 +1223,63 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
     marginLeft: 6,
+  },
+  scrollContent: {
+    paddingBottom: 160,
+  },
+  emptyStateContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 24,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.02,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  emptyIconWrapper: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#F0FDF4',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  emptyStateTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0F172A',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  emptyStateSubtitle: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  emptyStateButton: {
+    backgroundColor: '#16A34A',
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    borderRadius: 20,
+    shadowColor: '#16A34A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  emptyStateButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

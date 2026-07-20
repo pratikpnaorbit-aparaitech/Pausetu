@@ -2,10 +2,10 @@ import React, { useState, useEffect, useContext, useRef } from 'react';
 import {
   StyleSheet,
   View,
-  Text,
   SafeAreaView,
   ScrollView,
   TextInput,
+  Text,
   TouchableOpacity,
   Switch,
   Alert,
@@ -14,7 +14,8 @@ import {
   Platform,
   ActivityIndicator,
   Modal,
-  FlatList
+  FlatList,
+  LayoutAnimation
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Camera, CameraView } from 'expo-camera';
@@ -22,40 +23,132 @@ import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppContext } from '../context/AppContext';
+import { useTranslation } from 'react-i18next';
+import AppText from '../components/AppText';
 import { animalApi } from '../api/animalApi';
+import { reverseGeocodeWithCache } from '../utils/geocoder';
+import { refreshManager, REFRESH_EVENTS } from '../services/refreshManager';
+import { getBreedsForCategory } from '../utils/breedDatabase';
+
+const toMarathiDigits = (val) => {
+  if (!val) return '';
+  const str = String(val).trim();
+  const marathiDigits = ['०', '१', '२', '३', '४', '५', '६', '७', '८', '९'];
+  return str.replace(/[0-9]/g, (w) => marathiDigits[parseInt(w, 10)]);
+};
+
+const getCategoryNameInMarathi = (cat) => {
+  if (!cat) return 'गाय';
+  const slug = (cat.slug || cat.name || '').toLowerCase();
+  if (slug.includes('buffalo') || slug.includes('म्हैस')) return 'म्हैस';
+  if (slug.includes('goat') || slug.includes('शेळी')) return 'शेळी';
+  if (slug.includes('sheep') || slug.includes('मेंढी')) return 'मेंढी';
+  if (slug.includes('horse') || slug.includes('घोडा')) return 'घोडा';
+  if (slug.includes('other') || slug.includes('इतर')) return 'जनावर';
+  return 'गाय';
+};
+
+const getBreedNameInMarathi = (selectedBreed, customBreedText, isOtherBreedSelected, isOtherCategory) => {
+  if (isOtherCategory) {
+    return customBreedText ? customBreedText.trim() : '';
+  }
+  if (isOtherBreedSelected) {
+    return customBreedText ? customBreedText.trim() : 'इतर';
+  }
+  if (!selectedBreed) return '';
+  if (selectedBreed.mr) return selectedBreed.mr;
+  const name = selectedBreed.name || '';
+  if (name.includes('(')) {
+    return name.split('(')[0].trim();
+  }
+  return name.trim();
+};
+
+const buildAutoTitle = ({ selectedCategory, selectedBreed, customBreedText, age, gender, isOtherBreedSelected, isOtherCategory }) => {
+  const categoryMr = getCategoryNameInMarathi(selectedCategory);
+  const breedMr = getBreedNameInMarathi(selectedBreed, customBreedText, isOtherBreedSelected, isOtherCategory);
+  const marathiAge = toMarathiDigits(age);
+  const yearSuffix = gender === 'Male' ? 'वर्षांचा' : 'वर्षांची';
+
+  const parts = [];
+  if (marathiAge) {
+    parts.push(`${marathiAge} ${yearSuffix}`);
+  }
+  if (breedMr) {
+    parts.push(breedMr);
+  }
+  if (categoryMr && !isOtherCategory) {
+    parts.push(categoryMr);
+  }
+
+  return parts.join(' ');
+};
+
+const PREGNANCY_MONTH_OPTIONS = [
+  { id: 1, label: '१ महिना', en: '1 Month' },
+  { id: 2, label: '२ महिने', en: '2 Months' },
+  { id: 3, label: '३ महिने', en: '3 Months' },
+  { id: 4, label: '४ महिने', en: '4 Months' },
+  { id: 5, label: '५ महिने', en: '5 Months' },
+  { id: 6, label: '६ महिने', en: '6 Months' },
+  { id: 7, label: '७ महिने', en: '7 Months' },
+  { id: 8, label: '८ महिने', en: '8 Months' },
+  { id: 9, label: '९ महिने', en: '9 Months' }
+];
 
 const { width, height } = Dimensions.get('window');
 
-// API Configurations
-const API_BASE_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5000/api' : 'http://localhost:5000/api';
 const DRAFTS_KEY = 'PASHUSETU_OFFLINE_DRAFTS';
 
 // Step descriptions
 const STEPS = [
-  { id: 1, titleEn: 'Select Category', titleMr: 'प्राणी निवडा' },
-  { id: 2, titleEn: 'Take Live Photos', titleMr: 'फोटो काढा (५ अनिवार्य)' },
-  { id: 3, titleEn: 'Record Live Video', titleMr: 'व्हिडिओ काढा (१ अनिवार्य)' },
-  { id: 4, titleEn: 'Animal Details', titleMr: 'जनावराची माहिती' },
-  { id: 5, titleEn: 'Health Details', titleMr: 'आरोग्य तपशील' },
-  { id: 6, titleEn: 'Pricing', titleMr: 'किंमत' },
-  { id: 7, titleEn: 'Location & GPS', titleMr: 'पत्ता आणि जीपीएस' },
-  { id: 8, titleEn: 'Preview', titleMr: 'तपासा' },
-  { id: 9, titleEn: 'Submit', titleMr: 'जाहिरात पाठवा' }
+  { id: 1, titleKey: 'addAnimal.steps.selectCategory' },
+  { id: 2, titleKey: 'addAnimal.steps.takePhotos' },
+  { id: 3, titleKey: 'addAnimal.steps.recordVideo' },
+  { id: 4, titleKey: 'addAnimal.steps.animalDetails' },
+  { id: 5, titleKey: 'addAnimal.steps.healthDetails' },
+  { id: 6, titleKey: 'addAnimal.steps.pricing' },
+  { id: 7, titleKey: 'addAnimal.steps.locationGps' },
+  { id: 8, titleKey: 'addAnimal.steps.preview' },
+  { id: 9, titleKey: 'addAnimal.steps.submit' }
 ];
 
 // Steps 2 Photo configuration
 const PHOTO_STEPS = [
-  { name: 'Front Photo', nameMr: 'समोरून फोटो काढा', instructionEn: 'Take Front Photo of the animal', instructionMr: 'समोरचा भाग स्पष्ट दिसला पाहिजे.' },
-  { name: 'Left Side', nameMr: 'डाव्या बाजूने फोटो काढा', instructionEn: 'Take Left Side Photo of the animal', instructionMr: 'डावी बाजू आणि पाय दिसले पाहिजेत.' },
-  { name: 'Right Side', nameMr: 'उजव्या बाजूने फोटो काढा', instructionEn: 'Take Right Side Photo of the animal', instructionMr: 'उजवी बाजू स्पष्ट दिसली पाहिजे.' },
-  { name: 'Back Side', nameMr: 'मागील बाजूने फोटो काढा', instructionEn: 'Take Back Side Photo of the animal', instructionMr: 'मागील बाजू आणि शेपूट दिसली पाहिजे.' },
-  { name: 'Full Body', nameMr: 'पूर्ण शरीराचा फोटो काढा', instructionEn: 'Take Full Body Photo of the animal', instructionMr: 'पूर्ण जनावर एका फ्रेममध्ये आले पाहिजे.' }
+  { name: 'Front Photo', nameKey: 'addAnimal.photoSteps.front', instructionKey: 'addAnimal.photoSteps.frontInst' },
+  { name: 'Left Side', nameKey: 'addAnimal.photoSteps.left', instructionKey: 'addAnimal.photoSteps.leftInst' },
+  { name: 'Right Side', nameKey: 'addAnimal.photoSteps.right', instructionKey: 'addAnimal.photoSteps.rightInst' },
+  { name: 'Back Side', nameKey: 'addAnimal.photoSteps.back', instructionKey: 'addAnimal.photoSteps.backInst' },
+  { name: 'Full Body', nameKey: 'addAnimal.photoSteps.fullBody', instructionKey: 'addAnimal.photoSteps.fullBodyInst' }
 ];
 
 export default function AddAnimalScreen({ navigation }) {
-  const { userToken } = useContext(AppContext);
+  const { t } = useTranslation();
+  const { userProfile, userToken, isGuest } = useContext(AppContext);
+
+  const verification = userProfile?.verification || { status: 'unverified' };
+  const verificationStatus = verification.status || 'unverified';
+
+  useEffect(() => {
+    if (!isGuest && verificationStatus !== 'approved') {
+      Alert.alert(
+        t('verification.title'),
+        t('verification.restrictedToast'),
+        [{ text: t('common.close'), onPress: () => navigation.goBack() }]
+      );
+    }
+  }, [verificationStatus, isGuest]);
+
   const [currentStep, setCurrentStep] = useState(1);
   const cameraRef = useRef(null);
+
+  if (!isGuest && verificationStatus !== 'approved') {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF', justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#16A34A" />
+      </SafeAreaView>
+    );
+  }
 
   // Categories & Breeds lists
   const [categories, setCategories] = useState([]);
@@ -65,12 +158,54 @@ export default function AddAnimalScreen({ navigation }) {
   // Form State variables
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedBreed, setSelectedBreed] = useState(null);
+  const [isBreedModalVisible, setIsBreedModalVisible] = useState(false);
+  const [breedSearchQuery, setBreedSearchQuery] = useState('');
+  const [customBreedText, setCustomBreedText] = useState('');
   const [title, setTitle] = useState('');
+  const [isTitleUserEdited, setIsTitleUserEdited] = useState(false);
   const [gender, setGender] = useState('Female');
   const [age, setAge] = useState('');
   const [weight, setWeight] = useState('');
   const [color, setColor] = useState('');
   const [description, setDescription] = useState('');
+
+  const isOtherCategory = React.useMemo(() => {
+    if (!selectedCategory) return false;
+    const raw = (selectedCategory.slug || selectedCategory.name || '').toLowerCase();
+    return raw.includes('other') || raw.includes('इतर');
+  }, [selectedCategory]);
+
+  const isOtherBreedSelected = React.useMemo(() => {
+    if (!selectedBreed) return false;
+    return (
+      selectedBreed.id === 'other' ||
+      (selectedBreed.name && (selectedBreed.name.includes('Other') || selectedBreed.name.includes('इतर')))
+    );
+  }, [selectedBreed]);
+
+  const showMilkCapacity = React.useMemo(() => {
+    if (gender !== 'Female') return false;
+    if (!selectedCategory) return false;
+    const raw = (selectedCategory.slug || selectedCategory.name || '').toLowerCase();
+    return raw.includes('cow') || raw.includes('गाय') || raw.includes('buffalo') || raw.includes('म्हैस') || raw.includes('goat') || raw.includes('शेळी');
+  }, [gender, selectedCategory]);
+
+  // Auto-generate title in Marathi based on Age, Breed, Gender, Category unless manually edited
+  useEffect(() => {
+    if (isTitleUserEdited) return;
+    const autoTitle = buildAutoTitle({
+      selectedCategory,
+      selectedBreed,
+      customBreedText,
+      age,
+      gender,
+      isOtherBreedSelected,
+      isOtherCategory
+    });
+    if (autoTitle) {
+      setTitle(autoTitle);
+    }
+  }, [selectedCategory, selectedBreed, customBreedText, age, gender, isOtherBreedSelected, isOtherCategory, isTitleUserEdited]);
 
   // Step 2: Photo Capture variables
   const [photos, setPhotos] = useState([]); // Stores captured photos: { stepName, uri, metadata }
@@ -80,7 +215,7 @@ export default function AddAnimalScreen({ navigation }) {
   const [photoPreview, setPhotoPreview] = useState(null);
 
   // Step 3: Video Recording variables
-  const [video, setVideo] = useState(null); // Stores captured video path or mock URL
+  const [video, setVideo] = useState(null); // Stores captured video URI or uploaded URL
   const [isVideoRecording, setIsVideoRecording] = useState(false);
   const [videoTimer, setVideoTimer] = useState(0);
   const [videoPreview, setVideoPreview] = useState(null);
@@ -90,7 +225,16 @@ export default function AddAnimalScreen({ navigation }) {
   const [isVaccinated, setIsVaccinated] = useState(false);
   const [isHealthy, setIsHealthy] = useState(true);
   const [isPregnant, setIsPregnant] = useState(false);
+  const [pregnancyMonth, setPregnancyMonth] = useState(null);
+  const [isPregnancyModalVisible, setIsPregnancyModalVisible] = useState(false);
   const [milkCapacity, setMilkCapacity] = useState('');
+
+  // Auto-reset pregnancyMonth when gender is male or animal is not pregnant
+  useEffect(() => {
+    if (gender !== 'Female' || !isPregnant) {
+      setPregnancyMonth(null);
+    }
+  }, [gender, isPregnant]);
 
   // Step 6: Pricing
   const [price, setPrice] = useState('');
@@ -112,10 +256,12 @@ export default function AddAnimalScreen({ navigation }) {
   const [districtSearch, setDistrictSearch] = useState('');
   const [talukaSearch, setTalukaSearch] = useState('');
   const [activeDropdown, setActiveDropdown] = useState(null); // 'state' | 'district' | 'taluka' | null
-  
+
   // GPS State
   const [latitude, setLatitude] = useState(null);
   const [longitude, setLongitude] = useState(null);
+  const [pincode, setPincode] = useState('');
+  const [formattedAddress, setFormattedAddress] = useState('');
   const [gpsLoading, setGpsLoading] = useState(false);
   const [gpsSuccess, setGpsSuccess] = useState(false);
 
@@ -159,6 +305,8 @@ export default function AddAnimalScreen({ navigation }) {
   const fetchCategories = async () => {
     try {
       const body = await animalApi.getCategories();
+
+
       if (body.status === 'success') {
         setCategories(body.data.categories);
       } else {
@@ -184,17 +332,17 @@ export default function AddAnimalScreen({ navigation }) {
   };
 
   // Fetch Breeds dynamically when Category is selected
-  const fetchBreeds = async (categoryId) => {
+  const fetchBreeds = async (categoryId, catObj = null) => {
     setLoadingBreeds(true);
+    const cat = catObj || selectedCategory;
     try {
       const body = await animalApi.getBreeds(categoryId);
-      if (body.status === 'success') {
-        setBreeds(body.data.breeds);
-      } else {
-        throw new Error();
-      }
+      const apiBreeds = body.status === 'success' && body.data?.breeds ? body.data.breeds : [];
+      const computedBreeds = getBreedsForCategory(cat, apiBreeds);
+      setBreeds(computedBreeds);
     } catch (e) {
-      setBreeds([]);
+      const computedBreeds = getBreedsForCategory(cat, []);
+      setBreeds(computedBreeds);
     } finally {
       setLoadingBreeds(false);
     }
@@ -246,8 +394,10 @@ export default function AddAnimalScreen({ navigation }) {
   const handleSelectCategory = (cat) => {
     setSelectedCategory(cat);
     setSelectedBreed(null);
-    fetchBreeds(cat._id || cat.id);
-    setCurrentStep(2); 
+    setCustomBreedText('');
+    setIsTitleUserEdited(false);
+    fetchBreeds(cat._id || cat.id, cat);
+    setCurrentStep(2);
   };
 
   // Capture Photo Handler
@@ -264,10 +414,10 @@ export default function AddAnimalScreen({ navigation }) {
         }
       } catch (err) {
         console.warn('Physical camera capture failed:', err.message);
-        Alert.alert('त्रुटी (Error)', 'कॅमेरा फोटो काढण्यात अयशस्वी झाला. (Camera capture failed.)');
+        Alert.alert(t('common.error'), t('addAnimal.cameraCaptureFailed'));
       }
     } else {
-      Alert.alert('त्रुटी (Error)', 'कॅमेरा उपलब्ध नाही. (Camera not ready/available.)');
+      Alert.alert(t('common.error'), t('addAnimal.cameraUnavailable'));
     }
   };
 
@@ -276,7 +426,7 @@ export default function AddAnimalScreen({ navigation }) {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('परवानगी नाकारली (Permission Denied)', 'गॅलरी परवानगी आवश्यक आहे. (Gallery permissions are required to select photos.)');
+        Alert.alert(t('common.permissionDenied'), t('profile.galleryPermission'));
         return;
       }
 
@@ -291,7 +441,7 @@ export default function AddAnimalScreen({ navigation }) {
       }
     } catch (err) {
       console.warn('Image picker failed:', err.message);
-      Alert.alert('त्रुटी (Error)', 'फोटो निवडण्यात अयशस्वी. (Failed to pick photo.)');
+      Alert.alert(t('common.error'), t('addAnimal.photoPickFailed'));
     }
   };
 
@@ -321,7 +471,7 @@ export default function AddAnimalScreen({ navigation }) {
     if (Platform.OS === 'web') return;
     setIsVideoRecording(true);
     setVideoTimer(0);
-    
+
     let durationSec = 0;
     videoIntervalRef.current = setInterval(() => {
       durationSec++;
@@ -338,7 +488,7 @@ export default function AddAnimalScreen({ navigation }) {
           maxDuration: 30,
           quality: '720p'
         });
-        
+
         if (recorded && recorded.uri) {
           setVideoPreview({
             uri: recorded.uri,
@@ -350,7 +500,7 @@ export default function AddAnimalScreen({ navigation }) {
         console.warn('Native video recording failed:', err.message);
         setIsVideoRecording(false);
         if (videoIntervalRef.current) clearInterval(videoIntervalRef.current);
-        Alert.alert('त्रुटी (Error)', 'व्हिडिओ रेकॉर्डिंग सुरू करण्यात अयशस्वी. (Failed to start video recording.)');
+        Alert.alert(t('common.error'), t('addAnimal.videoRecordFailed'));
       }
     }
   };
@@ -361,7 +511,7 @@ export default function AddAnimalScreen({ navigation }) {
       clearInterval(videoIntervalRef.current);
     }
     setIsVideoRecording(false);
-    
+
     const finalDuration = forcedDuration !== undefined && typeof forcedDuration === 'number' ? forcedDuration : videoTimer;
 
     if (cameraRef.current) {
@@ -383,8 +533,8 @@ export default function AddAnimalScreen({ navigation }) {
   const handleConfirmVideo = () => {
     if (!videoPreview || videoPreview.duration < 20) {
       Alert.alert(
-        'कमी वेळ (Too Short)',
-        'कृपया किमान २० सेकंदांचा व्हिडिओ रेकॉर्ड करा. (Please record at least 20 seconds.)'
+        t('addAnimal.videoTooShort'),
+        t('addAnimal.videoMinDurationWarning')
       );
       return;
     }
@@ -401,7 +551,7 @@ export default function AddAnimalScreen({ navigation }) {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('परवानगी नाकारली (Permission Denied)', 'गॅलरी परवानगी आवश्यक आहे. (Gallery permissions are required to select video.)');
+        Alert.alert(t('common.permissionDenied'), t('addAnimal.galleryVideoPermission'));
         return;
       }
 
@@ -421,28 +571,113 @@ export default function AddAnimalScreen({ navigation }) {
       }
     } catch (err) {
       console.warn('Video picker failed:', err.message);
-      Alert.alert('त्रुटी (Error)', 'व्हिडिओ निवडण्यात अयशस्वी. (Failed to pick video.)');
+      Alert.alert(t('common.error'), t('addAnimal.videoPickFailed'));
+    }
+  };
+
+  // Helper to check location permission state across Web (Permissions API) and Mobile (expo-location)
+  const checkLocationPermissionState = async () => {
+    console.log('[GPS DEBUG] checkLocationPermissionState called. Platform.OS:', Platform.OS);
+    if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator?.permissions?.query) {
+      try {
+        const permissionStatus = await navigator.permissions.query({ name: 'geolocation' });
+        console.log('[GPS DEBUG] Web navigator.permissions query state:', permissionStatus?.state);
+        if (permissionStatus?.state) {
+          return permissionStatus.state; // 'granted', 'prompt', 'denied'
+        }
+      } catch (err) {
+        console.warn('[GPS DEBUG] navigator.permissions.query failed/unsupported:', err);
+      }
+    }
+
+    try {
+      const { status, canAskAgain } = await Location.getForegroundPermissionsAsync();
+      console.log('[GPS DEBUG] Native getForegroundPermissionsAsync status:', status, 'canAskAgain:', canAskAgain);
+      if (status === 'granted') return 'granted';
+      if (status === 'denied' && !canAskAgain) return 'denied';
+      return 'prompt';
+    } catch (e) {
+      console.warn('[GPS DEBUG] Native getForegroundPermissionsAsync error:', e);
+      return 'prompt';
     }
   };
 
   // GPS Auto Coordinates fetcher
   const handleAutoGPS = async () => {
+    console.log('[GPS DEBUG] handleAutoGPS entered');
     setGpsLoading(true);
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'GPS permission is required to fetch coordinates.');
+      // 1. Check permission state first
+      const permState = await checkLocationPermissionState();
+      console.log('[GPS DEBUG] Permission state resolved as:', permState);
+
+      if (permState === 'denied') {
+        console.log('[GPS DEBUG] Permission state is DENIED. Aborting GPS fetch.');
         setGpsLoading(false);
+        Alert.alert(
+          '📍 Location permission is blocked',
+          'Please enable Location permission from your browser/device settings and try again.\n\n📍 स्थान परवानगी ब्लॉक केली आहे. कृपया सेटिंग्जमधून परवानगी सक्षम करा.'
+        );
         return;
       }
-      
+
+      // 2. Request permission if prompt or not yet granted
+      if (permState !== 'granted') {
+        console.log('[GPS DEBUG] Permission state is not granted. Requesting permission...');
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        console.log('[GPS DEBUG] requestForegroundPermissionsAsync status result:', status);
+        if (status !== 'granted') {
+          Alert.alert(
+            '📍 Location permission is blocked',
+            'Please enable Location permission from your browser/device settings and try again.\n\n📍 स्थान परवानगी ब्लॉक केली आहे. कृपया सेटिंग्जमधून परवानगी सक्षम करा.'
+          );
+          setGpsLoading(false);
+          return;
+        }
+      }
+
+      // 3. Fetch location coordinates when granted
+      console.log('[GPS DEBUG] GPS request started (getCurrentPositionAsync)...');
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      setLatitude(loc.coords.latitude);
-      setLongitude(loc.coords.longitude);
+      const lat = loc.coords.latitude;
+      const lng = loc.coords.longitude;
+      console.log('[GPS DEBUG] GPS coordinates retrieved:', lat, lng);
+
+      setLatitude(lat);
+      setLongitude(lng);
+
+      console.log('[GPS DEBUG] Reverse geocoding started...');
+      const geocoded = await reverseGeocodeWithCache(lat, lng);
+      console.log('[GPS DEBUG] Reverse geocoding result:', geocoded);
+
+      const stateName = geocoded?.state || 'Maharashtra';
+      const districtName = geocoded?.district || 'Pune';
+      const talukaName = geocoded?.taluka || 'Baramati';
+
+      if (geocoded?.pincode) setPincode(geocoded.pincode);
+      if (geocoded?.formattedAddress) setFormattedAddress(geocoded.formattedAddress);
+
+      const matchedState = states.find(s => s.name && (s.name.toLowerCase().includes(stateName.toLowerCase()) || stateName.toLowerCase().includes(s.name.toLowerCase()))) || { name: stateName };
+      setSelectedState(matchedState);
+      if (matchedState._id) fetchDistricts(matchedState._id);
+
+      const matchedDistrict = districts.find(d => d.name && (d.name.toLowerCase().includes(districtName.toLowerCase()) || districtName.toLowerCase().includes(d.name.toLowerCase()))) || { name: districtName };
+      setSelectedDistrict(matchedDistrict);
+      if (matchedDistrict._id) fetchTalukas(matchedDistrict._id);
+
+      const matchedTaluka = talukas.find(t => t.name && (t.name.toLowerCase().includes(talukaName.toLowerCase()) || talukaName.toLowerCase().includes(t.name.toLowerCase()))) || { name: talukaName };
+      setSelectedTaluka(matchedTaluka);
+      if (matchedTaluka._id) fetchVillages(matchedTaluka._id);
+
       setGpsSuccess(true);
     } catch (e) {
+      console.warn('[GPS DEBUG] handleAutoGPS encountered error:', e);
       setLatitude(17.2855);
       setLongitude(74.1839);
+      setFormattedAddress('Murti, Baramati, Pune, Maharashtra');
+      setSelectedState({ name: 'Maharashtra' });
+      setSelectedDistrict({ name: 'Pune' });
+      setSelectedTaluka({ name: 'Baramati' });
       setGpsSuccess(true);
     } finally {
       setGpsLoading(false);
@@ -465,8 +700,7 @@ export default function AddAnimalScreen({ navigation }) {
 
     // 1. Guest Mode Check
     if (userToken === 'guest') {
-      const guestMsg = 'जाहिरात प्रसिद्ध करण्यासाठी कृपया लॉग इन करा. (Please log in to publish a listing.)';
-      showAlert('लॉगिन आवश्यक (Login Required)', guestMsg);
+      showAlert(t('addAnimal.loginRequired'), t('addAnimal.loginToPublish'));
       return;
     }
 
@@ -476,46 +710,59 @@ export default function AddAnimalScreen({ navigation }) {
 
 
     if (validPhotos.length < 5) {
-      missingFields.push(`किमान ५ फोटो आवश्यक आहेत (At least 5 photos are required. Current count: ${validPhotos.length})`);
+      missingFields.push(t('addAnimal.photosRequired', { count: validPhotos.length }));
     }
     if (!video) {
-      missingFields.push("१ पडताळणी व्हिडिओ आवश्यक आहे (1 verification video is required)");
+      missingFields.push(t('addAnimal.videoRequired'));
     }
-    if (!title || !title.trim()) {
-      missingFields.push("जाहिरातीचे नाव (Listing Title)");
-    }
-    if (!selectedBreed) {
-      missingFields.push("जात (Breed)");
+    if (isOtherCategory) {
+      if (!title || !title.trim()) {
+        missingFields.push('प्राण्याचे नाव (Animal Name)');
+      }
+      if (!customBreedText || !customBreedText.trim()) {
+        missingFields.push('जात (Breed Name)');
+      }
+    } else {
+      if (!title || !title.trim()) {
+        missingFields.push(t('addAnimal.previewLabelTitle'));
+      }
+      if (!selectedBreed) {
+        missingFields.push(t('addAnimal.breedPlaceholder'));
+      } else if (isOtherBreedSelected && (!customBreedText || !customBreedText.trim())) {
+        missingFields.push('इतर जात नमूद करा / Enter Breed');
+      }
     }
     if (!price || !price.toString().trim()) {
-      missingFields.push("अपेक्षित किंमत (Expected Price)");
+      missingFields.push(t('addAnimal.expectedPriceLabel'));
     }
     if (!selectedState) {
-      missingFields.push("राज्य (State)");
+      missingFields.push(t('addAnimal.stateLabel'));
     }
     if (!selectedDistrict) {
-      missingFields.push("जिल्हा (District)");
+      missingFields.push(t('addAnimal.districtLabel'));
     }
     if (!selectedTaluka) {
-      missingFields.push("तालुका (Taluka)");
-    }
-    const villageVal = typeof selectedVillage === 'object' ? selectedVillage?.name : selectedVillage;
-    if (!villageVal || !villageVal.trim()) {
-      missingFields.push("गाव (Village)");
+      missingFields.push(t('addAnimal.talukaLabel'));
     }
 
     if (missingFields.length > 0) {
-      const errMsg = `कृपया खालील माहिती अपूर्ण आहे:\n- ${missingFields.join('\n- ')}`;
-      showAlert('त्रुटी (Error)', errMsg);
+      const errMsg = t('addAnimal.missingFieldsError', { fields: missingFields.join('\n- ') });
+      showAlert(t('common.error'), errMsg);
       return;
     }
 
     setIsSubmitting(true);
     setUploadProgress(0);
 
+    const effectiveBreedName = isOtherCategory
+      ? customBreedText.trim()
+      : isOtherBreedSelected && customBreedText.trim()
+      ? `इतर - ${customBreedText.trim()}`
+      : selectedBreed?.name || '';
+
     const basePayload = {
       categoryId: selectedCategory._id || selectedCategory.id,
-      breedId: selectedBreed._id || selectedBreed.id,
+      breedId: selectedBreed?._id || selectedBreed?.id || (breeds && breeds[0] ? breeds[0]._id : selectedCategory._id),
       title: title,
       description: description,
       price: Number(price),
@@ -527,13 +774,16 @@ export default function AddAnimalScreen({ navigation }) {
       health: {
         vaccinated: isVaccinated,
         healthy: isHealthy,
-        pregnant: isPregnant,
+        pregnant: gender === 'Female' ? isPregnant : false,
+        pregnancyMonth: (gender === 'Female' && isPregnant && pregnancyMonth) ? Number(pregnancyMonth) : null,
         milkCapacity: milkCapacity ? milkCapacity + ' Liters/day' : ''
       },
       state: selectedState?.name || '',
       district: selectedDistrict?.name || '',
       taluka: selectedTaluka?.name || '',
       village: (typeof selectedVillage === 'object' ? selectedVillage?.name : selectedVillage) || '',
+      pincode: pincode || '',
+      formattedAddress: formattedAddress || [typeof selectedVillage === 'object' ? selectedVillage?.name : selectedVillage, selectedTaluka?.name, selectedDistrict?.name, selectedState?.name].filter(Boolean).join(', '),
       latitude: latitude,
       longitude: longitude,
       mediaMetadata: {
@@ -549,10 +799,10 @@ export default function AddAnimalScreen({ navigation }) {
     try {
       const isRemoteUrl = (uri) => {
         if (!uri) return false;
-        return (uri.startsWith('http://') || uri.startsWith('https://')) && 
-               !uri.includes('localhost') && 
-               !uri.includes('127.0.0.1') && 
-               !uri.includes('10.0.2.2');
+        return (uri.startsWith('http://') || uri.startsWith('https://')) &&
+          !uri.includes('localhost') &&
+          !uri.includes('127.0.0.1') &&
+          !uri.includes('10.0.2.2');
       };
 
       const uploadedPhotoUrls = [];
@@ -568,7 +818,7 @@ export default function AddAnimalScreen({ navigation }) {
         } else {
           const formData = new FormData();
           const filename = `photo_${i}.jpg`;
-          
+
           if (Platform.OS === 'web') {
             const resBlob = await fetch(photo.uri);
             const blob = await resBlob.blob();
@@ -593,7 +843,7 @@ export default function AddAnimalScreen({ navigation }) {
         }
 
         if (!uploadedUrl) {
-          throw new Error(`फोटो ${i+1} अपलोड करण्यात अयशस्वी. (Failed to upload photo ${i+1}.)`);
+          throw new Error(`फोटो ${i + 1} अपलोड करण्यात अयशस्वी. (Failed to upload photo ${i + 1}.)`);
         }
 
         uploadedPhotoUrls.push(uploadedUrl);
@@ -643,9 +893,10 @@ export default function AddAnimalScreen({ navigation }) {
 
       const body = await animalApi.createAnimal(finalPayload);
       if (body.status === 'success') {
+        refreshManager.emit(REFRESH_EVENTS.LISTING_CREATED, body.data?.animal);
         showAlert(
-          'यशस्वी! (Success)',
-          'तुमची जाहिरात यशस्वीरित्या पाठवली गेली आहे आणि मंजुरीसाठी प्रलंबित आहे. (Your listing was posted and is pending admin approval.)',
+          t('common.success'),
+          t('addAnimal.publishSuccess'),
           [{ text: 'OK', onPress: () => navigation.navigate('MyListings') }]
         );
       } else {
@@ -662,12 +913,12 @@ export default function AddAnimalScreen({ navigation }) {
       if (isNetworkError) {
         await saveDraftLocally(basePayload);
         showAlert(
-          'नेटवर्क नाही (No Internet)',
-          'तुमची जाहिरात ड्राफ्ट म्हणून जतन केली आहे. कनेक्शन उपलब्ध झाल्यावर ती अपलोड होईल.',
+          t('addAnimal.noInternet'),
+          t('addAnimal.savedAsDraft'),
           [{ text: 'OK', onPress: () => navigation.navigate('MyListings') }]
         );
       } else {
-        showAlert('त्रुटी (Error)', err.message || 'जाहिरात प्रसिद्ध करण्यात अडचण आली. (Failed to publish listing.)');
+        showAlert(t('common.error'), err.message || t('addAnimal.publishFailed'));
       }
     } finally {
       setIsSubmitting(false);
@@ -769,14 +1020,16 @@ export default function AddAnimalScreen({ navigation }) {
       case 1:
         return (
           <View style={styles.wizardCard}>
-            <Text style={styles.wizardLabel}>जनावराचा प्रकार निवडा / Select Animal Category</Text>
+            <AppText style={styles.wizardLabel}>
+              {t('addAnimal.selectAnimalCategory')}
+            </AppText>
             <View style={styles.categoryGrid}>
               {categories.map((cat) => {
                 let icon = 'cow';
                 if (cat.slug === 'buffalo') icon = 'water';
                 if (cat.slug === 'goat') icon = 'sheep';
                 if (cat.slug === 'horse') icon = 'horse-variant';
-                
+
                 return (
                   <TouchableOpacity
                     key={cat._id}
@@ -787,7 +1040,11 @@ export default function AddAnimalScreen({ navigation }) {
                     <View style={styles.categoryIconCircle}>
                       <MaterialCommunityIcons name={icon} size={38} color="#16A34A" />
                     </View>
-                    <Text style={styles.categoryNameText}>{cat.name}</Text>
+                    <AppText style={styles.categoryNameText}>
+                      {t(`buy.${cat.slug}`, {
+                        defaultValue: cat.name,
+                      })}
+                    </AppText>
                   </TouchableOpacity>
                 );
               })}
@@ -820,8 +1077,8 @@ export default function AddAnimalScreen({ navigation }) {
               elevation: 1
             }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <Text style={{ fontSize: 14, fontWeight: '700', color: '#1E293B' }}>माध्यम प्रगती / Media Progress</Text>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: '#16A34A' }}>{totalCompletedMedia} / 6 Completed</Text>
+                <AppText style={{ fontSize: 14, fontWeight: '700', color: '#1E293B' }}>{t('addAnimal.mediaProgress')}</AppText>
+                <AppText style={{ fontSize: 13, fontWeight: '700', color: '#16A34A' }}>{totalCompletedMedia} / 6 Completed</AppText>
               </View>
               <View style={{ height: 8, backgroundColor: '#E2E8F0', borderRadius: 4, overflow: 'hidden' }}>
                 <View style={{ width: `${mediaPercentage}%`, height: '100%', backgroundColor: '#16A34A', borderRadius: 4 }} />
@@ -855,7 +1112,7 @@ export default function AddAnimalScreen({ navigation }) {
                         style={StyleSheet.absoluteFillObject}
                         facing="back"
                       />
-                      
+
                       {/* Semi-transparent overlay to ensure text is highly readable */}
                       <View style={{
                         position: 'absolute',
@@ -866,11 +1123,18 @@ export default function AddAnimalScreen({ navigation }) {
                         padding: 10,
                         alignItems: 'center'
                       }}>
-                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF', textAlign: 'center' }}>
-                          {currentReq.nameMr} ({currentReq.name})
-                        </Text>
+                        <AppText
+                          style={{
+                            fontSize: 13,
+                            fontWeight: '700',
+                            color: '#FFFFFF',
+                            textAlign: 'center',
+                          }}
+                        >
+                          {t(currentReq.nameKey)}
+                        </AppText>
                       </View>
-                      
+
                       <TouchableOpacity style={[styles.shutterBtn, { position: 'absolute', bottom: 12 }]} onPress={handleCapturePhoto}>
                         <View style={styles.shutterBtnInner} />
                       </TouchableOpacity>
@@ -878,12 +1142,12 @@ export default function AddAnimalScreen({ navigation }) {
                   ) : (
                     <View style={{ alignItems: 'center', justifyContent: 'center', padding: 20, flex: 1 }}>
                       <MaterialCommunityIcons name="camera-off" size={50} color="#94A3B8" />
-                      <Text style={{ fontSize: 14, fontWeight: '700', color: '#1E293B', marginTop: 8, textAlign: 'center' }}>
-                        {currentReq.nameMr}
-                      </Text>
-                      <Text style={{ fontSize: 12, color: '#64748B', textAlign: 'center', marginTop: 4, paddingHorizontal: 10 }}>
+                      <AppText style={{ fontSize: 14, fontWeight: '700', color: '#1E293B', marginTop: 8, textAlign: 'center' }}>
+                        {t(currentReq.nameKey)}
+                      </AppText>
+                      <AppText style={{ fontSize: 12, color: '#64748B', textAlign: 'center', marginTop: 4, paddingHorizontal: 10 }}>
                         Camera is not supported in this browser. Please upload from gallery.
-                      </Text>
+                      </AppText>
                       <TouchableOpacity
                         style={{
                           backgroundColor: '#16A34A',
@@ -897,9 +1161,9 @@ export default function AddAnimalScreen({ navigation }) {
                         onPress={handlePickImage}
                       >
                         <Ionicons name="image-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                        <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>
+                        <AppText style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>
                           गॅलरीतून निवडा / Upload
-                        </Text>
+                        </AppText>
                       </TouchableOpacity>
                     </View>
                   )}
@@ -929,7 +1193,7 @@ export default function AddAnimalScreen({ navigation }) {
                     onPress={handleRetakePhoto}
                   >
                     <Ionicons name="refresh-outline" size={18} color="#EF4444" style={{ marginRight: 6 }} />
-                    <Text style={{ color: '#EF4444', fontWeight: '700', fontSize: 14 }}>पुन्हा काढा / Retake</Text>
+                    <AppText style={{ color: '#EF4444', fontWeight: '700', fontSize: 14 }}>{t('addAnimal.retakeBtn')}</AppText>
                   </TouchableOpacity>
 
                   {isPhotoAccepted ? (
@@ -947,7 +1211,7 @@ export default function AddAnimalScreen({ navigation }) {
                       }}
                     >
                       <Ionicons name="checkmark-circle" size={18} color="#16A34A" style={{ marginRight: 6 }} />
-                      <Text style={{ color: '#16A34A', fontWeight: '800', fontSize: 14 }}>स्वीकारले / Accepted</Text>
+                      <AppText style={{ color: '#16A34A', fontWeight: '800', fontSize: 14 }}>{t('addAnimal.accepted')}</AppText>
                     </View>
                   ) : (
                     <TouchableOpacity
@@ -963,7 +1227,7 @@ export default function AddAnimalScreen({ navigation }) {
                       onPress={handleConfirmPhoto}
                     >
                       <Ionicons name="checkmark-circle-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-                      <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>फोटो वापरा / Use Photo</Text>
+                      <AppText style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>फोटो वापरा / Use Photo</AppText>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -981,40 +1245,40 @@ export default function AddAnimalScreen({ navigation }) {
             }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
                 <Ionicons name="information-circle" size={20} color="#1D4ED8" style={{ marginRight: 8 }} />
-                <Text style={{ fontSize: 14, fontWeight: '700', color: '#1E3A8A' }}>
+                <AppText style={{ fontSize: 14, fontWeight: '700', color: '#1E3A8A' }}>
                   मार्गदर्शक सूचना / Instructions
-                </Text>
+                </AppText>
               </View>
-              
-              <Text style={{ fontSize: 14, fontWeight: '700', color: '#1E293B', marginBottom: 8 }}>
-                {currentReq.nameMr} ({currentReq.name})
-              </Text>
-              
+
+              <AppText style={{ fontSize: 14, fontWeight: '700', color: '#1E293B', marginBottom: 8 }}>
+                {t(currentReq.nameKey)}
+              </AppText>
+
               <View style={{ paddingLeft: 4 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                  <Text style={{ color: '#1D4ED8', marginRight: 8, fontSize: 12 }}>✔</Text>
-                  <Text style={{ fontSize: 12.5, color: '#1E293B', fontWeight: '500' }}>
-                    {currentReq.instructionEn}
-                  </Text>
+                  <AppText style={{ color: '#1D4ED8', marginRight: 8, fontSize: 12 }}>✔</AppText>
+                  <AppText style={{ fontSize: 12.5, color: '#1E293B', fontWeight: '500' }}>
+                    {t(currentReq.instructionKey)}
+                  </AppText>
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                  <Text style={{ color: '#1D4ED8', marginRight: 8, fontSize: 12 }}>✔</Text>
-                  <Text style={{ fontSize: 12.5, color: '#475569' }}>
-                    {currentReq.instructionMr}
-                  </Text>
+                  <AppText style={{ color: '#1D4ED8', marginRight: 8, fontSize: 12 }}>✔</AppText>
+                  <AppText style={{ fontSize: 12.5, color: '#475569' }}>
+                    {t(currentReq.instructionKey)}
+                  </AppText>
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                  <Text style={{ color: '#1D4ED8', marginRight: 8, fontSize: 12 }}>✔</Text>
-                  <Text style={{ fontSize: 12.5, color: '#475569' }}>Good lighting and no blur (चांगला प्रकाश आणि स्पष्ट फोटो)</Text>
+                  <AppText style={{ color: '#1D4ED8', marginRight: 8, fontSize: 12 }}>✔</AppText>
+                  <AppText style={{ fontSize: 12.5, color: '#475569' }}>Good lighting and no blur (चांगला प्रकाश आणि स्पष्ट फोटो)</AppText>
                 </View>
               </View>
             </View>
 
             {/* Required Media Checklist */}
             <View style={{ marginBottom: 20 }}>
-              <Text style={{ fontSize: 14, fontWeight: '700', color: '#1E293B', marginBottom: 12 }}>
+              <AppText style={{ fontSize: 14, fontWeight: '700', color: '#1E293B', marginBottom: 12 }}>
                 आवश्यक मीडिया यादी / Required Media Checklist
-              </Text>
+              </AppText>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
                 {PHOTO_STEPS.map((step, idx) => {
                   const isCompleted = !!photos[idx];
@@ -1040,15 +1304,15 @@ export default function AddAnimalScreen({ navigation }) {
                         elevation: 1
                       }}
                     >
-                      <Text style={{
+                      <AppText style={{
                         fontSize: 12.5,
                         fontWeight: '700',
                         color: isCurrent ? '#16A34A' : '#475569',
                         flex: 1,
                         marginRight: 4
                       }} numberOfLines={1}>
-                        {step.nameMr}
-                      </Text>
+                        {t(step.nameKey)}
+                      </AppText>
                       {isCompleted ? (
                         <Ionicons name="checkmark-circle" size={18} color="#16A34A" />
                       ) : (
@@ -1057,7 +1321,7 @@ export default function AddAnimalScreen({ navigation }) {
                     </View>
                   );
                 })}
-                
+
                 {/* Verification Video checklist item */}
                 <View
                   style={{
@@ -1078,7 +1342,7 @@ export default function AddAnimalScreen({ navigation }) {
                     elevation: 1
                   }}
                 >
-                  <Text style={{
+                  <AppText style={{
                     fontSize: 12.5,
                     fontWeight: '700',
                     color: '#475569',
@@ -1086,7 +1350,7 @@ export default function AddAnimalScreen({ navigation }) {
                     marginRight: 4
                   }} numberOfLines={1}>
                     व्हिडिओ / Video
-                  </Text>
+                  </AppText>
                   {isVideoRecorded ? (
                     <Ionicons name="checkmark-circle" size={18} color="#16A34A" />
                   ) : (
@@ -1108,9 +1372,7 @@ export default function AddAnimalScreen({ navigation }) {
               marginBottom: 8
             }}>
               <Ionicons name="warning" size={20} color="#D97706" style={{ marginRight: 10 }} />
-              <Text style={{ fontSize: 12, fontWeight: '700', color: '#B45309', flex: 1, lineHeight: 16 }}>
-                पुढील प्रक्रियेसाठी सर्व ५ फोटो आणि १ पडताळणी व्हिडिओ अनिवार्य आहेत. (All 5 Photos and Verification Video are mandatory before proceeding.)
-              </Text>
+              <AppText style={{ fontSize: 12, fontWeight: '700', color: '#B45309', flex: 1, lineHeight: 16 }}>{t('addAnimal.mandatoryMediaWarning')}</AppText>
             </View>
           </View>
         );
@@ -1135,10 +1397,8 @@ export default function AddAnimalScreen({ navigation }) {
               elevation: 1
             }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <Text style={{ fontSize: 14, fontWeight: '700', color: '#1E293B' }}>माध्यम प्रगती / Media Progress</Text>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: '#16A34A' }}>
-                  {photos.filter(p => !!p).length + (video ? 1 : 0)} / 6 Completed
-                </Text>
+                <AppText style={{ fontSize: 14, fontWeight: '700', color: '#1E293B' }}>{t('addAnimal.mediaProgress')}</AppText>
+                <AppText style={{ fontSize: 13, fontWeight: '700', color: '#16A34A' }}>{t('addAnimal.mediaCompletedCount', { completed: photos.filter(p => !!p).length + (video ? 1 : 0) })}</AppText>
               </View>
               <View style={{ height: 8, backgroundColor: '#E2E8F0', borderRadius: 4, overflow: 'hidden' }}>
                 <View style={{ width: `${videoPercentage}%`, height: '100%', backgroundColor: '#16A34A', borderRadius: 4 }} />
@@ -1163,32 +1423,20 @@ export default function AddAnimalScreen({ navigation }) {
                 {videoPreview ? (
                   <View style={{ width: '100%', padding: 16, borderRadius: 14, backgroundColor: '#F8FAFC', justifyContent: 'center', alignItems: 'center' }}>
                     <Ionicons name="videocam" size={64} color={videoPreview.duration < 20 ? '#EF4444' : '#16A34A'} />
-                    <Text style={{ fontSize: 15, fontWeight: '800', color: '#1E293B', marginTop: 8 }}>
-                      Uploaded Video Duration: 00:{videoPreview.duration < 10 ? `0${videoPreview.duration}` : videoPreview.duration} / 00:30
-                    </Text>
-                    <Text style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>
-                      Size: {Math.round((videoPreview.fileSize || 0) / (1024 * 1024))} MB
-                    </Text>
+                    <AppText style={{ fontSize: 15, fontWeight: '800', color: '#1E293B', marginTop: 8 }}>{t('addAnimal.uploadedVideoDuration', { duration: videoPreview.duration < 10 ? `0${videoPreview.duration}` : videoPreview.duration })}</AppText>
+                    <AppText style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>{t('addAnimal.videoSize', { size: Math.round((videoPreview.fileSize || 0) / (1024 * 1024)) })}</AppText>
                     {videoPreview.duration < 20 && (
                       <View style={{ padding: 12, backgroundColor: '#FEF2F2', borderRadius: 8, marginTop: 10, borderWidth: 1, borderColor: '#FEE2E2', width: '100%' }}>
-                        <Text style={{ fontSize: 13, color: '#EF4444', fontWeight: '700', textAlign: 'center', lineHeight: 18 }}>
-                          Please record at least 20 seconds for animal verification.
-                        </Text>
-                        <Text style={{ fontSize: 13, color: '#EF4444', fontWeight: '700', textAlign: 'center', marginTop: 6, lineHeight: 18 }}>
-                          प्राण्याच्या पडताळणीसाठी कृपया किमान 20 सेकंदांचा व्हिडिओ रेकॉर्ड करा.
-                        </Text>
+                        <AppText style={{ fontSize: 13, color: '#EF4444', fontWeight: '700', textAlign: 'center', lineHeight: 18 }}>{t('addAnimal.videoMinDurationWarning')}</AppText>
+                        <AppText style={{ fontSize: 13, color: '#EF4444', fontWeight: '700', textAlign: 'center', marginTop: 6, lineHeight: 18 }}>{t('addAnimal.videoMinDurationWarning')}</AppText>
                       </View>
                     )}
                   </View>
                 ) : (
                   <View style={{ height: 240, borderRadius: 14, backgroundColor: '#F8FAFC', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
                     <MaterialCommunityIcons name="video-off" size={50} color="#94A3B8" />
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#1E293B', marginTop: 8, textAlign: 'center' }}>
-                      Video recording is available only on Android and iOS devices.
-                    </Text>
-                    <Text style={{ fontSize: 12, color: '#64748B', textAlign: 'center', marginTop: 4, paddingHorizontal: 10 }}>
-                      Please select and upload an existing video file of the animal.
-                    </Text>
+                    <AppText style={{ fontSize: 14, fontWeight: '700', color: '#1E293B', marginTop: 8, textAlign: 'center' }}>{t('addAnimal.videoUnsupportedTitle')}</AppText>
+                    <AppText style={{ fontSize: 12, color: '#64748B', textAlign: 'center', marginTop: 4, paddingHorizontal: 10 }}>{t('addAnimal.videoUnsupportedSub')}</AppText>
                     <TouchableOpacity
                       style={{
                         backgroundColor: '#16A34A',
@@ -1202,9 +1450,7 @@ export default function AddAnimalScreen({ navigation }) {
                       onPress={handlePickVideo}
                     >
                       <Ionicons name="cloud-upload-outline" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-                      <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 14 }}>
-                        Upload Verification Video
-                      </Text>
+                      <AppText style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 14 }}>{t('addAnimal.uploadVideoBtn')}</AppText>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -1232,7 +1478,7 @@ export default function AddAnimalScreen({ navigation }) {
                       onPress={handleRetakeVideo}
                     >
                       <Ionicons name="refresh-outline" size={18} color="#EF4444" style={{ marginRight: 6 }} />
-                      <Text style={{ color: '#EF4444', fontWeight: '700', fontSize: 14 }}>पुन्हा काढा / Retake</Text>
+                      <AppText style={{ color: '#EF4444', fontWeight: '700', fontSize: 14 }}>{t('addAnimal.retakeBtn')}</AppText>
                     </TouchableOpacity>
 
                     {isVideoRecordingAccepted ? (
@@ -1250,7 +1496,7 @@ export default function AddAnimalScreen({ navigation }) {
                         }}
                       >
                         <Ionicons name="checkmark-circle" size={18} color="#16A34A" style={{ marginRight: 6 }} />
-                        <Text style={{ color: '#16A34A', fontWeight: '800', fontSize: 14 }}>स्वीकारले / Accepted</Text>
+                        <AppText style={{ color: '#16A34A', fontWeight: '800', fontSize: 14 }}>{t('addAnimal.accepted')}</AppText>
                       </View>
                     ) : (
                       <TouchableOpacity
@@ -1270,7 +1516,7 @@ export default function AddAnimalScreen({ navigation }) {
                         disabled={videoPreview.duration < 20}
                       >
                         <Ionicons name="checkmark-circle-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-                        <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>वापरा / Use Video</Text>
+                        <AppText style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>{t('addAnimal.useVideo')}</AppText>
                       </TouchableOpacity>
                     )}
                   </View>
@@ -1294,17 +1540,11 @@ export default function AddAnimalScreen({ navigation }) {
                 {videoPreview ? (
                   <View style={{ width: '100%', padding: 16, borderRadius: 14, backgroundColor: '#F8FAFC', justifyContent: 'center', alignItems: 'center' }}>
                     <Ionicons name="videocam" size={64} color={videoPreview.duration < 20 ? '#EF4444' : '#16A34A'} />
-                    <Text style={{ fontSize: 15, fontWeight: '800', color: '#1E293B', marginTop: 8 }}>
-                      Video Duration: 00:{videoPreview.duration < 10 ? `0${videoPreview.duration}` : videoPreview.duration} / 00:30
-                    </Text>
+                    <AppText style={{ fontSize: 15, fontWeight: '800', color: '#1E293B', marginTop: 8 }}>{t('addAnimal.videoDuration', { duration: videoPreview.duration < 10 ? `0${videoPreview.duration}` : videoPreview.duration })}</AppText>
                     {videoPreview.duration < 20 && (
                       <View style={{ padding: 12, backgroundColor: '#FEF2F2', borderRadius: 8, marginTop: 10, borderWidth: 1, borderColor: '#FEE2E2', width: '100%' }}>
-                        <Text style={{ fontSize: 13, color: '#EF4444', fontWeight: '700', textAlign: 'center', lineHeight: 18 }}>
-                          Please record at least 20 seconds for animal verification.
-                        </Text>
-                        <Text style={{ fontSize: 13, color: '#EF4444', fontWeight: '700', textAlign: 'center', marginTop: 6, lineHeight: 18 }}>
-                          प्राण्याच्या पडताळणीसाठी कृपया किमान 20 सेकंदांचा व्हिडिओ रेकॉर्ड करा.
-                        </Text>
+                        <AppText style={{ fontSize: 13, color: '#EF4444', fontWeight: '700', textAlign: 'center', lineHeight: 18 }}>{t('addAnimal.videoMinDurationWarning')}</AppText>
+                        <AppText style={{ fontSize: 13, color: '#EF4444', fontWeight: '700', textAlign: 'center', marginTop: 6, lineHeight: 18 }}>{t('addAnimal.videoMinDurationWarning')}</AppText>
                       </View>
                     )}
                   </View>
@@ -1342,20 +1582,14 @@ export default function AddAnimalScreen({ navigation }) {
                           padding: 10,
                           alignItems: 'center'
                         }}>
-                          <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF', textAlign: 'center' }}>
-                            पडताळणी व्हिडिओ / Verification Video
-                          </Text>
+                          <AppText style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF', textAlign: 'center' }}>{t('addAnimal.cameraBoxTitle')}</AppText>
                         </View>
                       </>
                     ) : (
                       <View style={{ alignItems: 'center', justifyContent: 'center', flex: 1 }}>
                         <MaterialCommunityIcons name="video-off" size={50} color="#94A3B8" />
-                        <Text style={{ fontSize: 14, fontWeight: '700', color: '#1E293B', marginTop: 8, textAlign: 'center' }}>
-                          Camera Unsupported
-                        </Text>
-                        <Text style={{ fontSize: 12, color: '#64748B', textAlign: 'center', marginTop: 4, paddingHorizontal: 10 }}>
-                          Recording is not supported in this browser. Please upload from gallery.
-                        </Text>
+                        <AppText style={{ fontSize: 14, fontWeight: '700', color: '#1E293B', marginTop: 8, textAlign: 'center' }}>{t('addAnimal.cameraUnsupportedTitle')}</AppText>
+                        <AppText style={{ fontSize: 12, color: '#64748B', textAlign: 'center', marginTop: 4, paddingHorizontal: 10 }}>{t('addAnimal.cameraUnsupportedSub')}</AppText>
                         <TouchableOpacity
                           style={{
                             backgroundColor: '#16A34A',
@@ -1369,9 +1603,7 @@ export default function AddAnimalScreen({ navigation }) {
                           onPress={handlePickVideo}
                         >
                           <Ionicons name="cloud-upload-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                          <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>
-                            गॅलरीतून व्हिडिओ निवडा / Upload Video
-                          </Text>
+                          <AppText style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>{t('addAnimal.uploadVideoBtn')}</AppText>
                         </TouchableOpacity>
                       </View>
                     )}
@@ -1383,16 +1615,12 @@ export default function AddAnimalScreen({ navigation }) {
                   <View style={{ alignItems: 'center', marginTop: 12 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
                       <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444', marginRight: 6 }} />
-                      <Text style={{ fontSize: 14, fontWeight: '700', color: '#EF4444' }}>
-                        Recording: 00:{videoTimer < 10 ? `0${videoTimer}` : videoTimer} / 00:30
-                      </Text>
+                      <AppText style={{ fontSize: 14, fontWeight: '700', color: '#EF4444' }}>{t('addAnimal.recordingTimer', { timer: videoTimer < 10 ? `0${videoTimer}` : videoTimer })}</AppText>
                     </View>
                     <View style={{ height: 6, backgroundColor: '#E2E8F0', borderRadius: 3, width: '80%', overflow: 'hidden', marginTop: 6, marginBottom: 8 }}>
                       <View style={{ width: `${(videoTimer / 30) * 100}%`, height: '100%', backgroundColor: '#EF4444' }} />
                     </View>
-                    <Text style={{ fontSize: 11, color: '#64748B' }}>
-                      (Min. 20s required / किमान २० सेकंद रेकॉर्ड करा)
-                    </Text>
+                    <AppText style={{ fontSize: 11, color: '#64748B' }}>{t('addAnimal.minDurationRequired')}</AppText>
                   </View>
                 )}
 
@@ -1419,7 +1647,7 @@ export default function AddAnimalScreen({ navigation }) {
                       onPress={handleRetakeVideo}
                     >
                       <Ionicons name="refresh-outline" size={18} color="#EF4444" style={{ marginRight: 6 }} />
-                      <Text style={{ color: '#EF4444', fontWeight: '700', fontSize: 14 }}>पुन्हा काढा / Retake</Text>
+                      <AppText style={{ color: '#EF4444', fontWeight: '700', fontSize: 14 }}>{t('addAnimal.retakeBtn')}</AppText>
                     </TouchableOpacity>
 
                     {isVideoRecordingAccepted ? (
@@ -1437,7 +1665,7 @@ export default function AddAnimalScreen({ navigation }) {
                         }}
                       >
                         <Ionicons name="checkmark-circle" size={18} color="#16A34A" style={{ marginRight: 6 }} />
-                        <Text style={{ color: '#16A34A', fontWeight: '800', fontSize: 14 }}>स्वीकारले / Accepted</Text>
+                        <AppText style={{ color: '#16A34A', fontWeight: '800', fontSize: 14 }}>{t('addAnimal.accepted')}</AppText>
                       </View>
                     ) : (
                       <TouchableOpacity
@@ -1457,7 +1685,7 @@ export default function AddAnimalScreen({ navigation }) {
                         disabled={videoPreview.duration < 20}
                       >
                         <Ionicons name="checkmark-circle-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-                        <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>वापरा / Use Video</Text>
+                        <AppText style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>{t('addAnimal.useVideo')}</AppText>
                       </TouchableOpacity>
                     )}
                   </View>
@@ -1477,7 +1705,7 @@ export default function AddAnimalScreen({ navigation }) {
                           onPress={handleStopRecording}
                         >
                           <Ionicons name="square" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-                          <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>रेकॉर्डिंग थांबवा / Stop Recording</Text>
+                          <AppText style={{ color: '#FFFFFF', fontWeight: '700' }}>रेकॉर्डिंग थांबवा / Stop Recording</AppText>
                         </TouchableOpacity>
                       ) : (
                         <TouchableOpacity
@@ -1492,7 +1720,7 @@ export default function AddAnimalScreen({ navigation }) {
                           onPress={handleStartRecording}
                         >
                           <Ionicons name="radio-button-on" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-                          <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>रेकॉर्डिंग सुरू करा / Start Recording</Text>
+                          <AppText style={{ color: '#FFFFFF', fontWeight: '700' }}>रेकॉर्डिंग सुरू करा / Start Recording</AppText>
                         </TouchableOpacity>
                       )}
                     </View>
@@ -1512,30 +1740,30 @@ export default function AddAnimalScreen({ navigation }) {
             }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
                 <Ionicons name="information-circle" size={20} color="#1D4ED8" style={{ marginRight: 8 }} />
-                <Text style={{ fontSize: 14, fontWeight: '700', color: '#1E3A8A' }}>
+                <AppText style={{ fontSize: 14, fontWeight: '700', color: '#1E3A8A' }}>
                   व्हिडिओ मार्गदर्शक सूचना / Video Instructions
-                </Text>
+                </AppText>
               </View>
               <View style={{ paddingLeft: 4 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                  <Text style={{ color: '#1D4ED8', marginRight: 8, fontSize: 12 }}>✔</Text>
-                  <Text style={{ fontSize: 12.5, color: '#1E293B', fontWeight: '500' }}>
+                  <AppText style={{ color: '#1D4ED8', marginRight: 8, fontSize: 12 }}>✔</AppText>
+                  <AppText style={{ fontSize: 12.5, color: '#1E293B', fontWeight: '500' }}>
                     Walk around the animal (जनावराला चालवून व्हिडिओ काढा)
-                  </Text>
+                  </AppText>
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                  <Text style={{ color: '#1D4ED8', marginRight: 8, fontSize: 12 }}>✔</Text>
-                  <Text style={{ fontSize: 12.5, color: '#475569' }}>
+                  <AppText style={{ color: '#1D4ED8', marginRight: 8, fontSize: 12 }}>✔</AppText>
+                  <AppText style={{ fontSize: 12.5, color: '#475569' }}>
                     Show Front, Left, Right, Back (सर्व बाजू स्पष्ट दाखवा)
-                  </Text>
+                  </AppText>
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                  <Text style={{ color: '#1D4ED8', marginRight: 8, fontSize: 12 }}>✔</Text>
-                  <Text style={{ fontSize: 12.5, color: '#475569' }}>Record in good lighting (चांगल्या प्रकाशात रेकॉर्ड करा)</Text>
+                  <AppText style={{ color: '#1D4ED8', marginRight: 8, fontSize: 12 }}>✔</AppText>
+                  <AppText style={{ fontSize: 12.5, color: '#475569' }}>Record in good lighting (चांगल्या प्रकाशात रेकॉर्ड करा)</AppText>
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                  <Text style={{ color: '#1D4ED8', marginRight: 8, fontSize: 12 }}>✔</Text>
-                  <Text style={{ fontSize: 12.5, color: '#16A34A', fontWeight: '700' }}>Minimum 20 seconds (किमान २० सेकंदांचा व्हिडिओ)</Text>
+                  <AppText style={{ color: '#1D4ED8', marginRight: 8, fontSize: 12 }}>✔</AppText>
+                  <AppText style={{ fontSize: 12.5, color: '#16A34A', fontWeight: '700' }}>Minimum 20 seconds (किमान २० सेकंदांचा व्हिडिओ)</AppText>
                 </View>
               </View>
             </View>
@@ -1552,9 +1780,9 @@ export default function AddAnimalScreen({ navigation }) {
               marginBottom: 8
             }}>
               <Ionicons name="warning" size={20} color="#D97706" style={{ marginRight: 10 }} />
-              <Text style={{ fontSize: 12, fontWeight: '700', color: '#B45309', flex: 1, lineHeight: 16 }}>
+              <AppText style={{ fontSize: 12, fontWeight: '700', color: '#B45309', flex: 1, lineHeight: 16 }}>
                 पडताळणी व्हिडिओ अनिवार्य आहे. जनावराभोवती फिरून सर्व बाजू स्पष्टपणे दाखवा. (Verification video is mandatory. Walk around the animal and clearly show all sides.)
-              </Text>
+              </AppText>
             </View>
           </View>
         );
@@ -1562,40 +1790,91 @@ export default function AddAnimalScreen({ navigation }) {
       case 4:
         return (
           <View style={styles.wizardCard}>
-            <Text style={styles.wizardLabel}>जनावराची माहिती भरा / Animal Details</Text>
-            
-            <View style={styles.inputGroup}>
-              <Text style={styles.largeFieldLabel}>जाहिरातीचे नाव / Listing Title *</Text>
-              <TextInput
-                style={styles.largeInput}
-                placeholder="उदा. २ वर्षांची जर्सी गाय (e.g. 2 Yr Jersey Cow)"
-                value={title}
-                onChangeText={setTitle}
-              />
-            </View>
+            <AppText style={styles.wizardLabel}>जनावराची माहिती भरा / Animal Details</AppText>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.largeFieldLabel}>जात / Breed *</Text>
-              {loadingBreeds ? (
-                <ActivityIndicator size="small" color="#16A34A" />
-              ) : (
-                <View style={styles.dropdownContainer}>
-                  {breeds.map((b) => (
-                    <TouchableOpacity
-                      key={b._id}
-                      style={[styles.pillOption, selectedBreed?._id === b._id && styles.selectedPillOption]}
-                      onPress={() => setSelectedBreed(b)}
-                    >
-                      <Text style={[styles.pillText, selectedBreed?._id === b._id && styles.selectedPillText]}>{b.name}</Text>
-                    </TouchableOpacity>
-                  ))}
+            {isOtherCategory ? (
+              <>
+                <View style={styles.inputGroup}>
+                  <AppText style={styles.largeFieldLabel}>प्राण्याचे नाव / Animal Name *</AppText>
+                  <TextInput
+                    style={styles.largeInput}
+                    placeholder="उदा. ससा / बदक / उंट (e.g. Rabbit / Duck / Camel)"
+                    value={title}
+                    onChangeText={(txt) => {
+                      setTitle(txt);
+                      setIsTitleUserEdited(txt.trim().length > 0);
+                    }}
+                  />
                 </View>
-              )}
-            </View>
+
+                <View style={styles.inputGroup}>
+                  <AppText style={styles.largeFieldLabel}>जात / Breed Name *</AppText>
+                  <TextInput
+                    style={styles.largeInput}
+                    placeholder="उदा. देशी / ससा जात (e.g. Desi / Rabbit Breed)"
+                    value={customBreedText}
+                    onChangeText={(txt) => {
+                      setCustomBreedText(txt);
+                      if (!selectedBreed || selectedBreed.id !== 'custom_other') {
+                        setSelectedBreed({ id: 'custom_other', name: txt, _id: selectedCategory?._id });
+                      }
+                    }}
+                  />
+                </View>
+              </>
+            ) : (
+              <>
+                <View style={styles.inputGroup}>
+                  <AppText style={styles.largeFieldLabel}>जाहिरातीचे नाव / Listing Title *</AppText>
+                  <TextInput
+                    style={styles.largeInput}
+                    placeholder="उदा. २ वर्षांची जर्सी गाय"
+                    value={title}
+                    onChangeText={(txt) => {
+                      setTitle(txt);
+                      setIsTitleUserEdited(txt.trim().length > 0);
+                    }}
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <AppText style={styles.largeFieldLabel}>जात / Breed *</AppText>
+                  {loadingBreeds ? (
+                    <ActivityIndicator size="small" color="#16A34A" />
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.dropdownSelector}
+                      onPress={() => {
+                        setBreedSearchQuery('');
+                        setIsBreedModalVisible(true);
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <AppText style={[styles.dropdownSelectorText, !selectedBreed && { color: '#94A3B8' }]}>
+                        {selectedBreed ? selectedBreed.name : 'जात निवडा / Select Breed'}
+                      </AppText>
+                      <Ionicons name="chevron-down" size={20} color="#64748B" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {isOtherBreedSelected && (
+                  <View style={styles.inputGroup}>
+                    <AppText style={styles.largeFieldLabel}>इतर जात नमूद करा / Enter Breed *</AppText>
+                    <TextInput
+                      style={styles.largeInput}
+                      placeholder="उदा. गीर क्रॉस (e.g. Gir Cross)"
+                      value={customBreedText}
+                      onChangeText={setCustomBreedText}
+                    />
+                  </View>
+                )}
+              </>
+            )}
 
             <View style={styles.rowInputs}>
               <View style={[styles.inputGroup, { width: '48%' }]}>
-                <Text style={styles.largeFieldLabel}>वय / Age (वर्ष) *</Text>
+                <AppText style={styles.largeFieldLabel}>वय / Age (वर्ष) *</AppText>
                 <TextInput
                   style={styles.largeInput}
                   keyboardType="numeric"
@@ -1605,7 +1884,7 @@ export default function AddAnimalScreen({ navigation }) {
                 />
               </View>
               <View style={[styles.inputGroup, { width: '48%' }]}>
-                <Text style={styles.largeFieldLabel}>वजन / Weight (किलो)</Text>
+                <AppText style={styles.largeFieldLabel}>वजन (पर्यायी) / Weight (kg)</AppText>
                 <TextInput
                   style={styles.largeInput}
                   keyboardType="numeric"
@@ -1617,7 +1896,7 @@ export default function AddAnimalScreen({ navigation }) {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.largeFieldLabel}>लिंग / Gender</Text>
+              <AppText style={styles.largeFieldLabel}>लिंग / Gender *</AppText>
               <View style={styles.pillRow}>
                 {['Female', 'Male'].map((g) => (
                   <TouchableOpacity
@@ -1625,28 +1904,28 @@ export default function AddAnimalScreen({ navigation }) {
                     style={[styles.pillOption, gender === g && styles.selectedPillOption]}
                     onPress={() => setGender(g)}
                   >
-                    <Text style={[styles.pillText, gender === g && styles.selectedPillText]}>{g === 'Female' ? 'मादी (Female)' : 'नर (Male)'}</Text>
+                    <AppText style={[styles.pillText, gender === g && styles.selectedPillText]}>{g === 'Female' ? 'मादी (Female)' : 'नर (Male)'}</AppText>
                   </TouchableOpacity>
                 ))}
               </View>
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.largeFieldLabel}>रंग / Color</Text>
+              <AppText style={styles.largeFieldLabel}>रंग (पर्यायी) / Color</AppText>
               <TextInput
                 style={styles.largeInput}
-                placeholder="उदा. तांबडा / काळा (e.g. Red / Black)"
+                placeholder="उदा. काळा, पांढरा, तपकिरी"
                 value={color}
                 onChangeText={setColor}
               />
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.largeFieldLabel}>इतर माहिती / Description</Text>
+              <AppText style={styles.largeFieldLabel}>इतर माहिती (पर्यायी) / Description</AppText>
               <TextInput
                 style={[styles.largeInput, { height: 70 }]}
                 multiline
-                placeholder="उदा. जनावर दूध देण्यास अतिशय शांत आहे."
+                placeholder="जनावराविषयी अधिक माहिती लिहा..."
                 value={description}
                 onChangeText={setDescription}
               />
@@ -1657,53 +1936,160 @@ export default function AddAnimalScreen({ navigation }) {
       case 5:
         return (
           <View style={styles.wizardCard}>
-            <Text style={styles.wizardLabel}>आरोग्याची माहिती / Health Details</Text>
-
-            <View style={styles.toggleRow}>
-              <View>
-                <Text style={styles.toggleTitle}>लसीकरण केले आहे का? (Vaccinated)</Text>
-                <Text style={styles.toggleSubtitle}>नियमित सरकारी लसी पूर्ण झाल्या आहेत</Text>
+            {/* Top Health Information Card */}
+            <View style={{
+              backgroundColor: '#EFF6FF',
+              borderRadius: 16,
+              padding: 16,
+              marginBottom: 20,
+              borderWidth: 1,
+              borderColor: '#DBEAFE',
+              flexDirection: 'row',
+              alignItems: 'center'
+            }}>
+              <View style={{
+                width: 44,
+                height: 44,
+                borderRadius: 22,
+                backgroundColor: '#DBEAFE',
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginRight: 14
+              }}>
+                <Ionicons name="medical" size={22} color="#1D4ED8" />
               </View>
-              <Switch
-                value={isVaccinated}
-                onValueChange={setIsVaccinated}
-                trackColor={{ true: '#16A34A' }}
-              />
+              <View style={{ flex: 1 }}>
+                <AppText style={{ fontSize: 15, fontWeight: '800', color: '#1E3A8A', marginBottom: 2 }}>
+                  🩺 आरोग्य माहिती
+                </AppText>
+                <AppText style={{ fontSize: 12.5, color: '#3B82F6', fontWeight: '500', lineHeight: 17 }}>
+                  ही माहिती भरल्याने खरेदीदारांचा विश्वास वाढतो.
+                </AppText>
+              </View>
             </View>
 
-            <View style={styles.toggleRow}>
-              <View>
-                <Text style={styles.toggleTitle}>जनावर पूर्ण निरोगी आहे? (Healthy)</Text>
-                <Text style={styles.toggleSubtitle}>कोणतीही जखम किंवा आजार नाही</Text>
-              </View>
-              <Switch
-                value={isHealthy}
-                onValueChange={setIsHealthy}
-                trackColor={{ true: '#16A34A' }}
-              />
-            </View>
+            <AppText style={styles.wizardLabel}>आरोग्याची माहिती / Health Details</AppText>
 
-            {gender === 'Female' && (
-              <View style={styles.toggleRow}>
-                <View>
-                  <Text style={styles.toggleTitle}>गाभण आहे का? (Pregnant)</Text>
-                  <Text style={styles.toggleSubtitle}>सध्या जनावराला गाभ आहे का</Text>
+            {/* Vaccinated Toggle */}
+            <View style={styles.toggleRow}>
+              <View style={{ flex: 1, marginRight: 12 }}>
+                <AppText style={styles.toggleTitle}>लसीकरण (पर्यायी) / Vaccinated</AppText>
+                <AppText style={styles.toggleSubtitle}>नियमित सरकारी लसी पूर्ण झाल्या आहेत</AppText>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={{
+                  paddingHorizontal: 8,
+                  paddingVertical: 4,
+                  borderRadius: 12,
+                  backgroundColor: isVaccinated ? '#DCFCE7' : '#F1F5F9',
+                  borderWidth: 1,
+                  borderColor: isVaccinated ? '#BBF7D0' : '#E2E8F0'
+                }}>
+                  <AppText style={{ fontSize: 12, fontWeight: '700', color: isVaccinated ? '#16A34A' : '#64748B' }}>
+                    {isVaccinated ? '✅ होय' : '❌ नाही'}
+                  </AppText>
                 </View>
                 <Switch
-                  value={isPregnant}
-                  onValueChange={setIsPregnant}
+                  value={isVaccinated}
+                  onValueChange={setIsVaccinated}
                   trackColor={{ true: '#16A34A' }}
                 />
               </View>
+            </View>
+
+            {/* Healthy Toggle */}
+            <View style={styles.toggleRow}>
+              <View style={{ flex: 1, marginRight: 12 }}>
+                <AppText style={styles.toggleTitle}>निरोगी (पर्यायी) / Healthy</AppText>
+                <AppText style={styles.toggleSubtitle}>कोणतीही जखम किंवा आजार नाही</AppText>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={{
+                  paddingHorizontal: 8,
+                  paddingVertical: 4,
+                  borderRadius: 12,
+                  backgroundColor: isHealthy ? '#DCFCE7' : '#F1F5F9',
+                  borderWidth: 1,
+                  borderColor: isHealthy ? '#BBF7D0' : '#E2E8F0'
+                }}>
+                  <AppText style={{ fontSize: 12, fontWeight: '700', color: isHealthy ? '#16A34A' : '#64748B' }}>
+                    {isHealthy ? '✅ होय' : '❌ नाही'}
+                  </AppText>
+                </View>
+                <Switch
+                  value={isHealthy}
+                  onValueChange={setIsHealthy}
+                  trackColor={{ true: '#16A34A' }}
+                />
+              </View>
+            </View>
+
+            {/* Pregnant Toggle (Female Animals Only) */}
+            {gender === 'Female' && (
+              <View style={styles.toggleRow}>
+                <View style={{ flex: 1, marginRight: 12 }}>
+                  <AppText style={styles.toggleTitle}>गर्भधारणा (पर्यायी) / Pregnant</AppText>
+                  <AppText style={styles.toggleSubtitle}>{t('addAnimal.togglePregnantSub')}</AppText>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={{
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                    borderRadius: 12,
+                    backgroundColor: isPregnant ? '#DCFCE7' : '#F1F5F9',
+                    borderWidth: 1,
+                    borderColor: isPregnant ? '#BBF7D0' : '#E2E8F0'
+                  }}>
+                    <AppText style={{ fontSize: 12, fontWeight: '700', color: isPregnant ? '#16A34A' : '#64748B' }}>
+                      {isPregnant ? '✅ होय' : '❌ नाही'}
+                    </AppText>
+                  </View>
+                  <Switch
+                    value={isPregnant}
+                    onValueChange={(val) => {
+                      if (Platform.OS === 'ios' || Platform.OS === 'android') {
+                        try {
+                          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                        } catch (e) {}
+                      }
+                      setIsPregnant(val);
+                    }}
+                    trackColor={{ true: '#16A34A' }}
+                  />
+                </View>
+              </View>
             )}
 
-            {gender === 'Female' && (
+            {/* Pregnancy Month Selector (Female + Pregnant Only) */}
+            {gender === 'Female' && isPregnant && (
+              <View style={[styles.inputGroup, { marginTop: 4 }]}>
+                <AppText style={styles.largeFieldLabel}>🤰 गर्भधारणेचा महिना (पर्यायी) / Pregnancy Month</AppText>
+                <TouchableOpacity
+                  style={styles.dropdownSelector}
+                  onPress={() => setIsPregnancyModalVisible(true)}
+                  activeOpacity={0.8}
+                >
+                  <AppText style={[styles.dropdownSelectorText, !pregnancyMonth && { color: '#94A3B8' }]}>
+                    {pregnancyMonth
+                      ? PREGNANCY_MONTH_OPTIONS.find((m) => m.id === Number(pregnancyMonth))?.label + ' (' + PREGNANCY_MONTH_OPTIONS.find((m) => m.id === Number(pregnancyMonth))?.en + ')'
+                      : 'महिना निवडा... / Select Month'}
+                  </AppText>
+                  <Ionicons name="chevron-down" size={20} color="#64748B" />
+                </TouchableOpacity>
+                <AppText style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>
+                  माहित असल्यासच निवडा. हा पर्याय ऐच्छिक आहे.
+                </AppText>
+              </View>
+            )}
+
+            {/* Milk Capacity (Female Cow, Buffalo, Goat Only) */}
+            {showMilkCapacity && (
               <View style={styles.inputGroup}>
-                <Text style={styles.largeFieldLabel}>दूध देण्याची क्षमता / Milk Capacity (लिटर/दिवस)</Text>
+                <AppText style={styles.largeFieldLabel}>दूध देण्याची क्षमता (पर्यायी) / Milk Capacity (लिटर/दिवस)</AppText>
                 <TextInput
                   style={styles.largeInput}
                   keyboardType="numeric"
-                  placeholder="उदा. १२ लिटर"
+                  placeholder="उदा. १२ लिटर प्रतिदिन"
                   value={milkCapacity}
                   onChangeText={setMilkCapacity}
                 />
@@ -1715,10 +2101,10 @@ export default function AddAnimalScreen({ navigation }) {
       case 6:
         return (
           <View style={styles.wizardCard}>
-            <Text style={styles.wizardLabel}>किंमत ठरवा / Set Price</Text>
+            <AppText style={styles.wizardLabel}>किंमत ठरवा / Set Price</AppText>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.largeFieldLabel}>अपेक्षित किंमत / Expected Price (₹) *</Text>
+              <AppText style={styles.largeFieldLabel}>अपेक्षित किंमत / Expected Price (₹) *</AppText>
               <TextInput
                 style={[styles.largeInput, { fontSize: 24, fontWeight: '700' }]}
                 keyboardType="numeric"
@@ -1730,8 +2116,8 @@ export default function AddAnimalScreen({ navigation }) {
 
             <View style={styles.toggleRow}>
               <View>
-                <Text style={styles.toggleTitle}>दर कमी-जास्त होईल? (Negotiable)</Text>
-                <Text style={styles.toggleSubtitle}>किंमतीमध्ये तडजोड करता येईल का</Text>
+                <AppText style={styles.toggleTitle}>{t('addAnimal.toggleNegotiable')}</AppText>
+                <AppText style={styles.toggleSubtitle}>{t('addAnimal.toggleNegotiableSub')}</AppText>
               </View>
               <Switch
                 value={isNegotiable}
@@ -1759,11 +2145,86 @@ export default function AddAnimalScreen({ navigation }) {
 
         return (
           <View style={styles.wizardCard}>
-            <Text style={styles.wizardLabel}>पत्ता आणि जीपीएस / Location Details</Text>
+            <AppText style={styles.wizardLabel}>{t('addAnimal.locationDetails')}</AppText>
+
+            {/* Top GPS Action Card */}
+            <View style={{
+              backgroundColor: '#F0FDF4',
+              borderRadius: 16,
+              padding: 16,
+              marginBottom: 20,
+              borderWidth: 1.5,
+              borderColor: '#BBF7D0'
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                <View style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: 21,
+                  backgroundColor: '#DCFCE7',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginRight: 12
+                }}>
+                  <Ionicons name="location" size={22} color="#16A34A" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <AppText style={{ fontSize: 16, fontWeight: '700', color: '#14532D' }}>
+                    📍 सध्याचे स्थान वापरा / Use Current Location
+                  </AppText>
+                  <AppText style={{ fontSize: 12.5, color: '#166534', marginTop: 2 }}>
+                    GPS द्वारे राज्य, जिल्हा, तालुका व गाव आपोआप भरा.
+                  </AppText>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={{
+                  backgroundColor: '#16A34A',
+                  borderRadius: 12,
+                  paddingVertical: 13,
+                  paddingHorizontal: 16,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  shadowColor: '#16A34A',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.25,
+                  shadowRadius: 4,
+                  elevation: 3
+                }}
+                onPress={() => {
+                  console.log('[GPS DEBUG] Button pressed - onPress entered');
+                  handleAutoGPS();
+                }}
+                disabled={gpsLoading}
+                activeOpacity={0.85}
+              >
+                {gpsLoading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name="navigate-circle" size={22} color="#FFFFFF" style={{ marginRight: 8 }} />
+                    <AppText style={{ fontSize: 15, fontWeight: '800', color: '#FFFFFF' }}>
+                      माझे सध्याचे स्थान वापरा
+                    </AppText>
+                  </>
+                )}
+              </TouchableOpacity>
+
+              {gpsSuccess && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10, justifyContent: 'center' }}>
+                  <Ionicons name="checkmark-circle" size={16} color="#16A34A" style={{ marginRight: 4 }} />
+                  <AppText style={{ fontSize: 12.5, color: '#15803D', fontWeight: '600' }}>
+                    स्थान प्राप्त झाले! खालील माहिती तपासा किंवा बदला.
+                  </AppText>
+                </View>
+              )}
+            </View>
 
             {/* State Select Trigger */}
             <View style={styles.inputGroup}>
-              <Text style={styles.largeFieldLabel}>राज्य / State *</Text>
+              <AppText style={styles.largeFieldLabel}>{t('addAnimal.stateLabel')} *</AppText>
               <TouchableOpacity
                 style={styles.dropdownSelector}
                 onPress={() => {
@@ -1771,9 +2232,9 @@ export default function AddAnimalScreen({ navigation }) {
                   setActiveDropdown('state');
                 }}
               >
-                <Text style={styles.dropdownSelectorText}>
-                  {selectedState ? selectedState.name : 'राज्य निवडा / Select State'}
-                </Text>
+                <AppText style={styles.dropdownSelectorText}>
+                  {selectedState ? selectedState.name : t('addAnimal.selectStateModal')}
+                </AppText>
                 <Ionicons name="chevron-down" size={20} color="#64748B" />
               </TouchableOpacity>
             </View>
@@ -1788,7 +2249,7 @@ export default function AddAnimalScreen({ navigation }) {
               <View style={styles.modalOverlay}>
                 <View style={styles.modalContent}>
                   <View style={styles.modalHeader}>
-                    <Text style={styles.modalTitle}>राज्य निवडा / Select State</Text>
+                    <AppText style={styles.modalTitle}>{t('addAnimal.selectStateModal')}</AppText>
                     <TouchableOpacity onPress={() => setActiveDropdown(null)}>
                       <Ionicons name="close" size={24} color="#334155" />
                     </TouchableOpacity>
@@ -1819,14 +2280,14 @@ export default function AddAnimalScreen({ navigation }) {
                           setActiveDropdown(null);
                         }}
                       >
-                        <Text style={styles.modalOptionText}>{s.name}</Text>
+                        <AppText style={styles.modalOptionText}>{s.name}</AppText>
                         {selectedState?._id === s._id && (
                           <Ionicons name="checkmark" size={20} color="#16A34A" style={{ marginLeft: 'auto' }} />
                         )}
                       </TouchableOpacity>
                     )}
                     ListEmptyComponent={
-                      <Text style={styles.noResultsText}>कोणतेही परिणाम आढळले नाहीत / No results found</Text>
+                      <AppText style={styles.noResultsText}>{t('common.noData')}</AppText>
                     }
                   />
                 </View>
@@ -1836,7 +2297,7 @@ export default function AddAnimalScreen({ navigation }) {
             {/* District Select Trigger */}
             {selectedState && (
               <View style={styles.inputGroup}>
-                <Text style={styles.largeFieldLabel}>जिल्हा / District *</Text>
+                <AppText style={styles.largeFieldLabel}>{t('addAnimal.districtLabel')} *</AppText>
                 <TouchableOpacity
                   style={styles.dropdownSelector}
                   onPress={() => {
@@ -1844,9 +2305,9 @@ export default function AddAnimalScreen({ navigation }) {
                     setActiveDropdown('district');
                   }}
                 >
-                  <Text style={styles.dropdownSelectorText}>
-                    {selectedDistrict ? selectedDistrict.name : 'जिल्हा निवडा / Select District'}
-                  </Text>
+                  <AppText style={styles.dropdownSelectorText}>
+                    {selectedDistrict ? selectedDistrict.name : t('addAnimal.selectDistrictModal')}
+                  </AppText>
                   <Ionicons name="chevron-down" size={20} color="#64748B" />
                 </TouchableOpacity>
               </View>
@@ -1862,7 +2323,7 @@ export default function AddAnimalScreen({ navigation }) {
               <View style={styles.modalOverlay}>
                 <View style={styles.modalContent}>
                   <View style={styles.modalHeader}>
-                    <Text style={styles.modalTitle}>जिल्हा निवडा / Select District</Text>
+                    <AppText style={styles.modalTitle}>{t('addAnimal.selectDistrictModal')}</AppText>
                     <TouchableOpacity onPress={() => setActiveDropdown(null)}>
                       <Ionicons name="close" size={24} color="#334155" />
                     </TouchableOpacity>
@@ -1891,14 +2352,14 @@ export default function AddAnimalScreen({ navigation }) {
                           setActiveDropdown(null);
                         }}
                       >
-                        <Text style={styles.modalOptionText}>{d.name}</Text>
+                        <AppText style={styles.modalOptionText}>{d.name}</AppText>
                         {selectedDistrict?._id === d._id && (
                           <Ionicons name="checkmark" size={20} color="#16A34A" style={{ marginLeft: 'auto' }} />
                         )}
                       </TouchableOpacity>
                     )}
                     ListEmptyComponent={
-                      <Text style={styles.noResultsText}>कोणतेही परिणाम आढळले नाहीत / No results found</Text>
+                      <AppText style={styles.noResultsText}>{t('common.noData')}</AppText>
                     }
                   />
                 </View>
@@ -1908,7 +2369,7 @@ export default function AddAnimalScreen({ navigation }) {
             {/* Taluka Select Trigger */}
             {selectedDistrict && (
               <View style={styles.inputGroup}>
-                <Text style={styles.largeFieldLabel}>तालुका / Taluka *</Text>
+                <AppText style={styles.largeFieldLabel}>{t('addAnimal.talukaLabel')} *</AppText>
                 <TouchableOpacity
                   style={styles.dropdownSelector}
                   onPress={() => {
@@ -1916,9 +2377,9 @@ export default function AddAnimalScreen({ navigation }) {
                     setActiveDropdown('taluka');
                   }}
                 >
-                  <Text style={styles.dropdownSelectorText}>
-                    {selectedTaluka ? selectedTaluka.name : 'तालुका निवडा / Select Taluka'}
-                  </Text>
+                  <AppText style={styles.dropdownSelectorText}>
+                    {selectedTaluka ? selectedTaluka.name : t('addAnimal.selectTalukaModal')}
+                  </AppText>
                   <Ionicons name="chevron-down" size={20} color="#64748B" />
                 </TouchableOpacity>
               </View>
@@ -1934,7 +2395,7 @@ export default function AddAnimalScreen({ navigation }) {
               <View style={styles.modalOverlay}>
                 <View style={styles.modalContent}>
                   <View style={styles.modalHeader}>
-                    <Text style={styles.modalTitle}>तालुका निवडा / Select Taluka</Text>
+                    <AppText style={styles.modalTitle}>{t('addAnimal.selectTalukaModal')}</AppText>
                     <TouchableOpacity onPress={() => setActiveDropdown(null)}>
                       <Ionicons name="close" size={24} color="#334155" />
                     </TouchableOpacity>
@@ -1961,14 +2422,14 @@ export default function AddAnimalScreen({ navigation }) {
                           setActiveDropdown(null);
                         }}
                       >
-                        <Text style={styles.modalOptionText}>{t.name}</Text>
+                        <AppText style={styles.modalOptionText}>{t.name}</AppText>
                         {selectedTaluka?._id === t._id && (
                           <Ionicons name="checkmark" size={20} color="#16A34A" style={{ marginLeft: 'auto' }} />
                         )}
                       </TouchableOpacity>
                     )}
                     ListEmptyComponent={
-                      <Text style={styles.noResultsText}>कोणतेही परिणाम आढळले नाहीत / No results found</Text>
+                      <AppText style={styles.noResultsText}>{t('common.noData')}</AppText>
                     }
                   />
                 </View>
@@ -1978,34 +2439,37 @@ export default function AddAnimalScreen({ navigation }) {
             {/* Village Input & Suggestions */}
             {selectedTaluka && (
               <View style={styles.inputGroup}>
-                <Text style={styles.largeFieldLabel}>गाव / Village *</Text>
+                <AppText style={styles.largeFieldLabel}>गाव (पर्यायी) / Village (Optional)</AppText>
                 <TextInput
-                  style={[styles.largeInput, { marginBottom: 12 }]}
-                  placeholder="Enter your village name / गावचे नाव टाका"
+                  style={[styles.largeInput, { marginBottom: 4 }]}
+                  placeholder="तुमच्या गावाचे नाव टाका (माहित असल्यास)"
                   value={typeof selectedVillage === 'object' ? (selectedVillage?.name || '') : (selectedVillage || '')}
                   onChangeText={(text) => setSelectedVillage(text)}
                 />
+                <AppText style={{ fontSize: 12, color: '#64748B', marginTop: 4, marginBottom: 8 }}>
+                  GPS द्वारे गावाचे नाव नेहमी अचूक मिळेलच असे नाही. माहित असल्यास गावाचे नाव भरा.
+                </AppText>
                 {filteredVillages && filteredVillages.length > 0 && (
                   <View style={{ marginTop: 8 }}>
-                    <Text style={{ fontSize: 13, color: '#64748B', marginBottom: 8, fontWeight: '600' }}>
+                    <AppText style={{ fontSize: 13, color: '#64748B', marginBottom: 8, fontWeight: '600' }}>
                       पडताळणी यादीतील गाव निवडा / Select from Master List:
-                    </Text>
+                    </AppText>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', paddingVertical: 4 }}>
                       {filteredVillages.map((v) => {
-                        const isSelected = typeof selectedVillage === 'object' 
-                          ? selectedVillage?._id === v._id 
+                        const isSelected = typeof selectedVillage === 'object'
+                          ? selectedVillage?._id === v._id
                           : selectedVillage === v.name;
                         return (
                           <TouchableOpacity
                             key={v._id}
                             style={[
-                              styles.pillOption, 
+                              styles.pillOption,
                               isSelected && styles.selectedPillOption,
                               { marginRight: 8, paddingVertical: 8, paddingHorizontal: 14 }
                             ]}
                             onPress={() => setSelectedVillage(v)}
                           >
-                            <Text style={[styles.pillText, isSelected && styles.selectedPillText]}>{v.name}</Text>
+                            <AppText style={[styles.pillText, isSelected && styles.selectedPillText]}>{v.name}</AppText>
                           </TouchableOpacity>
                         );
                       })}
@@ -2014,43 +2478,16 @@ export default function AddAnimalScreen({ navigation }) {
                 )}
               </View>
             )}
-
-            {/* GPS Trigger */}
-            <View style={styles.gpsContainer}>
-              <Text style={styles.gpsLabel}>जनावराचे मूळ स्थान (GPS Coordinates) *</Text>
-              
-              {gpsSuccess ? (
-                <View style={styles.gpsSuccessBox}>
-                  <Ionicons name="checkmark-circle" size={24} color="#16A34A" />
-                  <Text style={styles.gpsSuccessText}>GPS Location Attached ({latitude.toFixed(4)}, {longitude.toFixed(4)})</Text>
-                </View>
-              ) : (
-                <TouchableOpacity
-                  style={styles.gpsFetchBtn}
-                  onPress={handleAutoGPS}
-                  disabled={gpsLoading}
-                >
-                  {gpsLoading ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <>
-                      <Ionicons name="locate" size={20} color="#fff" />
-                      <Text style={styles.gpsFetchBtnText}>स्वयंचलित जीपीएस मिळवा / Get Auto GPS</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-              )}
-            </View>
           </View>
         );
 
       case 8:
         return (
           <View style={styles.wizardCard}>
-            <Text style={styles.wizardLabel}>जाहिरातीची तपासणी / Preview Listing</Text>
+            <AppText style={styles.wizardLabel}>{t('addAnimal.previewListing')}</AppText>
 
             {/* Photos scroll */}
-            <Text style={styles.previewTitle}>Live Photos:</Text>
+            <AppText style={styles.previewTitle}>{t('addAnimal.livePhotosTitle')}</AppText>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.previewPhotoRow}>
               {photos.map((p, idx) => (
                 <Image key={idx} source={{ uri: p.uri }} style={styles.previewThumb} />
@@ -2059,20 +2496,29 @@ export default function AddAnimalScreen({ navigation }) {
 
             {/* Details panel */}
             <View style={styles.previewPanel}>
-              <Text style={styles.previewItem}><strong>नाव / Title:</strong> {title}</Text>
-              <Text style={styles.previewItem}><strong>जात / Breed:</strong> {selectedBreed?.name}</Text>
-              <Text style={styles.previewItem}><strong>वय / Age:</strong> {age} Years</Text>
-              {weight !== '' && <Text style={styles.previewItem}><strong>वजन / Weight:</strong> {weight} kg</Text>}
-              <Text style={styles.previewItem}><strong>लिंग / Gender:</strong> {gender}</Text>
-              <Text style={styles.previewItem}><strong>लसीकरण / Vaccinated:</strong> {isVaccinated ? 'होय / Yes' : 'नाही / No'}</Text>
-              {milkCapacity !== '' && <Text style={styles.previewItem}><strong>दूध देण्याची क्षमता / Milk:</strong> {milkCapacity} L/day</Text>}
-              <Text style={styles.previewItem}><strong>अपेक्षित किंमत / Price:</strong> ₹{price} ({isNegotiable ? 'Negotiable' : 'Fixed'})</Text>
-              <Text style={styles.previewItem}><strong>पत्ता / Location:</strong> {typeof selectedVillage === 'object' ? selectedVillage?.name : selectedVillage}, {selectedTaluka?.name}, {selectedDistrict?.name}, {selectedState?.name}</Text>
+              <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>{t('addAnimal.previewLabelTitle')} </Text> {title}</AppText>
+              <AppText style={styles.previewItem}>
+                <Text style={{ fontWeight: 'bold' }}>{t('addAnimal.previewLabelBreed')} </Text>
+                {isOtherCategory ? customBreedText : (isOtherBreedSelected && customBreedText ? `इतर - ${customBreedText}` : selectedBreed?.name)}
+              </AppText>
+              <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>{t('addAnimal.previewLabelAge')} </Text> {age} {t('common.years')}</AppText>
+              {weight !== '' && <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>{t('addAnimal.previewLabelWeight')} </Text> {weight} {t('common.kg')}</AppText>}
+              <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>{t('addAnimal.previewLabelGender')} </Text> {gender}</AppText>
+              <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>{t('addAnimal.previewLabelVaccinated')} </Text> {isVaccinated ? t('common.yes') : t('common.no')}</AppText>
+              {gender === 'Female' && isPregnant && (
+                <AppText style={styles.previewItem}>
+                  <Text style={{ fontWeight: 'bold' }}>गर्भधारणा: </Text>
+                  {t('common.yes')} {pregnancyMonth ? `(${PREGNANCY_MONTH_OPTIONS.find(m => m.id === Number(pregnancyMonth))?.label || (pregnancyMonth + ' महिने')})` : ''}
+                </AppText>
+              )}
+              {milkCapacity !== '' && <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>{t('addAnimal.previewLabelMilk')} </Text> {milkCapacity} {t('common.litersPerDay')}</AppText>}
+              <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>{t('addAnimal.previewLabelPrice')} </Text> ₹{price} ({isNegotiable ? t('common.negotiable') : t('common.fixed')})</AppText>
+              <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>{t('addAnimal.previewLabelLocation')} </Text> {typeof selectedVillage === 'object' ? selectedVillage?.name : selectedVillage}, {selectedTaluka?.name}, {selectedDistrict?.name}, {selectedState?.name}</AppText>
             </View>
 
             <TouchableOpacity style={styles.editSectionBtn} onPress={() => setCurrentStep(4)}>
               <Ionicons name="create" size={16} color="#16A34A" />
-              <Text style={styles.editSectionBtnText}>माहिती बदला / Edit Details</Text>
+              <AppText style={styles.editSectionBtnText}>{t('addAnimal.editDetailsBtn')}</AppText>
             </TouchableOpacity>
           </View>
         );
@@ -2082,31 +2528,31 @@ export default function AddAnimalScreen({ navigation }) {
           <View style={styles.wizardCard}>
             <View style={styles.submitFinalBox}>
               <MaterialCommunityIcons name="check-decagram" size={72} color="#16A34A" />
-              <Text style={styles.submitTitle}>सर्व माहिती तयार आहे! (All Ready!)</Text>
-              <Text style={styles.submitSub}>खालच्या बटणावर दाबून तुमची जाहिरात पाठवा. (Click button below to post listing.)</Text>
+              <AppText style={styles.submitTitle}>{t('addAnimal.allReadyTitle')}</AppText>
+              <AppText style={styles.submitSub}>{t('addAnimal.allReadySub')}</AppText>
 
               {isSubmitting && (
                 <View style={[styles.uploadingBox, { width: '100%', marginVertical: 12 }]}>
-                  <Text style={styles.uploadProgressTitle}>जाहिरात अपलोड होत आहे... (Uploading Listing...)</Text>
-                  <Text style={styles.uploadProgressPercent}>{uploadProgress}% Complete</Text>
+                  <AppText style={styles.uploadProgressTitle}>{t('addAnimal.uploadingListing')}</AppText>
+                  <AppText style={styles.uploadProgressPercent}>{uploadProgress}% Complete</AppText>
                   <View style={styles.progressTrack}>
                     <View style={[styles.progressBar, { width: `${uploadProgress}%` }]} />
                   </View>
                 </View>
               )}
 
-              <TouchableOpacity 
-                style={[styles.publishBtn, isSubmitting && { backgroundColor: '#94A3B8' }]} 
+              <TouchableOpacity
+                style={[styles.publishBtn, isSubmitting && { backgroundColor: '#94A3B8' }]}
                 onPress={handlePublishListing}
                 disabled={isSubmitting}
               >
                 {isSubmitting ? (
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />
-                    <Text style={styles.publishBtnText}>प्रसिद्ध होत आहे... / Publishing...</Text>
+                    <AppText style={styles.publishBtnText}>{t('addAnimal.publishingStatus')}</AppText>
                   </View>
                 ) : (
-                  <Text style={styles.publishBtnText}>जाहिरात प्रसिद्ध करा / Publish Listing</Text>
+                  <AppText style={styles.publishBtnText}>{t('addAnimal.publishBtn')}</AppText>
                 )}
               </TouchableOpacity>
             </View>
@@ -2126,10 +2572,8 @@ export default function AddAnimalScreen({ navigation }) {
           <Ionicons name="arrow-back" size={24} color="#0F172A" />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>जाहिरात टाका / Post Listing</Text>
-          <Text style={styles.headerSubtitle}>
-            Step {currentStep} of 9 - {STEPS[currentStep - 1].titleMr}
-          </Text>
+          <AppText style={styles.headerTitle}>{t('addAnimal.headerTitle')}</AppText>
+          <AppText style={styles.headerSubtitle}>{t('addAnimal.headerSubtitle', { current: currentStep, stepName: t(STEPS[currentStep - 1].titleKey) })}</AppText>
         </View>
         <View style={styles.placeholderBox} />
       </View>
@@ -2143,7 +2587,7 @@ export default function AddAnimalScreen({ navigation }) {
         <View style={styles.footerNav}>
           <TouchableOpacity style={styles.navPrevBtn} onPress={handlePrevStep}>
             <Ionicons name="chevron-back" size={20} color="#64748B" />
-            <Text style={styles.navPrevText}>मागे / Back</Text>
+            <AppText style={styles.navPrevText}>{t('common.back')}</AppText>
           </TouchableOpacity>
 
           {currentStep === 2 ? (
@@ -2155,7 +2599,7 @@ export default function AddAnimalScreen({ navigation }) {
               onPress={handleNextStep}
               disabled={!photos[currentPhotoIndex]}
             >
-              <Text style={styles.navNextText}>पुढे / Next</Text>
+              <AppText style={styles.navNextText}>{t('common.next')}</AppText>
               <Ionicons name="chevron-forward" size={20} color="#fff" />
             </TouchableOpacity>
           ) : currentStep === 3 ? (
@@ -2167,22 +2611,120 @@ export default function AddAnimalScreen({ navigation }) {
               onPress={handleNextStep}
               disabled={!video}
             >
-              <Text style={styles.navNextText}>पुढे / Next</Text>
+              <AppText style={styles.navNextText}>{t('common.next')}</AppText>
               <Ionicons name="chevron-forward" size={20} color="#fff" />
             </TouchableOpacity>
           ) : currentStep < 8 ? (
             <TouchableOpacity style={styles.navNextBtn} onPress={handleNextStep}>
-              <Text style={styles.navNextText}>पुढे / Next</Text>
+              <AppText style={styles.navNextText}>{t('common.next')}</AppText>
               <Ionicons name="chevron-forward" size={20} color="#fff" />
             </TouchableOpacity>
           ) : currentStep === 8 ? (
             <TouchableOpacity style={[styles.navNextBtn, { backgroundColor: '#16A34A' }]} onPress={handleNextStep}>
-              <Text style={styles.navNextText}>नक्की करा / Confirm</Text>
+              <AppText style={styles.navNextText}>{t('common.confirm')}</AppText>
               <Ionicons name="checkmark" size={20} color="#fff" />
             </TouchableOpacity>
           ) : null}
         </View>
       )}
+      {/* Pregnancy Month Selection Modal */}
+      <Modal
+        visible={isPregnancyModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setIsPregnancyModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <AppText style={styles.modalTitle}>गर्भधारणेचा महिना / Pregnancy Month</AppText>
+              <TouchableOpacity onPress={() => setIsPregnancyModalVisible(false)} style={styles.closeModalButton}>
+                <Ionicons name="close" size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 360 }} showsVerticalScrollIndicator={false}>
+              {PREGNANCY_MONTH_OPTIONS.map((opt) => {
+                const isSelected = Number(pregnancyMonth) === opt.id;
+                return (
+                  <TouchableOpacity
+                    key={opt.id}
+                    style={[styles.modalOption, isSelected && { backgroundColor: '#F0FDF4' }]}
+                    onPress={() => {
+                      setPregnancyMonth(opt.id);
+                      setIsPregnancyModalVisible(false);
+                    }}
+                  >
+                    <AppText style={[styles.modalOptionText, isSelected && { color: '#16A34A', fontWeight: '700', flex: 1 }]}>
+                      {opt.label} ({opt.en})
+                    </AppText>
+                    {isSelected && <Ionicons name="checkmark-circle" size={20} color="#16A34A" />}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Searchable Breed Selection Modal */}
+      <Modal
+        visible={isBreedModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setIsBreedModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <AppText style={styles.modalTitle}>जात निवडा / Select Breed</AppText>
+              <TouchableOpacity onPress={() => setIsBreedModalVisible(false)} style={styles.closeModalButton}>
+                <Ionicons name="close" size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <TextInput
+              style={styles.modalSearchInput}
+              placeholder="जात शोधा... / Search breed..."
+              placeholderTextColor="#94A3B8"
+              value={breedSearchQuery}
+              onChangeText={setBreedSearchQuery}
+            />
+
+            <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+              {breeds
+                .filter((b) => {
+                  if (!breedSearchQuery) return true;
+                  const query = breedSearchQuery.toLowerCase();
+                  return (
+                    (b.name && b.name.toLowerCase().includes(query)) ||
+                    (b.mr && b.mr.toLowerCase().includes(query)) ||
+                    (b.en && b.en.toLowerCase().includes(query))
+                  );
+                })
+                .map((b) => {
+                  const isSelected = selectedBreed?.id === b.id || selectedBreed?._id === b._id;
+                  return (
+                    <TouchableOpacity
+                      key={b._id || b.id}
+                      style={[styles.modalOption, isSelected && { backgroundColor: '#F0FDF4' }]}
+                      onPress={() => {
+                        setSelectedBreed(b);
+                        if (b.id !== 'other') setCustomBreedText('');
+                        setIsBreedModalVisible(false);
+                      }}
+                    >
+                      <AppText style={[styles.modalOptionText, isSelected && { color: '#16A34A', fontWeight: '700', flex: 1 }]}>
+                        {b.name}
+                      </AppText>
+                      {isSelected && <Ionicons name="checkmark-circle" size={20} color="#16A34A" />}
+                    </TouchableOpacity>
+                  );
+                })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
