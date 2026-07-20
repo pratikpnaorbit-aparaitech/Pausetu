@@ -19,7 +19,8 @@ exports.getDashboardStats = asyncHandler(async (req, res, next) => {
   const rejectedListings = await Animal.countDocuments({ status: 'rejected', isDeleted: false });
   const soldAnimals = await Animal.countDocuments({ status: 'sold', isDeleted: false });
   const pendingComplaints = await Complaint.countDocuments({ status: 'pending' });
-  
+  const pendingVerificationRequests = await User.countDocuments({ 'verification.status': 'pending' });
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const todayRegistrations = await User.countDocuments({ createdAt: { $gte: today } });
@@ -66,7 +67,8 @@ exports.getDashboardStats = asyncHandler(async (req, res, next) => {
         rejectedListings,
         soldAnimals,
         todayRegistrations,
-        pendingComplaints
+        pendingComplaints,
+        pendingVerificationRequests
       },
       weeklyStats,
       categoryDistribution: distribution

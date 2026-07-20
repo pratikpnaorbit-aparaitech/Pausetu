@@ -14,7 +14,8 @@ import {
   Platform,
   ActivityIndicator,
   Modal,
-  FlatList
+  FlatList,
+  LayoutAnimation
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Camera, CameraView } from 'expo-camera';
@@ -27,6 +28,73 @@ import AppText from '../components/AppText';
 import { animalApi } from '../api/animalApi';
 import { reverseGeocodeWithCache } from '../utils/geocoder';
 import { refreshManager, REFRESH_EVENTS } from '../services/refreshManager';
+import { getBreedsForCategory } from '../utils/breedDatabase';
+
+const toMarathiDigits = (val) => {
+  if (!val) return '';
+  const str = String(val).trim();
+  const marathiDigits = ['०', '१', '२', '३', '४', '५', '६', '७', '८', '९'];
+  return str.replace(/[0-9]/g, (w) => marathiDigits[parseInt(w, 10)]);
+};
+
+const getCategoryNameInMarathi = (cat) => {
+  if (!cat) return 'गाय';
+  const slug = (cat.slug || cat.name || '').toLowerCase();
+  if (slug.includes('buffalo') || slug.includes('म्हैस')) return 'म्हैस';
+  if (slug.includes('goat') || slug.includes('शेळी')) return 'शेळी';
+  if (slug.includes('sheep') || slug.includes('मेंढी')) return 'मेंढी';
+  if (slug.includes('horse') || slug.includes('घोडा')) return 'घोडा';
+  if (slug.includes('other') || slug.includes('इतर')) return 'जनावर';
+  return 'गाय';
+};
+
+const getBreedNameInMarathi = (selectedBreed, customBreedText, isOtherBreedSelected, isOtherCategory) => {
+  if (isOtherCategory) {
+    return customBreedText ? customBreedText.trim() : '';
+  }
+  if (isOtherBreedSelected) {
+    return customBreedText ? customBreedText.trim() : 'इतर';
+  }
+  if (!selectedBreed) return '';
+  if (selectedBreed.mr) return selectedBreed.mr;
+  const name = selectedBreed.name || '';
+  if (name.includes('(')) {
+    return name.split('(')[0].trim();
+  }
+  return name.trim();
+};
+
+const buildAutoTitle = ({ selectedCategory, selectedBreed, customBreedText, age, gender, isOtherBreedSelected, isOtherCategory }) => {
+  const categoryMr = getCategoryNameInMarathi(selectedCategory);
+  const breedMr = getBreedNameInMarathi(selectedBreed, customBreedText, isOtherBreedSelected, isOtherCategory);
+  const marathiAge = toMarathiDigits(age);
+  const yearSuffix = gender === 'Male' ? 'वर्षांचा' : 'वर्षांची';
+
+  const parts = [];
+  if (marathiAge) {
+    parts.push(`${marathiAge} ${yearSuffix}`);
+  }
+  if (breedMr) {
+    parts.push(breedMr);
+  }
+  if (categoryMr && !isOtherCategory) {
+    parts.push(categoryMr);
+  }
+
+  return parts.join(' ');
+};
+
+const PREGNANCY_MONTH_OPTIONS = [
+  { id: 1, label: '१ महिना', en: '1 Month' },
+  { id: 2, label: '२ महिने', en: '2 Months' },
+  { id: 3, label: '३ महिने', en: '3 Months' },
+  { id: 4, label: '४ महिने', en: '4 Months' },
+  { id: 5, label: '५ महिने', en: '5 Months' },
+  { id: 6, label: '६ महिने', en: '6 Months' },
+  { id: 7, label: '७ महिने', en: '7 Months' },
+  { id: 8, label: '८ महिने', en: '8 Months' },
+  { id: 9, label: '९ महिने', en: '9 Months' }
+];
 
 const { width, height } = Dimensions.get('window');
 
@@ -90,12 +158,54 @@ export default function AddAnimalScreen({ navigation }) {
   // Form State variables
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedBreed, setSelectedBreed] = useState(null);
+  const [isBreedModalVisible, setIsBreedModalVisible] = useState(false);
+  const [breedSearchQuery, setBreedSearchQuery] = useState('');
+  const [customBreedText, setCustomBreedText] = useState('');
   const [title, setTitle] = useState('');
+  const [isTitleUserEdited, setIsTitleUserEdited] = useState(false);
   const [gender, setGender] = useState('Female');
   const [age, setAge] = useState('');
   const [weight, setWeight] = useState('');
   const [color, setColor] = useState('');
   const [description, setDescription] = useState('');
+
+  const isOtherCategory = React.useMemo(() => {
+    if (!selectedCategory) return false;
+    const raw = (selectedCategory.slug || selectedCategory.name || '').toLowerCase();
+    return raw.includes('other') || raw.includes('इतर');
+  }, [selectedCategory]);
+
+  const isOtherBreedSelected = React.useMemo(() => {
+    if (!selectedBreed) return false;
+    return (
+      selectedBreed.id === 'other' ||
+      (selectedBreed.name && (selectedBreed.name.includes('Other') || selectedBreed.name.includes('इतर')))
+    );
+  }, [selectedBreed]);
+
+  const showMilkCapacity = React.useMemo(() => {
+    if (gender !== 'Female') return false;
+    if (!selectedCategory) return false;
+    const raw = (selectedCategory.slug || selectedCategory.name || '').toLowerCase();
+    return raw.includes('cow') || raw.includes('गाय') || raw.includes('buffalo') || raw.includes('म्हैस') || raw.includes('goat') || raw.includes('शेळी');
+  }, [gender, selectedCategory]);
+
+  // Auto-generate title in Marathi based on Age, Breed, Gender, Category unless manually edited
+  useEffect(() => {
+    if (isTitleUserEdited) return;
+    const autoTitle = buildAutoTitle({
+      selectedCategory,
+      selectedBreed,
+      customBreedText,
+      age,
+      gender,
+      isOtherBreedSelected,
+      isOtherCategory
+    });
+    if (autoTitle) {
+      setTitle(autoTitle);
+    }
+  }, [selectedCategory, selectedBreed, customBreedText, age, gender, isOtherBreedSelected, isOtherCategory, isTitleUserEdited]);
 
   // Step 2: Photo Capture variables
   const [photos, setPhotos] = useState([]); // Stores captured photos: { stepName, uri, metadata }
@@ -115,7 +225,16 @@ export default function AddAnimalScreen({ navigation }) {
   const [isVaccinated, setIsVaccinated] = useState(false);
   const [isHealthy, setIsHealthy] = useState(true);
   const [isPregnant, setIsPregnant] = useState(false);
+  const [pregnancyMonth, setPregnancyMonth] = useState(null);
+  const [isPregnancyModalVisible, setIsPregnancyModalVisible] = useState(false);
   const [milkCapacity, setMilkCapacity] = useState('');
+
+  // Auto-reset pregnancyMonth when gender is male or animal is not pregnant
+  useEffect(() => {
+    if (gender !== 'Female' || !isPregnant) {
+      setPregnancyMonth(null);
+    }
+  }, [gender, isPregnant]);
 
   // Step 6: Pricing
   const [price, setPrice] = useState('');
@@ -213,17 +332,17 @@ export default function AddAnimalScreen({ navigation }) {
   };
 
   // Fetch Breeds dynamically when Category is selected
-  const fetchBreeds = async (categoryId) => {
+  const fetchBreeds = async (categoryId, catObj = null) => {
     setLoadingBreeds(true);
+    const cat = catObj || selectedCategory;
     try {
       const body = await animalApi.getBreeds(categoryId);
-      if (body.status === 'success') {
-        setBreeds(body.data.breeds);
-      } else {
-        throw new Error();
-      }
+      const apiBreeds = body.status === 'success' && body.data?.breeds ? body.data.breeds : [];
+      const computedBreeds = getBreedsForCategory(cat, apiBreeds);
+      setBreeds(computedBreeds);
     } catch (e) {
-      setBreeds([]);
+      const computedBreeds = getBreedsForCategory(cat, []);
+      setBreeds(computedBreeds);
     } finally {
       setLoadingBreeds(false);
     }
@@ -275,7 +394,9 @@ export default function AddAnimalScreen({ navigation }) {
   const handleSelectCategory = (cat) => {
     setSelectedCategory(cat);
     setSelectedBreed(null);
-    fetchBreeds(cat._id || cat.id);
+    setCustomBreedText('');
+    setIsTitleUserEdited(false);
+    fetchBreeds(cat._id || cat.id, cat);
     setCurrentStep(2);
   };
 
@@ -454,47 +575,109 @@ export default function AddAnimalScreen({ navigation }) {
     }
   };
 
+  // Helper to check location permission state across Web (Permissions API) and Mobile (expo-location)
+  const checkLocationPermissionState = async () => {
+    console.log('[GPS DEBUG] checkLocationPermissionState called. Platform.OS:', Platform.OS);
+    if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator?.permissions?.query) {
+      try {
+        const permissionStatus = await navigator.permissions.query({ name: 'geolocation' });
+        console.log('[GPS DEBUG] Web navigator.permissions query state:', permissionStatus?.state);
+        if (permissionStatus?.state) {
+          return permissionStatus.state; // 'granted', 'prompt', 'denied'
+        }
+      } catch (err) {
+        console.warn('[GPS DEBUG] navigator.permissions.query failed/unsupported:', err);
+      }
+    }
+
+    try {
+      const { status, canAskAgain } = await Location.getForegroundPermissionsAsync();
+      console.log('[GPS DEBUG] Native getForegroundPermissionsAsync status:', status, 'canAskAgain:', canAskAgain);
+      if (status === 'granted') return 'granted';
+      if (status === 'denied' && !canAskAgain) return 'denied';
+      return 'prompt';
+    } catch (e) {
+      console.warn('[GPS DEBUG] Native getForegroundPermissionsAsync error:', e);
+      return 'prompt';
+    }
+  };
+
   // GPS Auto Coordinates fetcher
   const handleAutoGPS = async () => {
+    console.log('[GPS DEBUG] handleAutoGPS entered');
     setGpsLoading(true);
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert(t('common.permissionDenied'), t('addAnimal.gpsPermissionWarning'));
+      // 1. Check permission state first
+      const permState = await checkLocationPermissionState();
+      console.log('[GPS DEBUG] Permission state resolved as:', permState);
+
+      if (permState === 'denied') {
+        console.log('[GPS DEBUG] Permission state is DENIED. Aborting GPS fetch.');
         setGpsLoading(false);
+        Alert.alert(
+          '📍 Location permission is blocked',
+          'Please enable Location permission from your browser/device settings and try again.\n\n📍 स्थान परवानगी ब्लॉक केली आहे. कृपया सेटिंग्जमधून परवानगी सक्षम करा.'
+        );
         return;
       }
 
+      // 2. Request permission if prompt or not yet granted
+      if (permState !== 'granted') {
+        console.log('[GPS DEBUG] Permission state is not granted. Requesting permission...');
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        console.log('[GPS DEBUG] requestForegroundPermissionsAsync status result:', status);
+        if (status !== 'granted') {
+          Alert.alert(
+            '📍 Location permission is blocked',
+            'Please enable Location permission from your browser/device settings and try again.\n\n📍 स्थान परवानगी ब्लॉक केली आहे. कृपया सेटिंग्जमधून परवानगी सक्षम करा.'
+          );
+          setGpsLoading(false);
+          return;
+        }
+      }
+
+      // 3. Fetch location coordinates when granted
+      console.log('[GPS DEBUG] GPS request started (getCurrentPositionAsync)...');
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       const lat = loc.coords.latitude;
       const lng = loc.coords.longitude;
+      console.log('[GPS DEBUG] GPS coordinates retrieved:', lat, lng);
 
       setLatitude(lat);
       setLongitude(lng);
 
+      console.log('[GPS DEBUG] Reverse geocoding started...');
       const geocoded = await reverseGeocodeWithCache(lat, lng);
-      if (geocoded) {
-        if (geocoded.pincode) setPincode(geocoded.pincode);
-        if (geocoded.formattedAddress) setFormattedAddress(geocoded.formattedAddress);
+      console.log('[GPS DEBUG] Reverse geocoding result:', geocoded);
 
-        if (geocoded.state && !selectedState) {
-          setSelectedState({ name: geocoded.state });
-        }
-        if (geocoded.district && !selectedDistrict) {
-          setSelectedDistrict({ name: geocoded.district });
-        }
-        if (geocoded.taluka && !selectedTaluka) {
-          setSelectedTaluka({ name: geocoded.taluka });
-        }
-        if (geocoded.village && (!selectedVillage || selectedVillage === '')) {
-          setSelectedVillage(geocoded.village);
-        }
-      }
+      const stateName = geocoded?.state || 'Maharashtra';
+      const districtName = geocoded?.district || 'Pune';
+      const talukaName = geocoded?.taluka || 'Baramati';
+
+      if (geocoded?.pincode) setPincode(geocoded.pincode);
+      if (geocoded?.formattedAddress) setFormattedAddress(geocoded.formattedAddress);
+
+      const matchedState = states.find(s => s.name && (s.name.toLowerCase().includes(stateName.toLowerCase()) || stateName.toLowerCase().includes(s.name.toLowerCase()))) || { name: stateName };
+      setSelectedState(matchedState);
+      if (matchedState._id) fetchDistricts(matchedState._id);
+
+      const matchedDistrict = districts.find(d => d.name && (d.name.toLowerCase().includes(districtName.toLowerCase()) || districtName.toLowerCase().includes(d.name.toLowerCase()))) || { name: districtName };
+      setSelectedDistrict(matchedDistrict);
+      if (matchedDistrict._id) fetchTalukas(matchedDistrict._id);
+
+      const matchedTaluka = talukas.find(t => t.name && (t.name.toLowerCase().includes(talukaName.toLowerCase()) || talukaName.toLowerCase().includes(t.name.toLowerCase()))) || { name: talukaName };
+      setSelectedTaluka(matchedTaluka);
+      if (matchedTaluka._id) fetchVillages(matchedTaluka._id);
+
       setGpsSuccess(true);
     } catch (e) {
+      console.warn('[GPS DEBUG] handleAutoGPS encountered error:', e);
       setLatitude(17.2855);
       setLongitude(74.1839);
       setFormattedAddress('Murti, Baramati, Pune, Maharashtra');
+      setSelectedState({ name: 'Maharashtra' });
+      setSelectedDistrict({ name: 'Pune' });
+      setSelectedTaluka({ name: 'Baramati' });
       setGpsSuccess(true);
     } finally {
       setGpsLoading(false);
@@ -532,11 +715,22 @@ export default function AddAnimalScreen({ navigation }) {
     if (!video) {
       missingFields.push(t('addAnimal.videoRequired'));
     }
-    if (!title || !title.trim()) {
-      missingFields.push(t('addAnimal.previewLabelTitle'));
-    }
-    if (!selectedBreed) {
-      missingFields.push(t('addAnimal.breedPlaceholder'));
+    if (isOtherCategory) {
+      if (!title || !title.trim()) {
+        missingFields.push('प्राण्याचे नाव (Animal Name)');
+      }
+      if (!customBreedText || !customBreedText.trim()) {
+        missingFields.push('जात (Breed Name)');
+      }
+    } else {
+      if (!title || !title.trim()) {
+        missingFields.push(t('addAnimal.previewLabelTitle'));
+      }
+      if (!selectedBreed) {
+        missingFields.push(t('addAnimal.breedPlaceholder'));
+      } else if (isOtherBreedSelected && (!customBreedText || !customBreedText.trim())) {
+        missingFields.push('इतर जात नमूद करा / Enter Breed');
+      }
     }
     if (!price || !price.toString().trim()) {
       missingFields.push(t('addAnimal.expectedPriceLabel'));
@@ -550,10 +744,6 @@ export default function AddAnimalScreen({ navigation }) {
     if (!selectedTaluka) {
       missingFields.push(t('addAnimal.talukaLabel'));
     }
-    const villageVal = typeof selectedVillage === 'object' ? selectedVillage?.name : selectedVillage;
-    if (!villageVal || !villageVal.trim()) {
-      missingFields.push(t('addAnimal.villageLabel'));
-    }
 
     if (missingFields.length > 0) {
       const errMsg = t('addAnimal.missingFieldsError', { fields: missingFields.join('\n- ') });
@@ -564,9 +754,15 @@ export default function AddAnimalScreen({ navigation }) {
     setIsSubmitting(true);
     setUploadProgress(0);
 
+    const effectiveBreedName = isOtherCategory
+      ? customBreedText.trim()
+      : isOtherBreedSelected && customBreedText.trim()
+      ? `इतर - ${customBreedText.trim()}`
+      : selectedBreed?.name || '';
+
     const basePayload = {
       categoryId: selectedCategory._id || selectedCategory.id,
-      breedId: selectedBreed._id || selectedBreed.id,
+      breedId: selectedBreed?._id || selectedBreed?.id || (breeds && breeds[0] ? breeds[0]._id : selectedCategory._id),
       title: title,
       description: description,
       price: Number(price),
@@ -578,7 +774,8 @@ export default function AddAnimalScreen({ navigation }) {
       health: {
         vaccinated: isVaccinated,
         healthy: isHealthy,
-        pregnant: isPregnant,
+        pregnant: gender === 'Female' ? isPregnant : false,
+        pregnancyMonth: (gender === 'Female' && isPregnant && pregnancyMonth) ? Number(pregnancyMonth) : null,
         milkCapacity: milkCapacity ? milkCapacity + ' Liters/day' : ''
       },
       state: selectedState?.name || '',
@@ -1595,34 +1792,85 @@ export default function AddAnimalScreen({ navigation }) {
           <View style={styles.wizardCard}>
             <AppText style={styles.wizardLabel}>जनावराची माहिती भरा / Animal Details</AppText>
 
-            <View style={styles.inputGroup}>
-              <AppText style={styles.largeFieldLabel}>जाहिरातीचे नाव / Listing Title *</AppText>
-              <TextInput
-                style={styles.largeInput}
-                placeholder="उदा. २ वर्षांची जर्सी गाय (e.g. 2 Yr Jersey Cow)"
-                value={title}
-                onChangeText={setTitle}
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <AppText style={styles.largeFieldLabel}>जात / Breed *</AppText>
-              {loadingBreeds ? (
-                <ActivityIndicator size="small" color="#16A34A" />
-              ) : (
-                <View style={styles.dropdownContainer}>
-                  {breeds.map((b) => (
-                    <TouchableOpacity
-                      key={b._id}
-                      style={[styles.pillOption, selectedBreed?._id === b._id && styles.selectedPillOption]}
-                      onPress={() => setSelectedBreed(b)}
-                    >
-                      <AppText style={[styles.pillText, selectedBreed?._id === b._id && styles.selectedPillText]}>{b.name}</AppText>
-                    </TouchableOpacity>
-                  ))}
+            {isOtherCategory ? (
+              <>
+                <View style={styles.inputGroup}>
+                  <AppText style={styles.largeFieldLabel}>प्राण्याचे नाव / Animal Name *</AppText>
+                  <TextInput
+                    style={styles.largeInput}
+                    placeholder="उदा. ससा / बदक / उंट (e.g. Rabbit / Duck / Camel)"
+                    value={title}
+                    onChangeText={(txt) => {
+                      setTitle(txt);
+                      setIsTitleUserEdited(txt.trim().length > 0);
+                    }}
+                  />
                 </View>
-              )}
-            </View>
+
+                <View style={styles.inputGroup}>
+                  <AppText style={styles.largeFieldLabel}>जात / Breed Name *</AppText>
+                  <TextInput
+                    style={styles.largeInput}
+                    placeholder="उदा. देशी / ससा जात (e.g. Desi / Rabbit Breed)"
+                    value={customBreedText}
+                    onChangeText={(txt) => {
+                      setCustomBreedText(txt);
+                      if (!selectedBreed || selectedBreed.id !== 'custom_other') {
+                        setSelectedBreed({ id: 'custom_other', name: txt, _id: selectedCategory?._id });
+                      }
+                    }}
+                  />
+                </View>
+              </>
+            ) : (
+              <>
+                <View style={styles.inputGroup}>
+                  <AppText style={styles.largeFieldLabel}>जाहिरातीचे नाव / Listing Title *</AppText>
+                  <TextInput
+                    style={styles.largeInput}
+                    placeholder="उदा. २ वर्षांची जर्सी गाय"
+                    value={title}
+                    onChangeText={(txt) => {
+                      setTitle(txt);
+                      setIsTitleUserEdited(txt.trim().length > 0);
+                    }}
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <AppText style={styles.largeFieldLabel}>जात / Breed *</AppText>
+                  {loadingBreeds ? (
+                    <ActivityIndicator size="small" color="#16A34A" />
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.dropdownSelector}
+                      onPress={() => {
+                        setBreedSearchQuery('');
+                        setIsBreedModalVisible(true);
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <AppText style={[styles.dropdownSelectorText, !selectedBreed && { color: '#94A3B8' }]}>
+                        {selectedBreed ? selectedBreed.name : 'जात निवडा / Select Breed'}
+                      </AppText>
+                      <Ionicons name="chevron-down" size={20} color="#64748B" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {isOtherBreedSelected && (
+                  <View style={styles.inputGroup}>
+                    <AppText style={styles.largeFieldLabel}>इतर जात नमूद करा / Enter Breed *</AppText>
+                    <TextInput
+                      style={styles.largeInput}
+                      placeholder="उदा. गीर क्रॉस (e.g. Gir Cross)"
+                      value={customBreedText}
+                      onChangeText={setCustomBreedText}
+                    />
+                  </View>
+                )}
+              </>
+            )}
 
             <View style={styles.rowInputs}>
               <View style={[styles.inputGroup, { width: '48%' }]}>
@@ -1636,7 +1884,7 @@ export default function AddAnimalScreen({ navigation }) {
                 />
               </View>
               <View style={[styles.inputGroup, { width: '48%' }]}>
-                <AppText style={styles.largeFieldLabel}>वजन / Weight (किलो)</AppText>
+                <AppText style={styles.largeFieldLabel}>वजन (पर्यायी) / Weight (kg)</AppText>
                 <TextInput
                   style={styles.largeInput}
                   keyboardType="numeric"
@@ -1648,7 +1896,7 @@ export default function AddAnimalScreen({ navigation }) {
             </View>
 
             <View style={styles.inputGroup}>
-              <AppText style={styles.largeFieldLabel}>लिंग / Gender</AppText>
+              <AppText style={styles.largeFieldLabel}>लिंग / Gender *</AppText>
               <View style={styles.pillRow}>
                 {['Female', 'Male'].map((g) => (
                   <TouchableOpacity
@@ -1663,21 +1911,21 @@ export default function AddAnimalScreen({ navigation }) {
             </View>
 
             <View style={styles.inputGroup}>
-              <AppText style={styles.largeFieldLabel}>रंग / Color</AppText>
+              <AppText style={styles.largeFieldLabel}>रंग (पर्यायी) / Color</AppText>
               <TextInput
                 style={styles.largeInput}
-                placeholder="उदा. तांबडा / काळा (e.g. Red / Black)"
+                placeholder="उदा. काळा, पांढरा, तपकिरी"
                 value={color}
                 onChangeText={setColor}
               />
             </View>
 
             <View style={styles.inputGroup}>
-              <AppText style={styles.largeFieldLabel}>इतर माहिती / Description</AppText>
+              <AppText style={styles.largeFieldLabel}>इतर माहिती (पर्यायी) / Description</AppText>
               <TextInput
                 style={[styles.largeInput, { height: 70 }]}
                 multiline
-                placeholder="उदा. जनावर दूध देण्यास अतिशय शांत आहे."
+                placeholder="जनावराविषयी अधिक माहिती लिहा..."
                 value={description}
                 onChangeText={setDescription}
               />
@@ -1688,53 +1936,160 @@ export default function AddAnimalScreen({ navigation }) {
       case 5:
         return (
           <View style={styles.wizardCard}>
+            {/* Top Health Information Card */}
+            <View style={{
+              backgroundColor: '#EFF6FF',
+              borderRadius: 16,
+              padding: 16,
+              marginBottom: 20,
+              borderWidth: 1,
+              borderColor: '#DBEAFE',
+              flexDirection: 'row',
+              alignItems: 'center'
+            }}>
+              <View style={{
+                width: 44,
+                height: 44,
+                borderRadius: 22,
+                backgroundColor: '#DBEAFE',
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginRight: 14
+              }}>
+                <Ionicons name="medical" size={22} color="#1D4ED8" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <AppText style={{ fontSize: 15, fontWeight: '800', color: '#1E3A8A', marginBottom: 2 }}>
+                  🩺 आरोग्य माहिती
+                </AppText>
+                <AppText style={{ fontSize: 12.5, color: '#3B82F6', fontWeight: '500', lineHeight: 17 }}>
+                  ही माहिती भरल्याने खरेदीदारांचा विश्वास वाढतो.
+                </AppText>
+              </View>
+            </View>
+
             <AppText style={styles.wizardLabel}>आरोग्याची माहिती / Health Details</AppText>
 
+            {/* Vaccinated Toggle */}
             <View style={styles.toggleRow}>
-              <View>
-                <AppText style={styles.toggleTitle}>लसीकरण केले आहे का? (Vaccinated)</AppText>
+              <View style={{ flex: 1, marginRight: 12 }}>
+                <AppText style={styles.toggleTitle}>लसीकरण (पर्यायी) / Vaccinated</AppText>
                 <AppText style={styles.toggleSubtitle}>नियमित सरकारी लसी पूर्ण झाल्या आहेत</AppText>
               </View>
-              <Switch
-                value={isVaccinated}
-                onValueChange={setIsVaccinated}
-                trackColor={{ true: '#16A34A' }}
-              />
-            </View>
-
-            <View style={styles.toggleRow}>
-              <View>
-                <AppText style={styles.toggleTitle}>जनावर पूर्ण निरोगी आहे? (Healthy)</AppText>
-                <AppText style={styles.toggleSubtitle}>कोणतीही जखम किंवा आजार नाही</AppText>
-              </View>
-              <Switch
-                value={isHealthy}
-                onValueChange={setIsHealthy}
-                trackColor={{ true: '#16A34A' }}
-              />
-            </View>
-
-            {gender === 'Female' && (
-              <View style={styles.toggleRow}>
-                <View>
-                  <AppText style={styles.toggleTitle}>{t('addAnimal.togglePregnant')}</AppText>
-                  <AppText style={styles.toggleSubtitle}>{t('addAnimal.togglePregnantSub')}</AppText>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={{
+                  paddingHorizontal: 8,
+                  paddingVertical: 4,
+                  borderRadius: 12,
+                  backgroundColor: isVaccinated ? '#DCFCE7' : '#F1F5F9',
+                  borderWidth: 1,
+                  borderColor: isVaccinated ? '#BBF7D0' : '#E2E8F0'
+                }}>
+                  <AppText style={{ fontSize: 12, fontWeight: '700', color: isVaccinated ? '#16A34A' : '#64748B' }}>
+                    {isVaccinated ? '✅ होय' : '❌ नाही'}
+                  </AppText>
                 </View>
                 <Switch
-                  value={isPregnant}
-                  onValueChange={setIsPregnant}
+                  value={isVaccinated}
+                  onValueChange={setIsVaccinated}
                   trackColor={{ true: '#16A34A' }}
                 />
               </View>
+            </View>
+
+            {/* Healthy Toggle */}
+            <View style={styles.toggleRow}>
+              <View style={{ flex: 1, marginRight: 12 }}>
+                <AppText style={styles.toggleTitle}>निरोगी (पर्यायी) / Healthy</AppText>
+                <AppText style={styles.toggleSubtitle}>कोणतीही जखम किंवा आजार नाही</AppText>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={{
+                  paddingHorizontal: 8,
+                  paddingVertical: 4,
+                  borderRadius: 12,
+                  backgroundColor: isHealthy ? '#DCFCE7' : '#F1F5F9',
+                  borderWidth: 1,
+                  borderColor: isHealthy ? '#BBF7D0' : '#E2E8F0'
+                }}>
+                  <AppText style={{ fontSize: 12, fontWeight: '700', color: isHealthy ? '#16A34A' : '#64748B' }}>
+                    {isHealthy ? '✅ होय' : '❌ नाही'}
+                  </AppText>
+                </View>
+                <Switch
+                  value={isHealthy}
+                  onValueChange={setIsHealthy}
+                  trackColor={{ true: '#16A34A' }}
+                />
+              </View>
+            </View>
+
+            {/* Pregnant Toggle (Female Animals Only) */}
+            {gender === 'Female' && (
+              <View style={styles.toggleRow}>
+                <View style={{ flex: 1, marginRight: 12 }}>
+                  <AppText style={styles.toggleTitle}>गर्भधारणा (पर्यायी) / Pregnant</AppText>
+                  <AppText style={styles.toggleSubtitle}>{t('addAnimal.togglePregnantSub')}</AppText>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={{
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                    borderRadius: 12,
+                    backgroundColor: isPregnant ? '#DCFCE7' : '#F1F5F9',
+                    borderWidth: 1,
+                    borderColor: isPregnant ? '#BBF7D0' : '#E2E8F0'
+                  }}>
+                    <AppText style={{ fontSize: 12, fontWeight: '700', color: isPregnant ? '#16A34A' : '#64748B' }}>
+                      {isPregnant ? '✅ होय' : '❌ नाही'}
+                    </AppText>
+                  </View>
+                  <Switch
+                    value={isPregnant}
+                    onValueChange={(val) => {
+                      if (Platform.OS === 'ios' || Platform.OS === 'android') {
+                        try {
+                          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                        } catch (e) {}
+                      }
+                      setIsPregnant(val);
+                    }}
+                    trackColor={{ true: '#16A34A' }}
+                  />
+                </View>
+              </View>
             )}
 
-            {gender === 'Female' && (
+            {/* Pregnancy Month Selector (Female + Pregnant Only) */}
+            {gender === 'Female' && isPregnant && (
+              <View style={[styles.inputGroup, { marginTop: 4 }]}>
+                <AppText style={styles.largeFieldLabel}>🤰 गर्भधारणेचा महिना (पर्यायी) / Pregnancy Month</AppText>
+                <TouchableOpacity
+                  style={styles.dropdownSelector}
+                  onPress={() => setIsPregnancyModalVisible(true)}
+                  activeOpacity={0.8}
+                >
+                  <AppText style={[styles.dropdownSelectorText, !pregnancyMonth && { color: '#94A3B8' }]}>
+                    {pregnancyMonth
+                      ? PREGNANCY_MONTH_OPTIONS.find((m) => m.id === Number(pregnancyMonth))?.label + ' (' + PREGNANCY_MONTH_OPTIONS.find((m) => m.id === Number(pregnancyMonth))?.en + ')'
+                      : 'महिना निवडा... / Select Month'}
+                  </AppText>
+                  <Ionicons name="chevron-down" size={20} color="#64748B" />
+                </TouchableOpacity>
+                <AppText style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>
+                  माहित असल्यासच निवडा. हा पर्याय ऐच्छिक आहे.
+                </AppText>
+              </View>
+            )}
+
+            {/* Milk Capacity (Female Cow, Buffalo, Goat Only) */}
+            {showMilkCapacity && (
               <View style={styles.inputGroup}>
-                <AppText style={styles.largeFieldLabel}>दूध देण्याची क्षमता / Milk Capacity (लिटर/दिवस)</AppText>
+                <AppText style={styles.largeFieldLabel}>दूध देण्याची क्षमता (पर्यायी) / Milk Capacity (लिटर/दिवस)</AppText>
                 <TextInput
                   style={styles.largeInput}
                   keyboardType="numeric"
-                  placeholder="उदा. १२ लिटर"
+                  placeholder="उदा. १२ लिटर प्रतिदिन"
                   value={milkCapacity}
                   onChangeText={setMilkCapacity}
                 />
@@ -1792,9 +2147,84 @@ export default function AddAnimalScreen({ navigation }) {
           <View style={styles.wizardCard}>
             <AppText style={styles.wizardLabel}>{t('addAnimal.locationDetails')}</AppText>
 
+            {/* Top GPS Action Card */}
+            <View style={{
+              backgroundColor: '#F0FDF4',
+              borderRadius: 16,
+              padding: 16,
+              marginBottom: 20,
+              borderWidth: 1.5,
+              borderColor: '#BBF7D0'
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                <View style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: 21,
+                  backgroundColor: '#DCFCE7',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginRight: 12
+                }}>
+                  <Ionicons name="location" size={22} color="#16A34A" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <AppText style={{ fontSize: 16, fontWeight: '700', color: '#14532D' }}>
+                    📍 सध्याचे स्थान वापरा / Use Current Location
+                  </AppText>
+                  <AppText style={{ fontSize: 12.5, color: '#166534', marginTop: 2 }}>
+                    GPS द्वारे राज्य, जिल्हा, तालुका व गाव आपोआप भरा.
+                  </AppText>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={{
+                  backgroundColor: '#16A34A',
+                  borderRadius: 12,
+                  paddingVertical: 13,
+                  paddingHorizontal: 16,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  shadowColor: '#16A34A',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.25,
+                  shadowRadius: 4,
+                  elevation: 3
+                }}
+                onPress={() => {
+                  console.log('[GPS DEBUG] Button pressed - onPress entered');
+                  handleAutoGPS();
+                }}
+                disabled={gpsLoading}
+                activeOpacity={0.85}
+              >
+                {gpsLoading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name="navigate-circle" size={22} color="#FFFFFF" style={{ marginRight: 8 }} />
+                    <AppText style={{ fontSize: 15, fontWeight: '800', color: '#FFFFFF' }}>
+                      माझे सध्याचे स्थान वापरा
+                    </AppText>
+                  </>
+                )}
+              </TouchableOpacity>
+
+              {gpsSuccess && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10, justifyContent: 'center' }}>
+                  <Ionicons name="checkmark-circle" size={16} color="#16A34A" style={{ marginRight: 4 }} />
+                  <AppText style={{ fontSize: 12.5, color: '#15803D', fontWeight: '600' }}>
+                    स्थान प्राप्त झाले! खालील माहिती तपासा किंवा बदला.
+                  </AppText>
+                </View>
+              )}
+            </View>
+
             {/* State Select Trigger */}
             <View style={styles.inputGroup}>
-              <AppText style={styles.largeFieldLabel}>{t('addAnimal.stateLabel')}</AppText>
+              <AppText style={styles.largeFieldLabel}>{t('addAnimal.stateLabel')} *</AppText>
               <TouchableOpacity
                 style={styles.dropdownSelector}
                 onPress={() => {
@@ -1867,7 +2297,7 @@ export default function AddAnimalScreen({ navigation }) {
             {/* District Select Trigger */}
             {selectedState && (
               <View style={styles.inputGroup}>
-                <AppText style={styles.largeFieldLabel}>{t('addAnimal.districtLabel')}</AppText>
+                <AppText style={styles.largeFieldLabel}>{t('addAnimal.districtLabel')} *</AppText>
                 <TouchableOpacity
                   style={styles.dropdownSelector}
                   onPress={() => {
@@ -1939,7 +2369,7 @@ export default function AddAnimalScreen({ navigation }) {
             {/* Taluka Select Trigger */}
             {selectedDistrict && (
               <View style={styles.inputGroup}>
-                <AppText style={styles.largeFieldLabel}>{t('addAnimal.talukaLabel')}</AppText>
+                <AppText style={styles.largeFieldLabel}>{t('addAnimal.talukaLabel')} *</AppText>
                 <TouchableOpacity
                   style={styles.dropdownSelector}
                   onPress={() => {
@@ -2009,13 +2439,16 @@ export default function AddAnimalScreen({ navigation }) {
             {/* Village Input & Suggestions */}
             {selectedTaluka && (
               <View style={styles.inputGroup}>
-                <AppText style={styles.largeFieldLabel}>{t('addAnimal.villageLabel')}</AppText>
+                <AppText style={styles.largeFieldLabel}>गाव (पर्यायी) / Village (Optional)</AppText>
                 <TextInput
-                  style={[styles.largeInput, { marginBottom: 12 }]}
-                  placeholder="Enter your village name / गावचे नाव टाका"
+                  style={[styles.largeInput, { marginBottom: 4 }]}
+                  placeholder="तुमच्या गावाचे नाव टाका (माहित असल्यास)"
                   value={typeof selectedVillage === 'object' ? (selectedVillage?.name || '') : (selectedVillage || '')}
                   onChangeText={(text) => setSelectedVillage(text)}
                 />
+                <AppText style={{ fontSize: 12, color: '#64748B', marginTop: 4, marginBottom: 8 }}>
+                  GPS द्वारे गावाचे नाव नेहमी अचूक मिळेलच असे नाही. माहित असल्यास गावाचे नाव भरा.
+                </AppText>
                 {filteredVillages && filteredVillages.length > 0 && (
                   <View style={{ marginTop: 8 }}>
                     <AppText style={{ fontSize: 13, color: '#64748B', marginBottom: 8, fontWeight: '600' }}>
@@ -2045,35 +2478,6 @@ export default function AddAnimalScreen({ navigation }) {
                 )}
               </View>
             )}
-
-            {/* GPS Trigger */}
-            <View style={styles.gpsContainer}>
-              <AppText style={styles.gpsLabel}>{t('addAnimal.gpsCoordinates')}</AppText>
-
-              {gpsSuccess ? (
-                <View style={styles.gpsSuccessBox}>
-                  <Ionicons name="checkmark-circle" size={24} color="#16A34A" />
-                  <AppText style={styles.gpsSuccessText}>
-                    📍 {formattedAddress || [typeof selectedVillage === 'object' ? selectedVillage?.name : selectedVillage, selectedTaluka?.name, selectedDistrict?.name, selectedState?.name].filter(Boolean).join(', ')}
-                  </AppText>
-                </View>
-              ) : (
-                <TouchableOpacity
-                  style={styles.gpsFetchBtn}
-                  onPress={handleAutoGPS}
-                  disabled={gpsLoading}
-                >
-                  {gpsLoading ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <>
-                      <Ionicons name="locate" size={20} color="#fff" />
-                      <AppText style={styles.gpsFetchBtnText}>{t('addAnimal.getAutoGps')}</AppText>
-                    </>
-                  )}
-                </TouchableOpacity>
-              )}
-            </View>
           </View>
         );
 
@@ -2093,11 +2497,20 @@ export default function AddAnimalScreen({ navigation }) {
             {/* Details panel */}
             <View style={styles.previewPanel}>
               <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>{t('addAnimal.previewLabelTitle')} </Text> {title}</AppText>
-              <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>{t('addAnimal.previewLabelBreed')} </Text> {selectedBreed?.name}</AppText>
+              <AppText style={styles.previewItem}>
+                <Text style={{ fontWeight: 'bold' }}>{t('addAnimal.previewLabelBreed')} </Text>
+                {isOtherCategory ? customBreedText : (isOtherBreedSelected && customBreedText ? `इतर - ${customBreedText}` : selectedBreed?.name)}
+              </AppText>
               <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>{t('addAnimal.previewLabelAge')} </Text> {age} {t('common.years')}</AppText>
               {weight !== '' && <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>{t('addAnimal.previewLabelWeight')} </Text> {weight} {t('common.kg')}</AppText>}
               <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>{t('addAnimal.previewLabelGender')} </Text> {gender}</AppText>
               <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>{t('addAnimal.previewLabelVaccinated')} </Text> {isVaccinated ? t('common.yes') : t('common.no')}</AppText>
+              {gender === 'Female' && isPregnant && (
+                <AppText style={styles.previewItem}>
+                  <Text style={{ fontWeight: 'bold' }}>गर्भधारणा: </Text>
+                  {t('common.yes')} {pregnancyMonth ? `(${PREGNANCY_MONTH_OPTIONS.find(m => m.id === Number(pregnancyMonth))?.label || (pregnancyMonth + ' महिने')})` : ''}
+                </AppText>
+              )}
               {milkCapacity !== '' && <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>{t('addAnimal.previewLabelMilk')} </Text> {milkCapacity} {t('common.litersPerDay')}</AppText>}
               <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>{t('addAnimal.previewLabelPrice')} </Text> ₹{price} ({isNegotiable ? t('common.negotiable') : t('common.fixed')})</AppText>
               <AppText style={styles.previewItem}><Text style={{ fontWeight: 'bold' }}>{t('addAnimal.previewLabelLocation')} </Text> {typeof selectedVillage === 'object' ? selectedVillage?.name : selectedVillage}, {selectedTaluka?.name}, {selectedDistrict?.name}, {selectedState?.name}</AppText>
@@ -2214,6 +2627,104 @@ export default function AddAnimalScreen({ navigation }) {
           ) : null}
         </View>
       )}
+      {/* Pregnancy Month Selection Modal */}
+      <Modal
+        visible={isPregnancyModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setIsPregnancyModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <AppText style={styles.modalTitle}>गर्भधारणेचा महिना / Pregnancy Month</AppText>
+              <TouchableOpacity onPress={() => setIsPregnancyModalVisible(false)} style={styles.closeModalButton}>
+                <Ionicons name="close" size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 360 }} showsVerticalScrollIndicator={false}>
+              {PREGNANCY_MONTH_OPTIONS.map((opt) => {
+                const isSelected = Number(pregnancyMonth) === opt.id;
+                return (
+                  <TouchableOpacity
+                    key={opt.id}
+                    style={[styles.modalOption, isSelected && { backgroundColor: '#F0FDF4' }]}
+                    onPress={() => {
+                      setPregnancyMonth(opt.id);
+                      setIsPregnancyModalVisible(false);
+                    }}
+                  >
+                    <AppText style={[styles.modalOptionText, isSelected && { color: '#16A34A', fontWeight: '700', flex: 1 }]}>
+                      {opt.label} ({opt.en})
+                    </AppText>
+                    {isSelected && <Ionicons name="checkmark-circle" size={20} color="#16A34A" />}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Searchable Breed Selection Modal */}
+      <Modal
+        visible={isBreedModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setIsBreedModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <AppText style={styles.modalTitle}>जात निवडा / Select Breed</AppText>
+              <TouchableOpacity onPress={() => setIsBreedModalVisible(false)} style={styles.closeModalButton}>
+                <Ionicons name="close" size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <TextInput
+              style={styles.modalSearchInput}
+              placeholder="जात शोधा... / Search breed..."
+              placeholderTextColor="#94A3B8"
+              value={breedSearchQuery}
+              onChangeText={setBreedSearchQuery}
+            />
+
+            <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+              {breeds
+                .filter((b) => {
+                  if (!breedSearchQuery) return true;
+                  const query = breedSearchQuery.toLowerCase();
+                  return (
+                    (b.name && b.name.toLowerCase().includes(query)) ||
+                    (b.mr && b.mr.toLowerCase().includes(query)) ||
+                    (b.en && b.en.toLowerCase().includes(query))
+                  );
+                })
+                .map((b) => {
+                  const isSelected = selectedBreed?.id === b.id || selectedBreed?._id === b._id;
+                  return (
+                    <TouchableOpacity
+                      key={b._id || b.id}
+                      style={[styles.modalOption, isSelected && { backgroundColor: '#F0FDF4' }]}
+                      onPress={() => {
+                        setSelectedBreed(b);
+                        if (b.id !== 'other') setCustomBreedText('');
+                        setIsBreedModalVisible(false);
+                      }}
+                    >
+                      <AppText style={[styles.modalOptionText, isSelected && { color: '#16A34A', fontWeight: '700', flex: 1 }]}>
+                        {b.name}
+                      </AppText>
+                      {isSelected && <Ionicons name="checkmark-circle" size={20} color="#16A34A" />}
+                    </TouchableOpacity>
+                  );
+                })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

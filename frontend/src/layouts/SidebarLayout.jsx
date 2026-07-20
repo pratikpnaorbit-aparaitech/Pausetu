@@ -36,6 +36,7 @@ export default function SidebarLayout({ children }) {
     setCurrentView,
     animals,
     pendingVerificationCount,
+    dashboardStats,
     adminDetails,
     setIsAdminLoggedIn,
     triggerConfirm,
@@ -48,7 +49,7 @@ export default function SidebarLayout({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const pendingCount = animals.filter((a) => a.status === 'pending' && !a.isDeleted).length;
-  const pendingVerificationsCount = pendingVerificationCount;
+  const pendingVerificationsCount = dashboardStats?.kpis?.pendingVerificationRequests ?? pendingVerificationCount ?? 0;
 
   const handleNav = useCallback((name) => {
     setCurrentView(name);

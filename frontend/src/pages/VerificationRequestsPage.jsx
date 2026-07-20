@@ -61,19 +61,42 @@ export default function VerificationRequestsPage() {
 
   const handleApprove = async (id) => {
     if (!window.confirm('Are you sure you want to approve this verification request?')) return;
+
+    const targetItemIndex = requests.findIndex(r => r.id === id);
+    const targetItem = requests[targetItemIndex];
+
+    const rollback = () => {
+      if (activeTab === 'pending' && targetItem) {
+        setRequests(prev => {
+          if (prev.some(r => r.id === id)) return prev;
+          const updated = [...prev];
+          if (targetItemIndex >= 0 && targetItemIndex <= updated.length) {
+            updated.splice(targetItemIndex, 0, targetItem);
+          } else {
+            updated.push(targetItem);
+          }
+          return updated;
+        });
+      }
+    };
+
+    if (activeTab === 'pending' && targetItem) {
+      setRequests(prev => prev.filter(r => r.id !== id));
+    }
+
     setActionLoading(true);
     try {
       const success = await verificationApi.updateStatus(id, 'approved');
       if (success) {
-        refreshManager.emit(REFRESH_EVENTS.VERIFICATION_UPDATED);
+        refreshManager.emit(REFRESH_EVENTS.VERIFICATION_APPROVED, { id });
+        refreshManager.emit(REFRESH_EVENTS.VERIFICATION_UPDATED, { id });
         loadRequests(activeTab);
-        if (loadDashboardData) {
-          loadDashboardData(true);
-        }
       } else {
+        rollback();
         alert('Failed to approve request.');
       }
     } catch (err) {
+      rollback();
       alert(err.message || 'Error occurred while approving.');
     } finally {
       setActionLoading(false);
@@ -86,20 +109,46 @@ export default function VerificationRequestsPage() {
       alert('Please provide a reason for rejection.');
       return;
     }
+    const targetId = rejectRequest?.id;
+    if (!targetId) return;
+
+    const targetItemIndex = requests.findIndex(r => r.id === targetId);
+    const targetItem = requests[targetItemIndex];
+
+    const rollback = () => {
+      if (activeTab === 'pending' && targetItem) {
+        setRequests(prev => {
+          if (prev.some(r => r.id === targetId)) return prev;
+          const updated = [...prev];
+          if (targetItemIndex >= 0 && targetItemIndex <= updated.length) {
+            updated.splice(targetItemIndex, 0, targetItem);
+          } else {
+            updated.push(targetItem);
+          }
+          return updated;
+        });
+      }
+    };
+
+    if (activeTab === 'pending' && targetItem) {
+      setRequests(prev => prev.filter(r => r.id !== targetId));
+    }
+
     setActionLoading(true);
     try {
-      const success = await verificationApi.updateStatus(rejectRequest.id, 'rejected', rejectReason);
+      const success = await verificationApi.updateStatus(targetId, 'rejected', rejectReason);
       if (success) {
         setRejectRequest(null);
         setRejectReason('');
+        refreshManager.emit(REFRESH_EVENTS.VERIFICATION_REJECTED, { id: targetId });
+        refreshManager.emit(REFRESH_EVENTS.VERIFICATION_UPDATED, { id: targetId });
         loadRequests(activeTab);
-        if (loadDashboardData) {
-          loadDashboardData(true);
-        }
       } else {
+        rollback();
         alert('Failed to reject request.');
       }
     } catch (err) {
+      rollback();
       alert(err.message || 'Error occurred while rejecting.');
     } finally {
       setActionLoading(false);

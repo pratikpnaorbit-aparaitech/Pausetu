@@ -8,6 +8,7 @@ export const REFRESH_EVENTS = {
   LISTING_UPDATED: 'listing_updated',
   LISTING_DELETED: 'listing_deleted',
   PROFILE_UPDATED: 'profile_updated',
+  LOCATION_UPDATED: 'location_updated',
   VERIFICATION_UPDATED: 'verification_updated',
   NOTIFICATION_UPDATED: 'notification_updated',
   FAVORITE_UPDATED: 'favorite_updated',

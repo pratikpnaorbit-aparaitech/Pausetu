@@ -1,7 +1,7 @@
 import React, { useContext, useMemo, useState, useEffect, useCallback } from 'react';
 import { AdminContext } from '../context/AdminContext';
 import {
-  Users, UserCheck, Layers, Clock, Download, Printer,
+  Users, UserCheck, Layers, Clock, Download, Printer, Shield,
   ChevronUp, AlertCircle, RefreshCw, TrendingUp, CheckCircle2, XCircle, Lock, Unlock
 } from 'lucide-react';
 import { verificationApi } from '../api/verificationApi';
@@ -115,7 +115,8 @@ export default function DashboardPage() {
   const {
     sellers, buyers, animals, auditLogs, widgets,
     handleToggleWidget, handleMoveWidgetUp, handleExport,
-    isLoading, apiError, dashboardStats, loadDashboardData
+    isLoading, apiError, dashboardStats, loadDashboardData,
+    pendingVerificationCount
   } = useContext(AdminContext);
 
   const getWidget = (id) => widgets.find((w) => w.id === id);
@@ -161,7 +162,8 @@ export default function DashboardPage() {
       REFRESH_EVENTS.LISTING_CREATED,
       REFRESH_EVENTS.LISTING_UPDATED,
       REFRESH_EVENTS.LISTING_DELETED,
-      REFRESH_EVENTS.PROFILE_UPDATED
+      REFRESH_EVENTS.PROFILE_UPDATED,
+      REFRESH_EVENTS.VERIFICATION_UPDATED
     ],
     pageKey: 'DashboardPage'
   });
@@ -253,6 +255,7 @@ export default function DashboardPage() {
     totalBuyers: buyers.filter((b) => !b.isDeleted).length,
     totalAnimals: animals.filter((a) => !a.isDeleted).length,
     pendingApprovals: animals.filter((a) => a.status === 'pending').length,
+    pendingVerificationRequests: dashboardStats?.kpis?.pendingVerificationRequests ?? pendingVerificationCount ?? 0,
     approvedListings: animals.filter((a) => a.status === 'approved').length,
     rejectedListings: animals.filter((a) => a.status === 'rejected').length,
     soldAnimals: animals.filter((a) => a.status === 'sold').length,
@@ -468,6 +471,9 @@ export default function DashboardPage() {
         )}
         {getWidget('pending')?.visible && (
           <KpiCard label="Pending Approvals" value={kpis.pendingApprovals} icon={Clock} accentColor="var(--color-danger)" delay={0.12} />
+        )}
+        {getWidget('verifications')?.visible && (
+          <KpiCard label="Verification Requests" value={kpis?.pendingVerificationRequests ?? pendingVerificationCount ?? 0} icon={Shield} accentColor="#8b5cf6" delay={0.14} />
         )}
         {getWidget('registrations')?.visible && (
           <KpiCard label="Approved Listings" value={kpis.approvedListings} icon={CheckCircle2} accentColor="var(--color-success)" delay={0.16} />

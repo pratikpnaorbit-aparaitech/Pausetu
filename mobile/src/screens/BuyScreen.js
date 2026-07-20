@@ -314,42 +314,8 @@ export default function BuyScreen({ navigation }) {
   const [activeFilters, setActiveFilters] = useState(null);
   const mainListRef = useRef(null);
 
-  const handleLocationTap = async () => {
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        setIsLocationPickerVisible(true);
-        return;
-      }
-      
-      const loc = await Location.getCurrentPositionAsync({});
-      const { latitude, longitude } = loc.coords;
-      const reverse = await Location.reverseGeocodeAsync({ latitude, longitude });
-      
-      if (reverse && reverse.length > 0) {
-        const addr = reverse[0];
-        const selected = {
-          state: addr.region || '',
-          district: addr.district || addr.subregion || addr.city || '',
-          taluka: addr.district || '',
-          village: addr.city || addr.subregion || ''
-        };
-        updateLocation(selected);
-        
-        setActiveFilters(prev => ({
-          ...prev,
-          state: selected.state,
-          district: selected.district,
-          taluka: selected.taluka,
-          village: selected.village
-        }));
-      } else {
-        setIsLocationPickerVisible(true);
-      }
-    } catch (e) {
-      console.warn('Location error:', e);
-      setIsLocationPickerVisible(true);
-    }
+  const handleLocationTap = () => {
+    setIsLocationPickerVisible(true);
   };
 
   const getDistance = (lat1, lon1, lat2, lon2) => {

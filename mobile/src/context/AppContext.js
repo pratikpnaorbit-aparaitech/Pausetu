@@ -349,20 +349,34 @@ export const AppProvider = ({ children }) => {
   };
 
   const updateLocation = async (locData) => {
+    if (!locData) return;
+
     try {
+      const newVillage = locData.village !== undefined ? locData.village : (userProfile?.village || '');
+      const newTaluka = locData.taluka !== undefined ? locData.taluka : (userProfile?.taluka || '');
+      const newDistrict = locData.district !== undefined ? locData.district : (userProfile?.district || '');
+      const newState = locData.state !== undefined ? locData.state : (userProfile?.state || '');
+
       const updated = {
         ...userProfile,
         name: userProfile?.name || 'Guest',
         role: userProfile?.role || 'Farmer',
         mobile: userProfile?.mobile || '',
         language: userProfile?.language || language || 'en',
-        village: locData.village || userProfile?.village || '',
-        taluka: locData.taluka || userProfile?.taluka || '',
-        district: locData.district || userProfile?.district || '',
-        state: locData.state || userProfile?.state || '',
+        village: newVillage,
+        taluka: newTaluka,
+        district: newDistrict,
+        state: newState,
         verification: userProfile?.verification || { status: 'unverified' }
       };
-      
+
+      // 1. Synchronously update context state & AsyncStorage for immediate UI refresh
+      setUserProfile(updated);
+      await AsyncStorage.setItem('userProfile', JSON.stringify(updated));
+      refreshManager.emit(REFRESH_EVENTS.LOCATION_UPDATED, updated);
+      refreshManager.emit(REFRESH_EVENTS.PROFILE_UPDATED, updated);
+
+      // 2. Persist to backend asynchronously if logged in
       if (userToken && userToken !== 'guest') {
         const payload = {
           fullName: updated.name,
@@ -375,21 +389,15 @@ export const AppProvider = ({ children }) => {
           preferredLanguage: updated.language
         };
         await profileApi.updateProfile(payload);
-        await refreshProfileData();
-      } else {
-        await AsyncStorage.setItem('userProfile', JSON.stringify(updated));
-        setUserProfile(updated);
       }
     } catch (e) {
       console.error('[Context Error] updateLocation failed:', e);
-      // Local fallback preserving existing user profile fields
       const fallback = {
         ...userProfile,
-        village: locData.village || userProfile?.village || '',
-        taluka: locData.taluka || userProfile?.taluka || '',
-        district: locData.district || userProfile?.district || '',
-        state: locData.state || userProfile?.state || '',
-        verification: userProfile?.verification || { status: 'unverified' }
+        village: locData.village !== undefined ? locData.village : (userProfile?.village || ''),
+        taluka: locData.taluka !== undefined ? locData.taluka : (userProfile?.taluka || ''),
+        district: locData.district !== undefined ? locData.district : (userProfile?.district || ''),
+        state: locData.state !== undefined ? locData.state : (userProfile?.state || '')
       };
       setUserProfile(fallback);
     }

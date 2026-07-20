@@ -20,6 +20,7 @@ import AppText from './AppText';
 export default function LocationPicker({ visible, onClose, onSelectLocation }) {
   const { t, i18n } = useTranslation();
   const [loading, setLoading] = useState(false);
+  const [gpsSuccess, setGpsSuccess] = useState(false);
   const [pincode, setPincode] = useState('');
 
   const getCloseAccessibilityLabel = () => {
@@ -34,6 +35,7 @@ export default function LocationPicker({ visible, onClose, onSelectLocation }) {
     if (visible) {
       setPincode('');
       setLoading(false);
+      setGpsSuccess(false);
     }
   }, [visible]);
 
@@ -149,19 +151,15 @@ export default function LocationPicker({ visible, onClose, onSelectLocation }) {
       }
 
       if (typeof onSelectLocation === 'function') {
+        setGpsSuccess(true);
         onSelectLocation(selected);
       }
     } catch (e) {
       console.error('[LocationPicker] Exception in handleUseCurrentLocation:', e);
-      const fallbackLoc = {
-        state: 'Maharashtra',
-        district: 'Pune',
-        taluka: 'Baramati',
-        village: 'Murti'
-      };
-      if (typeof onSelectLocation === 'function') {
-        onSelectLocation(fallbackLoc);
-      }
+      Alert.alert(
+        t('locationPicker.errorTitle') || 'Location Error',
+        t('locationPicker.offlineError') || 'Unable to detect GPS location. Keeping existing location settings.'
+      );
     } finally {
       setLoading(false);
     }
@@ -296,32 +294,51 @@ export default function LocationPicker({ visible, onClose, onSelectLocation }) {
                     <AppText style={styles.loaderText}>{t('locationPicker.detecting')}</AppText>
                   </View>
                 ) : (
-                  <View style={styles.menuContainer}>
-                    {/* Option 1: Current Location Card */}
-                    <View style={styles.gpsCard}>
-                      <View style={styles.gpsCardHeader}>
-                        <View style={styles.gpsIconCircle}>
-                          <Ionicons name="navigate" size={26} color="#16A34A" />
-                        </View>
-                        <View style={styles.gpsTextContainer}>
-                          <AppText style={styles.gpsCardTitle}>{t('locationPicker.useCurrentTitle')}</AppText>
-                          <AppText style={styles.gpsCardSub}>{t('locationPicker.useCurrentSubtitle')}</AppText>
-                        </View>
+                <View style={styles.menuContainer}>
+                  {/* Option 1: Single Full-Width Primary GPS Button */}
+                  <TouchableOpacity
+                    style={[
+                      styles.primaryGpsButton,
+                      loading && styles.primaryGpsButtonDisabled
+                    ]}
+                    onPress={handleUseCurrentLocation}
+                    disabled={loading}
+                    activeOpacity={0.85}
+                  >
+                    {loading ? (
+                      <View style={styles.loadingRow}>
+                        <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />
+                        <AppText style={styles.primaryGpsButtonText}>
+                          स्थान शोधत आहे...
+                        </AppText>
                       </View>
-                      <TouchableOpacity style={styles.gpsButton} onPress={handleUseCurrentLocation}>
-                        <Ionicons name="navigate-sharp" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-                        <AppText style={styles.gpsButtonText}>{t('locationPicker.useCurrentBtn')}</AppText>
-                      </TouchableOpacity>
-                    </View>
+                    ) : (
+                      <View style={styles.loadingRow}>
+                        <Ionicons name="navigate" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+                        <AppText style={styles.primaryGpsButtonText}>
+                          📍 माझा सध्याचा पत्ता वापरा
+                        </AppText>
+                      </View>
+                    )}
+                  </TouchableOpacity>
 
-                    {/* Divider */}
-                    <View style={styles.dividerContainer}>
-                      <View style={styles.dividerLine} />
-                      <AppText style={styles.dividerText}>
-                        {t('locationPicker.dividerText') ? ` ${t('locationPicker.dividerText')} ` : ' OR '}
+                  {gpsSuccess && (
+                    <View style={styles.successContainer}>
+                      <Ionicons name="checkmark-circle" size={16} color="#16A34A" style={{ marginRight: 6 }} />
+                      <AppText style={styles.successText}>
+                        ✅ वर्तमान स्थान सापडले
                       </AppText>
-                      <View style={styles.dividerLine} />
                     </View>
+                  )}
+
+                  {/* Divider */}
+                  <View style={styles.dividerContainer}>
+                    <View style={styles.dividerLine} />
+                    <AppText style={styles.dividerText}>
+                      {t('locationPicker.dividerText') ? ` ${t('locationPicker.dividerText')} ` : ' OR '}
+                    </AppText>
+                    <View style={styles.dividerLine} />
+                  </View>
 
                     {/* Option 2: PIN Code Card */}
                     <View style={styles.pinCard}>
@@ -435,62 +452,48 @@ const styles = StyleSheet.create({
   menuContainer: {
     paddingTop: 4
   },
-  gpsCard: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    borderRadius: 20,
-    padding: 16,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 6,
-    elevation: 2
-  },
-  gpsCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 14
-  },
-  gpsIconCircle: {
-    width: 52,
+  primaryGpsButton: {
     height: 52,
-    borderRadius: 26,
-    backgroundColor: '#DCFCE7',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14
-  },
-  gpsTextContainer: {
-    flex: 1
-  },
-  gpsCardTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1E293B'
-  },
-  gpsCardSub: {
-    fontSize: 12,
-    color: '#64748B',
-    marginTop: 2
-  },
-  gpsButton: {
-    flexDirection: 'row',
-    height: 48,
     backgroundColor: '#16A34A',
-    borderRadius: 12,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 16,
     shadowColor: '#16A34A',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.2,
     shadowRadius: 6,
     elevation: 3
   },
-  gpsButtonText: {
+  primaryGpsButtonDisabled: {
+    backgroundColor: '#86EFAC',
+    shadowOpacity: 0,
+    elevation: 0
+  },
+  primaryGpsButtonText: {
     color: '#FFFFFF',
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: 'bold'
+  },
+  loadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  successContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+    backgroundColor: '#DCFCE7',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10
+  },
+  successText: {
+    color: '#15803D',
+    fontSize: 13,
+    fontWeight: '600'
   },
   dividerContainer: {
     flexDirection: 'row',

@@ -6,6 +6,7 @@ import { buyerApi } from '../api/buyerApi';
 import { animalApi } from '../api/animalApi';
 import { categoryApi } from '../api/categoryApi';
 import { verificationApi } from '../api/verificationApi';
+import { refreshManager, REFRESH_EVENTS } from '../services/refreshManager';
 
 // AdminContext (plain context object) lives in its own file so this file
 // only exports the AdminProvider component, satisfying Vite Fast Refresh.
@@ -36,9 +37,10 @@ const INITIAL_WIDGETS = [
   { id: 'buyers', label: 'Total Buyers', visible: true, order: 2 },
   { id: 'animals', label: 'Total Animals', visible: true, order: 3 },
   { id: 'pending', label: 'Pending Approvals', visible: true, order: 4 },
-  { id: 'registrations', label: "Today's Registrations", visible: true, order: 5 },
-  { id: 'charts', label: 'Weekly Listings & Distribution Charts', visible: true, order: 6 },
-  { id: 'timeline', label: 'Latest Activity Timeline', visible: true, order: 7 }
+  { id: 'verifications', label: 'Pending Verification Requests', visible: true, order: 5 },
+  { id: 'registrations', label: "Today's Registrations", visible: true, order: 6 },
+  { id: 'charts', label: 'Weekly Listings & Distribution Charts', visible: true, order: 7 },
+  { id: 'timeline', label: 'Latest Activity Timeline', visible: true, order: 8 }
 ];
 
 export const AdminProvider = ({ children }) => {
@@ -228,6 +230,12 @@ export const AdminProvider = ({ children }) => {
       // 2. Fetch Dashboard Statistics
       const stats = await dashboardApi.getStats();
       setDashboardStats(stats);
+      if (stats?.kpis?.pendingVerificationRequests !== undefined) {
+        const val = Number(stats.kpis.pendingVerificationRequests);
+        if (!isNaN(val) && val >= 0) {
+          setPendingVerificationCount(val);
+        }
+      }
 
       // 3. Fetch Categories
       const cats = await categoryApi.getAll();
@@ -301,6 +309,20 @@ export const AdminProvider = ({ children }) => {
       isFetchingRef.current = false;
     }
   }, [ensureAdminAuth]);
+
+  useEffect(() => {
+    const unsubUpdated = refreshManager.subscribe(REFRESH_EVENTS.VERIFICATION_UPDATED, () => loadDashboardData());
+    const unsubCreated = refreshManager.subscribe(REFRESH_EVENTS.VERIFICATION_CREATED, () => loadDashboardData());
+    const unsubApproved = refreshManager.subscribe(REFRESH_EVENTS.VERIFICATION_APPROVED, () => loadDashboardData());
+    const unsubRejected = refreshManager.subscribe(REFRESH_EVENTS.VERIFICATION_REJECTED, () => loadDashboardData());
+
+    return () => {
+      unsubUpdated();
+      unsubCreated();
+      unsubApproved();
+      unsubRejected();
+    };
+  }, [loadDashboardData]);
 
   /**
    * Bootstrap on mount: authenticate first, then trigger data load.
