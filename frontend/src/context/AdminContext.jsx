@@ -143,7 +143,7 @@ export const AdminProvider = ({ children }) => {
       );
     }
 
-    const token = authRes?.data?.accessToken;
+    const token = authRes?.accessToken || authRes?.data?.accessToken;
     if (!token) {
       throw new Error(
         'Admin authentication failed: server responded but returned no access token.'

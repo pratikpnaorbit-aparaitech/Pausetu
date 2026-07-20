@@ -51,14 +51,20 @@ exports.sendOtp = asyncHandler(async (req, res, next) => {
   await Otp.deleteMany({ email });
 
   // 5. Store hashed OTP in the database (hashed via pre-save hook in Otp model)
-  await Otp.create({
+  const newOtp = await Otp.create({
     email,
     otp,
     expiresAt
   });
 
-  // 6. Send OTP via email service
-  await sendOtpEmail({ to: email, otp, expiresIn: '5 minutes' });
+  // 6. Send OTP via email service (cleanup OTP record on failure to avoid false 60s cooldown)
+  try {
+    await sendOtpEmail({ to: email, otp, expiresIn: '5 minutes' });
+  } catch (emailError) {
+    await Otp.deleteOne({ _id: newOtp._id });
+    console.error(`[SEND OTP ERROR] Email dispatch failed for ${email}:`, emailError.message);
+    return next(new AppError('Failed to send OTP email. Please try again.', 500));
+  }
 
   res.status(200).json({
     status: 'success',

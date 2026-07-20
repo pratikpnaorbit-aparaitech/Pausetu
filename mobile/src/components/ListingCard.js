@@ -6,11 +6,16 @@ import { useTranslation } from 'react-i18next';
 import { AppContext } from '../context/AppContext';
 import { useNavigation } from '@react-navigation/native';
 import AppText from './AppText';
+import { isUserVerified } from '../utils/verificationUtils';
 
 export default function ListingCard({ item, onViewDetailsPress, style }) {
   const { t, i18n } = useTranslation();
   const navigation = useNavigation();
-  const { favorites, toggleFavoriteContext } = useContext(AppContext);
+  const { favorites, toggleFavoriteContext, isGuest, userToken } = useContext(AppContext);
+
+  // Mirrors the same restriction logic used in AnimalDetailsScreen.
+  // True for: guest sessions, post-logout (userToken null), or userToken === 'guest'.
+  const isRestrictedUser = isGuest || !userToken || userToken === 'guest';
   const normalizedItemId = String(item?._id ?? item?.id ?? '').trim();
   const isWishlisted = favorites ? favorites.includes(normalizedItemId) : false;
   
@@ -79,7 +84,7 @@ export default function ListingCard({ item, onViewDetailsPress, style }) {
 
   // Determine seller name & verification status
   const sellerName = item.sellerName || item.sellerId?.name || 'Seller';
-  const isSellerVerified = item.sellerId?.verification?.status === 'approved' || item.isVerified;
+  const isSellerVerified = isUserVerified(item.sellerId) || item.isVerified;
   const sellerInitial = (sellerName && typeof sellerName === 'string' && sellerName.trim()) ? sellerName.trim().charAt(0).toUpperCase() : '?';
 
   // Role localized label
@@ -243,20 +248,52 @@ export default function ListingCard({ item, onViewDetailsPress, style }) {
 
         {/* 11. Contact Buttons (Call + WhatsApp) */}
         <View style={styles.contactButtonsRow}>
-          <TouchableOpacity 
-            style={[styles.contactButton, styles.callButton]} 
-            onPress={handleCall}
-            activeOpacity={0.8}
+          <TouchableOpacity
+            style={[styles.contactButton, styles.callButton, isRestrictedUser && styles.guestDisabledBtn]}
+            activeOpacity={isRestrictedUser ? 1 : 0.8}
+            onPress={() => {
+              if (isRestrictedUser) {
+                Alert.alert(
+                  'लॉगिन आवश्यक',
+                  'विक्रेत्याशी संपर्क करण्यासाठी कृपया प्रथम लॉगिन करा.',
+                  [
+                    { text: 'रद्द करा', style: 'cancel' },
+                    { text: 'लॉगिन करा', onPress: () => navigation.navigate('Auth') }
+                  ]
+                );
+                return;
+              }
+              handleCall();
+            }}
           >
+            {isRestrictedUser && (
+              <Ionicons name="lock-closed" size={13} color="rgba(255,255,255,0.85)" style={{ marginRight: 3 }} />
+            )}
             <Ionicons name="call" size={18} color="#FFFFFF" />
             <AppText style={styles.contactButtonText}>{t('buy.callSeller', { defaultValue: 'Call' })}</AppText>
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={[styles.contactButton, styles.whatsappButton]} 
-            onPress={handleWhatsApp}
-            activeOpacity={0.8}
+          <TouchableOpacity
+            style={[styles.contactButton, styles.whatsappButton, isRestrictedUser && styles.guestDisabledBtn]}
+            activeOpacity={isRestrictedUser ? 1 : 0.8}
+            onPress={() => {
+              if (isRestrictedUser) {
+                Alert.alert(
+                  'लॉगिन आवश्यक',
+                  'विक्रेत्याशी संपर्क करण्यासाठी कृपया प्रथम लॉगिन करा.',
+                  [
+                    { text: 'रद्द करा', style: 'cancel' },
+                    { text: 'लॉगिन करा', onPress: () => navigation.navigate('Auth') }
+                  ]
+                );
+                return;
+              }
+              handleWhatsApp();
+            }}
           >
+            {isRestrictedUser && (
+              <Ionicons name="lock-closed" size={13} color="rgba(255,255,255,0.85)" style={{ marginRight: 3 }} />
+            )}
             <Ionicons name="logo-whatsapp" size={18} color="#FFFFFF" />
             <AppText style={styles.contactButtonText}>{t('buy.whatsapp', { defaultValue: 'WhatsApp' })}</AppText>
           </TouchableOpacity>
@@ -534,6 +571,11 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '700',
+  },
+  // Applied when isRestrictedUser is true (guest / logged-out).
+  // Visually mutes the button and suppresses press animation.
+  guestDisabledBtn: {
+    opacity: 0.38,
   },
   detailsButton: {
     backgroundColor: '#ECFDF5',

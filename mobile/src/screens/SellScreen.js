@@ -6,6 +6,7 @@ import { api, resolveMediaUrl } from '../api/api';
 import { useTranslation } from 'react-i18next';
 import AppText from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
+import { isUserVerified } from '../utils/verificationUtils';
 
 const { width } = Dimensions.get('window');
 
@@ -174,8 +175,9 @@ export default function SellScreen({ navigation }) {
 
   const verification = userProfile?.verification || { status: 'unverified' };
   const verificationStatus = verification.status || 'unverified';
+  const isVerified = isUserVerified(userProfile);
 
-  if (!isGuest && verificationStatus !== 'approved') {
+  if (!isGuest && !isVerified) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.guestContainer}>

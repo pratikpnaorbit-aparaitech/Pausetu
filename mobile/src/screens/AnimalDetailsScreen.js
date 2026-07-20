@@ -2,7 +2,7 @@
 // Redesigned premium livestock details page with dynamic zoom views, spec cards, maps trackers, and call CTAs.
 
 import React, { useState, useRef, useCallback, useEffect, useContext, useMemo } from 'react';
-import { StyleSheet, View, ScrollView, Image, TouchableOpacity, Dimensions, Modal, Share, FlatList, SafeAreaView, ActivityIndicator, Linking, Alert, Platform, TextInput } from 'react-native';
+import { StyleSheet, View, ScrollView, Image, TouchableOpacity, Dimensions, Modal, Share, FlatList, SafeAreaView, ActivityIndicator, Linking, Alert, Platform, TextInput, Animated } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import SectionHeader from '../components/SectionHeader';
@@ -12,43 +12,61 @@ import { useTranslation } from 'react-i18next';
 import AppText from '../components/AppText';
 import { AppContext } from '../context/AppContext';
 import { reverseGeocodeWithCache, formatLocationDisplay } from '../utils/geocoder';
+import { isUserVerified } from '../utils/verificationUtils';
 
 const { width } = Dimensions.get('window');
-const GALLERY_HEIGHT = 300;
+// Dynamic gallery height: 4:3 portrait ratio — shows the full animal without cropping.
+// Caps at 420px so the gallery doesn't dominate on very large screens.
+const GALLERY_HEIGHT = Math.min(Math.round(width * (4 / 3)), 420);
 
-const ImageWithLoader = ({ uri, style, resizeMode = 'cover', onPress }) => {
-  const [loading, setLoading] = useState(false);
+const ImageWithLoader = ({ uri, style, resizeMode = 'contain', onPress }) => {
+  const [loading, setLoading] = useState(true);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
   const source = useMemo(() => {
     if (!uri) {
-      return { uri: 'https://images.unsplash.com/photo-1546445317-29f4545e6d52?auto=format&fit=crop&w=300&q=80' };
+      return { uri: 'https://images.unsplash.com/photo-1546445317-29f4545e6d52?auto=format&fit=crop&w=800&q=80' };
     }
     return { uri };
   }, [uri]);
 
   const handleLoadStart = useCallback(() => {
+    fadeAnim.setValue(0);
     setLoading(true);
-  }, []);
+  }, [fadeAnim]);
 
   const handleLoadEnd = useCallback(() => {
     setLoading(false);
-  }, []);
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 280,
+      useNativeDriver: true,
+    }).start();
+  }, [fadeAnim]);
 
   return (
-    <TouchableOpacity activeOpacity={onPress ? 0.85 : 1} onPress={onPress} style={[style, { overflow: 'hidden' }]}>
-      {/* Main image filling container with cover resize mode */}
-      <Image
-        source={source}
-        style={StyleSheet.absoluteFillObject}
-        resizeMode={resizeMode}
-        onLoadStart={handleLoadStart}
-        onLoadEnd={handleLoadEnd}
-        onError={handleLoadEnd}
-      />
+    <TouchableOpacity
+      activeOpacity={onPress ? 0.9 : 1}
+      onPress={onPress}
+      style={[style, { overflow: 'hidden', backgroundColor: '#0F172A' }]}
+    >
+      {/* Skeleton shimmer while image loads */}
       {loading && (
-        <View style={[StyleSheet.absoluteFillObject, styles.loaderCenter]}>
-          <ActivityIndicator size="small" color="#16A34A" />
+        <View style={[StyleSheet.absoluteFillObject, styles.skeletonContainer]}>
+          <View style={styles.skeletonIconWrap}>
+            <MaterialCommunityIcons name="image-outline" size={48} color="rgba(255,255,255,0.18)" />
+          </View>
         </View>
       )}
+      {/* Image fades in after load — contain so full animal is always visible */}
+      <Animated.Image
+        source={source}
+        style={[StyleSheet.absoluteFillObject, { opacity: fadeAnim }]}
+        resizeMode={resizeMode}
+        onLoadStart={handleLoadStart}
+        onLoad={handleLoadEnd}
+        onError={handleLoadEnd}
+      />
     </TouchableOpacity>
   );
 };
@@ -78,7 +96,7 @@ export default function AnimalDetailsScreen({ route, navigation }) {
   
   const { t } = useTranslation();
 
-  const { userProfile, isGuest, userToken, favorites, toggleFavoriteContext } = useContext(AppContext);
+  const { userProfile, isGuest, userToken, favorites, toggleFavoriteContext, refreshProfileData } = useContext(AppContext);
   const normalizedAnimalId = String(animalId || '').trim();
   const isWishlisted = favorites ? favorites.includes(normalizedAnimalId) : false;
 
@@ -221,16 +239,40 @@ export default function AnimalDetailsScreen({ route, navigation }) {
     };
   }, [player]);
 
+  // Auto-refresh user profile on mount to ensure fresh verification status
+  useEffect(() => {
+    if (userToken && !isGuest && refreshProfileData) {
+      refreshProfileData();
+    }
+  }, [userToken, isGuest]);
+
+  // True for guest sessions AND for fully logged-out sessions (userToken null/absent).
+  // Both states must show the Marathi login dialog and disable Call/WhatsApp.
+  const isRestrictedUser = isGuest || !userToken || userToken === 'guest';
+
   const checkVerification = () => {
-    if (isGuest) {
+    console.log('[VERIFICATION DEBUG] User verification object:', userProfile?.verification);
+    console.log('[VERIFICATION DEBUG] User verification status:', userProfile?.verification?.status || userProfile?.verificationStatus);
+    console.log('[VERIFICATION DEBUG] isGuest:', isGuest, '| userToken:', userToken, '| isRestrictedUser:', isRestrictedUser);
+
+    if (isRestrictedUser) {
+      console.log('[VERIFICATION DEBUG] final boolean used to enable Call/WhatsApp:', false, '(Guest / Logged-out User)');
       Alert.alert(
-        t('common.loginRequired', { defaultValue: 'Login Required' }),
-        t('verification.restrictedToast', { defaultValue: 'Verification Required: Please log in and upload your milk dairy receipt to unlock this feature.' })
+        'लॉगिन आवश्यक',
+        'विक्रेत्याशी संपर्क करण्यासाठी कृपया प्रथम लॉगिन करा.',
+        [
+          { text: 'रद्द करा', style: 'cancel' },
+          { text: 'लॉगिन करा', onPress: () => navigation.navigate('Auth') }
+        ]
       );
       return false;
     }
-    const status = userProfile?.verification?.status || 'unverified';
-    if (status !== 'approved') {
+
+    const verified = isUserVerified(userProfile);
+    console.log('[VERIFICATION DEBUG] final boolean used to enable Call/WhatsApp:', verified);
+
+    if (!verified) {
+      const status = userProfile?.verification?.status || userProfile?.verificationStatus || 'unverified';
       Alert.alert(
         status === 'pending'
           ? t('verification.pending', { defaultValue: 'Verification Pending' })
@@ -284,6 +326,7 @@ export default function AnimalDetailsScreen({ route, navigation }) {
           let formattedAddr = a.formattedAddress || null;
 
           // Legacy migration: If listing contains latitude/longitude but missing formattedAddress/village
+          // Display geocoded address locally. Do NOT persist to DB from this read-only screen.
           if (a.latitude && a.longitude && (!a.formattedAddress || !a.village)) {
             const geocoded = await reverseGeocodeWithCache(a.latitude, a.longitude);
             if (geocoded) {
@@ -294,16 +337,8 @@ export default function AnimalDetailsScreen({ route, navigation }) {
               pincodeVal = geocoded.pincode || pincodeVal;
               formattedAddr = geocoded.formattedAddress;
               displayLocation = formattedAddr;
-              
-              // Persist generated address back to database once
-              api.updateAnimal(a._id, {
-                village: villageVal,
-                taluka: talukaVal,
-                district: districtVal,
-                state: stateVal,
-                pincode: pincodeVal,
-                formattedAddress: formattedAddr
-              }).catch(err => console.warn('[AnimalDetails] Auto-geocode background persist failed:', err.message));
+              // NOTE: No api.updateAnimal() call here. AnimalDetailsScreen is READ-ONLY.
+              // Geocoded location is displayed locally without writing to the database.
             }
           } else if (a.formattedAddress) {
             displayLocation = a.formattedAddress;
@@ -1021,14 +1056,56 @@ export default function AnimalDetailsScreen({ route, navigation }) {
         </View>
       </ScrollView>
 
-      {/* Sticky Bottom Actions Bar (Call Seller and WhatsApp side-by-side equal width height 60) */}
+      {/* Sticky Bottom Actions Bar */}
+      {/* Guest / logged-out: buttons are visually muted and show a login dialog on tap */}
+      {/* Authenticated: existing handleCall / handleWhatsApp logic is unchanged */}
       <View style={styles.stickyBottomBar}>
-        <TouchableOpacity style={styles.stickyCallBtn} onPress={handleCall} activeOpacity={0.8}>
+        <TouchableOpacity
+          style={[styles.stickyCallBtn, isRestrictedUser && styles.guestDisabledBtn]}
+          activeOpacity={isRestrictedUser ? 1 : 0.8}
+          onPress={() => {
+            if (isRestrictedUser) {
+              Alert.alert(
+                'लॉगिन आवश्यक',
+                'विक्रेत्याशी संपर्क करण्यासाठी कृपया प्रथम लॉगिन करा.',
+                [
+                  { text: 'रद्द करा', style: 'cancel' },
+                  { text: 'लॉगिन करा', onPress: () => navigation.navigate('Auth') }
+                ]
+              );
+              return;
+            }
+            handleCall();
+          }}
+        >
+          {isRestrictedUser && (
+            <Ionicons name="lock-closed" size={14} color="rgba(255,255,255,0.85)" style={{ marginRight: 5 }} />
+          )}
           <Ionicons name="call" size={20} color="#FFFFFF" style={styles.primaryBtnIcon} />
           <AppText style={styles.stickyPrimaryBtnText}>{t('buy.callSeller')}</AppText>
         </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.stickyWhatsappBtn} onPress={handleWhatsApp} activeOpacity={0.8}>
+
+        <TouchableOpacity
+          style={[styles.stickyWhatsappBtn, isRestrictedUser && styles.guestDisabledBtn]}
+          activeOpacity={isRestrictedUser ? 1 : 0.8}
+          onPress={() => {
+            if (isRestrictedUser) {
+              Alert.alert(
+                'लॉगिन आवश्यक',
+                'विक्रेत्याशी संपर्क करण्यासाठी कृपया प्रथम लॉगिन करा.',
+                [
+                  { text: 'रद्द करा', style: 'cancel' },
+                  { text: 'लॉगिन करा', onPress: () => navigation.navigate('Auth') }
+                ]
+              );
+              return;
+            }
+            handleWhatsApp();
+          }}
+        >
+          {isRestrictedUser && (
+            <Ionicons name="lock-closed" size={14} color="rgba(255,255,255,0.85)" style={{ marginRight: 5 }} />
+          )}
           <Ionicons name="logo-whatsapp" size={20} color="#FFFFFF" style={styles.primaryBtnIcon} />
           <AppText style={styles.stickyPrimaryBtnText}>{t('buy.whatsapp')}</AppText>
         </TouchableOpacity>
@@ -1262,9 +1339,10 @@ const styles = StyleSheet.create({
     width: '100%',
     height: GALLERY_HEIGHT,
     position: 'relative',
-    backgroundColor: '#F1F5F9',
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    // Dark background: letterbox bars are barely noticeable and look premium (OLX / Cars24 style)
+    backgroundColor: '#0F172A',
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
     overflow: 'hidden',
   },
   galleryImageWrap: {
@@ -1272,11 +1350,22 @@ const styles = StyleSheet.create({
     height: GALLERY_HEIGHT,
     position: 'relative',
     overflow: 'hidden',
+    backgroundColor: '#0F172A',
   },
   galleryImage: {
     width: width,
     height: GALLERY_HEIGHT,
     overflow: 'hidden',
+    backgroundColor: '#0F172A',
+  },
+  skeletonContainer: {
+    backgroundColor: '#1E293B',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  skeletonIconWrap: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   loaderCenter: {
     justifyContent: 'center',
@@ -1811,6 +1900,11 @@ const styles = StyleSheet.create({
   },
   disabledBtn: {
     opacity: 0.45,
+  },
+  // Applied to Call & WhatsApp buttons for guest/logged-out users: clearly muted, no press animation,
+  // but tap still fires — showing the Marathi login dialog rather than doing nothing.
+  guestDisabledBtn: {
+    opacity: 0.38,
   },
   zoomModalContainer: {
     flex: 1,

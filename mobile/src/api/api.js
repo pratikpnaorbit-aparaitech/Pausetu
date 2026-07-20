@@ -75,8 +75,15 @@ instance.interceptors.response.use(
   (response) => response.data,
   async (error) => {
     const status = error.response ? error.response.status : null;
+    const requestUrl = error.config?.url || 'unknown';
+    const requestMethod = (error.config?.method || 'unknown').toUpperCase();
 
-    if (status === 401 || status === 403) {
+    console.log(`[API Interceptor] ${requestMethod} ${requestUrl} → ${status}`);
+
+    // Only logout on 401 (token invalid/expired) — NOT on 403 (access denied/ownership check).
+    // A 403 means the token is valid but the user lacks permission; that is NOT a session expiry.
+    const token = await secureStorage.getItem('userToken');
+    if (status === 401 && token && token !== 'guest') {
       console.warn('[Session Expiry] Token is unauthorized or expired, logging out...');
       if (logoutCallback) {
         await logoutCallback();
@@ -105,7 +112,7 @@ export const api = {
     const email = phoneNumberOrEmail.includes('@') 
       ? phoneNumberOrEmail 
       : `${phoneNumberOrEmail}@pashusetu.com`;
-    return instance.post('/auth/send-otp', { email });
+    return instance.post('/auth/send-otp', { email }, { timeout: 25000 });
   },
 
   verifyOtp: async (phoneNumberOrEmail, otp) => {
