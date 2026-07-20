@@ -5,10 +5,10 @@ const { protect } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
-// Rate limiter for OTP requests (max 5 requests per 15 minutes per IP)
+// Rate limiter for OTP requests (max 100 in dev, 5 in prod per 15 minutes per IP)
 const otpLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5,
+  max: process.env.NODE_ENV === 'development' ? 100 : 5,
   message: {
     status: 'fail',
     message: 'Too many OTP requests from this IP. Please try again after 15 minutes.'

@@ -90,18 +90,30 @@ export default function AuthScreen({ navigation }) {
   };
 
   const handleSendOtp = async () => {
+    console.log('[AUTH DEBUG] Continue button pressed');
     const emailTrimmed = email.trim();
     if (isValidEmail(emailTrimmed)) {
+      console.log('[AUTH DEBUG] Validation passed for email:', emailTrimmed);
       setLoading(true);
       try {
-        await api.sendOtp(emailTrimmed);
+        console.log('[AUTH DEBUG] Calling sendOtp API...');
+        const res = await api.sendOtp(emailTrimmed);
+        console.log('[AUTH DEBUG] API response received:', res);
+        if (res && res.status === 'fail') {
+          console.warn('[AUTH DEBUG] API returned fail status:', res.message);
+          Alert.alert(t('common.error'), res.message || t('auth.otpError'));
+          return;
+        }
+        console.log('[AUTH DEBUG] Navigation called to OtpVerification with email:', emailTrimmed);
         navigation.navigate('OtpVerification', { email: emailTrimmed });
       } catch (err) {
+        console.error('[AUTH DEBUG] OTP Error caught:', err.message || err);
         Alert.alert(t('common.error'), err.message || t('auth.otpError'));
       } finally {
         setLoading(false);
       }
     } else {
+      console.warn('[AUTH DEBUG] Validation failed for input:', emailTrimmed);
       Alert.alert(t('common.error'), t('auth.invalidEmail'));
     }
   };

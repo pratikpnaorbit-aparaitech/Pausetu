@@ -16,6 +16,7 @@ export default function OtpVerificationScreen({ route, navigation }) {
   const [verifiedSuccess, setVerifiedSuccess] = useState(false);
 
   useEffect(() => {
+    console.log('[OTP DEBUG] OTP screen mounted with email:', email);
     const interval = setInterval(() => {
       setTimer((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
