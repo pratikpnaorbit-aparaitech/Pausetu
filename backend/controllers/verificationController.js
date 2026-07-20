@@ -178,13 +178,17 @@ exports.getPendingVerifications = asyncHandler(async (req, res, next) => {
 exports.getVerificationsByStatus = asyncHandler(async (req, res, next) => {
   const { status } = req.query;
   const filter = {};
-  if (status) {
-    filter['verification.status'] = status;
+  if (status && status.trim() !== '') {
+    filter['verification.status'] = new RegExp(`^${status.trim()}$`, 'i');
   } else {
     filter['verification.status'] = { $ne: 'unverified' };
   }
 
-  const users = await User.find(filter).sort({ 'verification.submittedAt': -1 });
+  const users = await User.find(filter).sort({
+    'verification.approvedAt': -1,
+    'verification.submittedAt': -1,
+    updatedAt: -1
+  });
 
   res.status(200).json({
     status: 'success',

@@ -16,6 +16,7 @@ export const verificationApi = {
           dairyName: u.verification?.dairyName || '',
           receiptDate: u.verification?.receiptDate ? new Date(u.verification.receiptDate).toLocaleDateString() : '',
           submittedAt: u.verification?.submittedAt ? new Date(u.verification.submittedAt).toLocaleDateString() : 'N/A',
+          approvedAt: u.verification?.approvedAt ? new Date(u.verification.approvedAt).toLocaleDateString() : '',
           status: u.verification?.status || 'unverified',
           rejectedReason: u.verification?.rejectedReason || '',
           photo: u.profilePhoto || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80'

@@ -1369,5 +1369,32 @@
     "marwari": "Marwari",
     "kathiawadi": "Kathiawadi",
     "nukra": "Nukra"
+  },
+  "verification": {
+    "cardTitle": "Verified Seller Verification",
+    "verificationStatus": "Verification Status",
+    "verifiedSeller": "Verified Seller",
+    "approved": "Verified Seller",
+    "pending": "Verification Pending",
+    "rejected": "Verification Rejected",
+    "unverified": "Unverified Account",
+    "approvedDesc": "Your account is verified as a trusted Dairy Farmer / Seller.",
+    "pendingDesc": "Your verification documents are currently under review.",
+    "rejectedDesc": "Rejection Reason: {{reason}}",
+    "unverifiedDesc": "Upload your dairy purchase receipt or business document to get a Verified Seller badge.",
+    "uploadNewBtn": "Upload New Document",
+    "uploadDate": "Submitted Date",
+    "submittedDate": "Submitted Date",
+    "approvalDate": "Approved Date",
+    "approvedDate": "Approved Date",
+    "rejectedReasonLabel": "Rejection Reason",
+    "receiptPreview": "Uploaded Document",
+    "uploadedDocument": "Uploaded Document",
+    "clickToView": "Tap to view document",
+    "viewDocument": "View Document",
+    "download": "Download",
+    "verificationSuccess": "Verification Successful!",
+    "docNotAvailable": "Document not available",
+    "close": "Close"
   }
 }

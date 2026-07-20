@@ -244,9 +244,14 @@ export default function VerificationRequestsPage() {
                   {req.farmerName && <div><strong>OCR Farmer Name:</strong> {req.farmerName}</div>}
                   {req.dairyName && <div><strong>OCR Dairy Name:</strong> {req.dairyName}</div>}
                   {req.receiptDate && <div><strong>OCR Receipt Date:</strong> {req.receiptDate}</div>}
+                  {req.status === 'approved' && (
+                    <div style={{ color: '#16a34a', fontWeight: '600' }}>
+                      <strong>Approved Date:</strong> {req.approvedAt || 'Verified'}
+                    </div>
+                  )}
                   {req.status === 'rejected' && (
                     <div style={{ color: 'var(--color-danger)' }}>
-                      <strong>Reason:</strong> {req.rejectedReason}
+                      <strong>Reason:</strong> {req.rejectedReason || 'No reason specified'}
                     </div>
                   )}
                 </div>
@@ -286,7 +291,7 @@ export default function VerificationRequestsPage() {
               </div>
 
               {/* Action Buttons */}
-              {req.status === 'pending' && (
+              {req.status === 'pending' ? (
                 <div style={{ display: 'flex', gap: 8, marginTop: 'auto' }}>
                   <button 
                     className="btn btn-secondary btn-sm" 
@@ -310,6 +315,16 @@ export default function VerificationRequestsPage() {
                     disabled={actionLoading}
                   >
                     <X size={14} /> Reject
+                  </button>
+                </div>
+              ) : (
+                <div style={{ marginTop: 'auto' }}>
+                  <button 
+                    className="btn btn-secondary btn-sm" 
+                    style={{ width: '100%' }}
+                    onClick={() => setPreviewRequest(req)}
+                  >
+                    <Eye size={14} /> View Document
                   </button>
                 </div>
               )}

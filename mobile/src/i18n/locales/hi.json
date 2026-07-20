@@ -1370,5 +1370,32 @@
     "marwari": "मारवाड़ी",
     "kathiawadi": "काठियावाड़ी",
     "nukra": "नुकरा"
+  },
+  "verification": {
+    "cardTitle": "सत्यापित विक्रेता सत्यापन",
+    "verificationStatus": "सत्यापन स्थिति",
+    "verifiedSeller": "सत्यापित विक्रेता",
+    "approved": "सत्यापित विक्रेता (Verified)",
+    "pending": "सत्यापन लंबित",
+    "rejected": "सत्यापन अस्वीकृत",
+    "unverified": "असत्यापित खाता",
+    "approvedDesc": "आपका खाता एक विश्वसनीय पशुपालक विक्रेता के रूप में सत्यापित है।",
+    "pendingDesc": "आपके दस्तावेज़ सत्यापन की जांच जारी है।",
+    "rejectedDesc": "अस्वीकृति का कारण: {{reason}}",
+    "unverifiedDesc": "सत्यापित विक्रेता बैज प्राप्त करने और खरीदारों का विश्वास बढ़ाने के लिए अपनी रसीद/दस्तावेज़ अपलोड करें।",
+    "uploadNewBtn": "नया दस्तावेज़ अपलोड करें",
+    "uploadDate": "सबमिट करने की तारीख",
+    "submittedDate": "सबमिट करने की तारीख",
+    "approvalDate": "स्वीकृत होने की तारीख",
+    "approvedDate": "स्वीकृत होने की तारीख",
+    "rejectedReasonLabel": "अस्वीकृति का कारण",
+    "receiptPreview": "अपलोड किया गया दस्तावेज़",
+    "uploadedDocument": "अपलोड किया गया दस्तावेज़",
+    "clickToView": "दस्तावेज़ देखने के लिए टैप करें",
+    "viewDocument": "दस्तावेज़ देखें",
+    "download": "डाउनलोड करें",
+    "verificationSuccess": "सत्यापन सफल!",
+    "docNotAvailable": "दस्तावेज़ उपलब्ध नहीं है",
+    "close": "बंद करें"
   }
 }
