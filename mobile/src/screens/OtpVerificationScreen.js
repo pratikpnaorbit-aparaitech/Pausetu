@@ -94,8 +94,13 @@ export default function OtpVerificationScreen({ route, navigation }) {
               </View>
               <AppText style={styles.title}>{t('otp.enterCode')}</AppText>
               <AppText style={styles.subtitle}>
-                {t('otp.sentTo')} {email}
+                {t('otp.sentTo')}
               </AppText>
+              {email ? (
+                <AppText style={[styles.subtitle, { color: '#1E293B', fontWeight: 'bold', marginTop: 4 }]}>
+                  {email}
+                </AppText>
+              ) : null}
 
               <TextInput
                 style={styles.otpInput}
