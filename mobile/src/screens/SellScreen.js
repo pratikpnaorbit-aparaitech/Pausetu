@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState, useMemo, useCallback } from 'react';
 import { StyleSheet, View, SafeAreaView, ScrollView, Image, TouchableOpacity, Dimensions, FlatList, Share, Alert, ActivityIndicator, Animated, Platform, AppState } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppContext } from '../context/AppContext';
@@ -158,6 +158,69 @@ export default function SellScreen({ navigation }) {
     loadData();
   }, [userProfile, isGuest]);
 
+  // Calculate dynamic stats unconditionally at top level
+  const statsData = useMemo(() => {
+    const activeCount = listings.filter(a => a.status === 'approved' && !a.isDeleted).length;
+    const pendingCount = listings.filter(a => a.status === 'pending' && !a.isDeleted).length;
+    const soldCount = listings.filter(a => a.status === 'sold' && !a.isDeleted).length;
+    const totalViews = listings.reduce((acc, a) => acc + (a.views || 0), 0);
+    const totalSales = listings.filter(a => a.status === 'sold' && !a.isDeleted).reduce((acc, a) => acc + a.price, 0);
+
+    return [
+      { id: '1', count: String(activeCount), label: t('sell.activeListing'), icon: 'checkbox-marked-circle-outline', color: '#16A34A', trend: t('sell.live') },
+      { id: '2', count: String(pendingCount), label: t('sell.pendingApproval'), icon: 'clock-outline', color: '#F59E0B', trend: t('sell.inReview') },
+      { id: '3', count: String(soldCount), label: t('sell.soldListing'), icon: 'check-decagram-outline', color: '#3B82F6', trend: `₹${(totalSales/1000).toFixed(1)}k Sales` },
+      { id: '4', count: totalViews >= 1000 ? `${(totalViews/1000).toFixed(1)}K` : String(totalViews), label: t('sell.totalViews'), icon: 'eye-outline', color: '#8B5CF6', trend: t('sell.views') },
+    ];
+  }, [listings, t]);
+
+  const recentListings = useMemo(() => {
+    return listings
+      .filter(a => a.status === 'approved' && !a.isDeleted)
+      .slice(0, 5)
+      .map(a => ({
+        id: a._id,
+        name: a.title,
+        breed: a.breedId?.name || 'Breed',
+        price: `₹${a.price.toLocaleString()}`,
+        status: t('sell.live'),
+        views: a.views || 0,
+        postedDate: t('sell.postedAgo', { time: new Date(a.createdAt).toLocaleDateString() }),
+        image: a.photos && a.photos.length > 0 ? resolveMediaUrl(a.photos[0]) : 'https://images.unsplash.com/photo-1546445317-29f4545e6d52?auto=format&fit=crop&w=300&q=80'
+      }));
+  }, [listings, t]);
+
+  const pendingListings = useMemo(() => {
+    return listings
+      .filter(a => a.status === 'pending' && !a.isDeleted)
+      .slice(0, 5)
+      .map(a => ({
+        id: a._id,
+        name: a.title,
+        breed: a.breedId?.name || 'Breed',
+        price: `₹${a.price.toLocaleString()}`,
+        status: t('sell.pending')
+      }));
+  }, [listings, t]);
+
+  const recentEnquiries = useMemo(() => {
+    return notifications
+      .filter(n => n.type === 'chat' || n.title.includes('Enquiry') || n.message.includes('inquiring'))
+      .slice(0, 3)
+      .map((n, index) => {
+        const nameMatch = n.message.match(/^([A-Za-z\s]+) (sent you|inquiring)/);
+        const animalMatch = n.message.match(/about the ([A-Za-z\s]+)\.?$/);
+        const buyerName = nameMatch ? nameMatch[1].trim() : 'Buyer';
+        const animalName = animalMatch ? animalMatch[1].replace(/\.$/, '').trim() : 'Livestock';
+        return {
+          id: n._id || String(index),
+          buyerName,
+          animal: animalName,
+          time: t('sell.live')
+        };
+      });
+  }, [notifications, t]);
+
   if (isGuest) {
     return (
       <SafeAreaView style={styles.container}>
@@ -237,61 +300,6 @@ export default function SellScreen({ navigation }) {
     );
   }
 
-  // Calculate dynamic stats
-  const activeCount = listings.filter(a => a.status === 'approved' && !a.isDeleted).length;
-  const pendingCount = listings.filter(a => a.status === 'pending' && !a.isDeleted).length;
-  const soldCount = listings.filter(a => a.status === 'sold' && !a.isDeleted).length;
-  const totalViews = listings.reduce((acc, a) => acc + (a.views || 0), 0);
-  const totalSales = listings.filter(a => a.status === 'sold' && !a.isDeleted).reduce((acc, a) => acc + a.price, 0);
-
-  const statsData = [
-    { id: '1', count: String(activeCount), label: t('sell.activeListing'), icon: 'checkbox-marked-circle-outline', color: '#16A34A', trend: t('sell.live') },
-    { id: '2', count: String(pendingCount), label: t('sell.pendingApproval'), icon: 'clock-outline', color: '#F59E0B', trend: t('sell.inReview') },
-    { id: '3', count: String(soldCount), label: t('sell.soldListing'), icon: 'check-decagram-outline', color: '#3B82F6', trend: `₹${(totalSales/1000).toFixed(1)}k Sales` },
-    { id: '4', count: totalViews >= 1000 ? `${(totalViews/1000).toFixed(1)}K` : String(totalViews), label: t('sell.totalViews'), icon: 'eye-outline', color: '#8B5CF6', trend: t('sell.views') },
-  ];
-
-  const recentListings = listings
-    .filter(a => a.status === 'approved' && !a.isDeleted)
-    .slice(0, 5)
-    .map(a => ({
-      id: a._id,
-      name: a.title,
-      breed: a.breedId?.name || 'Breed',
-      price: `₹${a.price.toLocaleString()}`,
-      status: t('sell.live'),
-      views: a.views || 0,
-      postedDate: t('sell.postedAgo', { time: new Date(a.createdAt).toLocaleDateString() }),
-      image: a.photos && a.photos.length > 0 ? resolveMediaUrl(a.photos[0]) : 'https://images.unsplash.com/photo-1546445317-29f4545e6d52?auto=format&fit=crop&w=300&q=80'
-    }));
-
-  const pendingListings = listings
-    .filter(a => a.status === 'pending' && !a.isDeleted)
-    .slice(0, 5)
-    .map(a => ({
-      id: a._id,
-      name: a.title,
-      breed: a.breedId?.name || 'Breed',
-      price: `₹${a.price.toLocaleString()}`,
-      status: t('sell.pending')
-    }));
-
-  const recentEnquiries = notifications
-    .filter(n => n.type === 'chat' || n.title.includes('Enquiry') || n.message.includes('inquiring'))
-    .slice(0, 3)
-    .map((n, index) => {
-      const nameMatch = n.message.match(/^([A-Za-z\s]+) (sent you|inquiring)/);
-      const animalMatch = n.message.match(/about the ([A-Za-z\s]+)\.?$/);
-      const buyerName = nameMatch ? nameMatch[1].trim() : 'Buyer';
-      const animalName = animalMatch ? animalMatch[1].replace(/\.$/, '').trim() : 'Livestock';
-      return {
-        id: n._id || String(index),
-        buyerName,
-        animal: animalName,
-        time: t('sell.live')
-      };
-    });
-
   const handleShare = async (item) => {
     try {
       await Share.share({
@@ -361,17 +369,7 @@ export default function SellScreen({ navigation }) {
           <SellerCtaCard
             listingsCount={listings.length}
             t={t}
-            onPress={() => {
-              if (listings.length > 0) {
-                Alert.alert(
-                  t('common.info', { defaultValue: 'Info' }),
-                  t('common.comingSoon'),
-                  [{ text: 'OK' }]
-                );
-              } else {
-                navigation.navigate('AddAnimal');
-              }
-            }}
+            onPress={() => navigation.navigate('AddAnimal')}
           />
         </View>
 

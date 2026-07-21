@@ -545,6 +545,13 @@ export default function BuyScreen({ navigation }) {
     navigation.navigate('AnimalDetails', { animal: item });
   }, [navigation]);
 
+  const renderBuyItem = useCallback(({ item }) => (
+    <ListingCard
+      item={item}
+      onViewDetailsPress={() => handleViewDetails(item)}
+    />
+  ), [handleViewDetails]);
+
   const handleLocationChange = useCallback(() => {
     setIsLocationPickerVisible(true);
   }, []);
@@ -618,6 +625,11 @@ export default function BuyScreen({ navigation }) {
               ref={mainListRef}
               data={filteredAnimals}
               keyExtractor={(item) => item.id}
+              initialNumToRender={5}
+              maxToRenderPerBatch={5}
+              windowSize={5}
+              updateCellsBatchingPeriod={50}
+              removeClippedSubviews={Platform.OS === 'android'}
               ListHeaderComponent={
                 <ListHeader
                   selectedCategory={selectedCategory}
@@ -658,12 +670,7 @@ export default function BuyScreen({ navigation }) {
               }
               contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={false}
-              renderItem={({ item }) => (
-                <ListingCard
-                  item={item}
-                  onViewDetailsPress={() => handleViewDetails(item)}
-                />
-              )}
+              renderItem={renderBuyItem}
             />
           )}
 

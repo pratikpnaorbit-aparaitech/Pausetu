@@ -16,25 +16,80 @@ const breedsData = {
     { name: 'Gir', description: 'Highly popular dairy breed originating from Gir hills' },
     { name: 'Sahiwal', description: 'One of the best dairy breeds in India' },
     { name: 'HF', description: 'Holstein Friesian high milk production breed' },
-    { name: 'Jersey', description: 'High milk fat producing breed' }
+    { name: 'Jersey', description: 'High milk fat producing breed' },
+    { name: 'Red Sindhi', description: 'Indigenous dairy cow breed' },
+    { name: 'Tharparkar', description: 'Dual-purpose dairy and draught breed' },
+    { name: 'Rathi', description: 'Milch cattle breed of Rajasthan' },
+    { name: 'Kankrej', description: 'Heavy draught and dairy breed' },
+    { name: 'Deoni', description: 'Dual-purpose breed from Maharashtra' },
+    { name: 'Dangi', description: 'Hardy draught breed from Western Ghats' },
+    { name: 'Khillar', description: 'Fast draught breed from Maharashtra' },
+    { name: 'Gaolao', description: 'Draught breed from Central India' },
+    { name: 'Lal Kandhari', description: 'Medium sized draught breed' },
+    { name: 'Krishna Valley', description: 'Heavy draught cow breed' },
+    { name: 'Crossbreed', description: 'Mixed dairy breed' },
+    { name: 'Desi', description: 'Local indigenous cow' },
+    { name: 'Other', description: 'Other cow breed' }
   ],
   buffalo: [
     { name: 'Murrah', description: 'Premier dairy buffalo breed from Haryana' },
     { name: 'Jaffarabadi', description: 'Very large sized buffalo breed from Gujarat' },
-    { name: 'Mehsana', description: 'High yield dairy buffalo breed' }
+    { name: 'Pandharpuri', description: 'High yielding dairy buffalo from Maharashtra' },
+    { name: 'Nagpuri', description: 'Draught and dairy buffalo breed' },
+    { name: 'Surti', description: 'Medium sized dairy buffalo breed' },
+    { name: 'Mehsana', description: 'High yield dairy buffalo breed' },
+    { name: 'Bhadawari', description: 'High milk fat buffalo breed' },
+    { name: 'Nili-Ravi', description: 'Dairy buffalo breed' },
+    { name: 'Toda', description: 'Hilly terrain buffalo breed' },
+    { name: 'Marathwadi', description: 'Hardy regional buffalo breed' },
+    { name: 'Crossbreed', description: 'Mixed buffalo breed' },
+    { name: 'Desi', description: 'Local indigenous buffalo' },
+    { name: 'Other', description: 'Other buffalo breed' }
   ],
   goat: [
     { name: 'Osmanabadi', description: 'Highly prolific meat and milk breed from Maharashtra' },
+    { name: 'Sangamneri', description: 'Dual-purpose goat breed' },
     { name: 'Boer', description: 'Fast growing premium meat breed' },
-    { name: 'Sirohi', description: 'Highly adaptable breed originating from Rajasthan' }
+    { name: 'Sirohi', description: 'Highly adaptable breed originating from Rajasthan' },
+    { name: 'Jamunapari', description: 'Tall Indian dairy goat breed' },
+    { name: 'Beetal', description: 'Large dairy goat breed' },
+    { name: 'Black Bengal', description: 'Prolific meat goat breed' },
+    { name: 'Barbari', description: 'Dual-purpose compact goat breed' },
+    { name: 'Jakhrana', description: 'High milk yield goat breed' },
+    { name: 'Malabari', description: 'Coastal goat breed' },
+    { name: 'Sojat', description: 'Large meat goat breed' },
+    { name: 'Ganjam', description: 'Hardy meat goat breed' },
+    { name: 'Crossbreed', description: 'Mixed goat breed' },
+    { name: 'Desi', description: 'Local indigenous goat' },
+    { name: 'Other', description: 'Other goat breed' }
   ],
   sheep: [
     { name: 'Deccani', description: 'Well adapted to Deccan plateau conditions' },
-    { name: 'Nellore', description: 'Tallest sheep breed in India' }
+    { name: 'Madgyal', description: 'Popular large sheep breed from Sangli' },
+    { name: 'Lonand', description: 'Regional meat sheep breed' },
+    { name: 'Sangamneri', description: 'Regional sheep breed' },
+    { name: 'Nellore', description: 'Tallest sheep breed in India' },
+    { name: 'Marwari', description: 'Hardy wool and meat sheep breed' },
+    { name: 'Mandya', description: 'Compact meat sheep breed' },
+    { name: 'Bellary', description: 'Medium sized sheep breed' },
+    { name: 'Patanwadi', description: 'Wool producing sheep breed' },
+    { name: 'Malpura', description: 'Rugged sheep breed' },
+    { name: 'Crossbreed', description: 'Mixed sheep breed' },
+    { name: 'Desi', description: 'Local indigenous sheep' },
+    { name: 'Other', description: 'Other sheep breed' }
   ],
   horse: [
     { name: 'Marwari', description: 'Famous Indian horse breed with inward-turning ears' },
-    { name: 'Kathiawari', description: 'Resilient breed originating from Gujarat' }
+    { name: 'Kathiawari', description: 'Resilient breed originating from Gujarat' },
+    { name: 'Spiti', description: 'Himalayan mountain horse breed' },
+    { name: 'Bhutia', description: 'Mountain pack horse breed' },
+    { name: 'Manipuri', description: 'Famous Indian polo pony and riding breed' },
+    { name: 'Zanskari', description: 'High altitude mountain horse breed' },
+    { name: 'Thoroughbred', description: 'High speed athletic horse breed' },
+    { name: 'Arabian', description: 'Classic endurance horse breed' },
+    { name: 'Quarter Horse', description: 'Versatile riding horse breed' },
+    { name: 'Friesian', description: 'Draft and riding horse breed' },
+    { name: 'Other', description: 'Other equine breed' }
   ]
 };
 
@@ -102,25 +157,27 @@ const statesData = [
  */
 const autoSeed = async () => {
   try {
-    // 1. Seed Categories
+    // 1. Seed Categories if empty
     const categoryCount = await Category.countDocuments();
     if (categoryCount === 0) {
       console.log('[SEED] Seeding default categories...');
-      const createdCategories = await Category.insertMany(categoriesData);
+      await Category.insertMany(categoriesData);
+      console.log('[SEED] Categories seeded successfully.');
+    }
 
-      // 2. Seed Breeds based on category mapping
-      console.log('[SEED] Seeding default breeds...');
-      for (const cat of createdCategories) {
-        const slug = cat.slug;
-        if (breedsData[slug]) {
-          const breedsToInsert = breedsData[slug].map((b) => ({
-            ...b,
-            categoryId: cat._id
-          }));
-          await Breed.insertMany(breedsToInsert);
+    // 2. Ensure all breeds in breedsData exist in the database
+    const allCategories = await Category.find();
+    for (const cat of allCategories) {
+      const slug = cat.slug;
+      if (breedsData[slug]) {
+        for (const b of breedsData[slug]) {
+          const existing = await Breed.findOne({ categoryId: cat._id, name: b.name });
+          if (!existing) {
+            await Breed.create({ ...b, categoryId: cat._id });
+            console.log(`[SEED] Added missing breed '${b.name}' for category '${cat.name}'`);
+          }
         }
       }
-      console.log('[SEED] Categories and Breeds seeded successfully.');
     }
 
     // 3. Seed States, Districts, Talukas, Villages (Self-healing re-seed check)

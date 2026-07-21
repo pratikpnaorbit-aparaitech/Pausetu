@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+import React, { useContext, useState, useMemo } from 'react';
 import { View, StyleSheet, TouchableOpacity, Image, Share, Linking, Alert } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { resolveMediaUrl } from '../api/api';
@@ -8,7 +8,7 @@ import { useNavigation } from '@react-navigation/native';
 import AppText from './AppText';
 import { isUserVerified } from '../utils/verificationUtils';
 
-export default function ListingCard({ item, onViewDetailsPress, style }) {
+function ListingCard({ item, onViewDetailsPress, style }) {
   const { t, i18n } = useTranslation();
   const navigation = useNavigation();
   const { favorites, toggleFavoriteContext, isGuest, userToken } = useContext(AppContext);
@@ -19,7 +19,38 @@ export default function ListingCard({ item, onViewDetailsPress, style }) {
   const normalizedItemId = String(item?._id ?? item?.id ?? '').trim();
   const isWishlisted = favorites ? favorites.includes(normalizedItemId) : false;
   
-  const imageUrl = resolveMediaUrl(item.photos && item.photos.length > 0 ? item.photos[0] : null);
+  const [imageError, setImageError] = useState(false);
+  const fallbackUrl = 'https://images.unsplash.com/photo-1546445317-29f4545e6d52?auto=format&fit=crop&w=300&q=80';
+  const resolvedUrl = resolveMediaUrl(item.photos && item.photos.length > 0 ? item.photos[0] : null);
+  const imageUrl = imageError ? fallbackUrl : resolvedUrl;
+
+  // Category-aware determination of milk applicability
+  const isMilkApplicable = useMemo(() => {
+    if (!item) return false;
+    if (item.gender === 'Male') return false;
+
+    const cat = (
+      item.categorySlug ||
+      item.categoryId?.slug ||
+      item.categoryName ||
+      item.categoryId?.name ||
+      item.category ||
+      ''
+    ).toString().toLowerCase();
+
+    if (!cat) return true;
+    if (cat.includes('horse') || cat.includes('घोडा')) return false;
+    if (cat.includes('sheep') || cat.includes('मेंढी')) return false;
+    if (cat.includes('other') || cat.includes('इतर')) return false;
+    if (cat.includes('bull') || cat.includes('ox')) return false;
+    if (cat.includes('donkey') || cat.includes('mule')) return false;
+
+    return (
+      cat.includes('cow') || cat.includes('गाय') ||
+      cat.includes('buffalo') || cat.includes('म्हैस') ||
+      cat.includes('goat') || cat.includes('शेळी')
+    );
+  }, [item?.gender, item?.categorySlug, item?.categoryId, item?.categoryName, item?.category]);
 
   const handleShare = async () => {
     try {
@@ -107,7 +138,10 @@ export default function ListingCard({ item, onViewDetailsPress, style }) {
             source={{ uri: imageUrl }} 
             style={styles.cardImage} 
             resizeMode="cover"
-            onError={(e) => console.log('[Image Load Error] ListingCard:', e.nativeEvent.error, 'URL:', imageUrl)}
+            onError={(e) => {
+              console.log('[Image Load Error] ListingCard:', e.nativeEvent?.error || e, 'URL:', imageUrl);
+              if (!imageError) setImageError(true);
+            }}
           />
         ) : (
           <MaterialCommunityIcons name="image-outline" size={38} color="#94A3B8" />
@@ -206,7 +240,7 @@ export default function ListingCard({ item, onViewDetailsPress, style }) {
         {/* 9. Animal Specification Cards (Age and Milk Capacity) */}
         <View style={styles.specsContainer}>
           {/* Left Card: Age */}
-          <View style={styles.specCard}>
+          <View style={[styles.specCard, !isMilkApplicable && { flex: 1, marginRight: 0 }]}>
             <Ionicons name="calendar-outline" size={20} color="#16A34A" style={styles.specIcon} />
             <View style={styles.specTextContainer}>
               <AppText style={styles.specLabel}>{t('buy.ageLabel', { defaultValue: 'Age' })}</AppText>
@@ -216,16 +250,18 @@ export default function ListingCard({ item, onViewDetailsPress, style }) {
             </View>
           </View>
 
-          {/* Right Card: Milk Capacity */}
-          <View style={styles.specCard}>
-            <MaterialCommunityIcons name="bottle-tonic-outline" size={20} color="#2563EB" style={styles.specIcon} />
-            <View style={styles.specTextContainer}>
-              <AppText style={styles.specLabel}>{t('buy.milkLabel', { defaultValue: 'Milk' })}</AppText>
-              <AppText style={styles.specValue} numberOfLines={1}>
-                {item.milkYield ? `${item.milkYield} L` : getUnavailableMilkText()}
-              </AppText>
+          {/* Right Card: Milk Capacity (Only rendered if applicable) */}
+          {isMilkApplicable && (
+            <View style={styles.specCard}>
+              <MaterialCommunityIcons name="bottle-tonic-outline" size={20} color="#2563EB" style={styles.specIcon} />
+              <View style={styles.specTextContainer}>
+                <AppText style={styles.specLabel}>{t('buy.milkLabel', { defaultValue: 'Milk' })}</AppText>
+                <AppText style={styles.specValue} numberOfLines={1}>
+                  {item.milkYield ? `${item.milkYield} L` : getUnavailableMilkText()}
+                </AppText>
+              </View>
             </View>
-          </View>
+          )}
         </View>
 
         {/* 10. Seller Profile Section */}
@@ -604,3 +640,5 @@ const styles = StyleSheet.create({
     right: 16,
   },
 });
+
+export default React.memo(ListingCard);

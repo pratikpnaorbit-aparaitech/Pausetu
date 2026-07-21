@@ -215,12 +215,12 @@ export const resolveMediaUrl = (photo) => {
   
   let targetUrl = '';
   if (typeof photo === 'string') {
-    targetUrl = photo;
+    targetUrl = photo.trim();
   } else if (typeof photo === 'object') {
-    targetUrl = photo.fileUrl || photo.url || '';
+    targetUrl = (photo.fileUrl || photo.url || photo.uri || photo.path || '').trim();
   }
   
-  if (!targetUrl) return 'https://images.unsplash.com/photo-1546445317-29f4545e6d52?auto=format&fit=crop&w=300&q=80';
+  if (!targetUrl || targetUrl === 'null' || targetUrl === 'undefined') return 'https://images.unsplash.com/photo-1546445317-29f4545e6d52?auto=format&fit=crop&w=300&q=80';
   if (targetUrl.startsWith('http')) return targetUrl;
   
   const pathPart = targetUrl.startsWith('/') ? targetUrl : `/${targetUrl}`;

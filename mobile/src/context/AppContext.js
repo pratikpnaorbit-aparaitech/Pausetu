@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect, useMemo, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { secureStorage, registerLogoutHandler } from '../api/api';
 import { profileApi } from '../api/profileApi';
@@ -341,9 +341,15 @@ export const AppProvider = ({ children }) => {
       setIsProfileComplete(true);
     } catch (e) {
       console.error('[Context Error] Profile complete failed:', e);
-      await AsyncStorage.setItem('userProfile', JSON.stringify(profileData));
+      const fallbackProfile = {
+        ...userProfile,
+        ...profileData,
+        name: profileData.name || userProfile?.name,
+        verification: userProfile?.verification || { status: 'unverified' }
+      };
+      await AsyncStorage.setItem('userProfile', JSON.stringify(fallbackProfile));
       await AsyncStorage.setItem('isProfileComplete', 'true');
-      setUserProfile(profileData);
+      setUserProfile(fallbackProfile);
       setIsProfileComplete(true);
     }
   };
@@ -474,36 +480,49 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const contextValue = useMemo(() => ({
+    isLoading,
+    isOnboarded,
+    language,
+    userToken,
+    isGuest,
+    isProfileComplete,
+    hasLocationPermission,
+    userProfile,
+    isProfileLoading,
+    isDarkMode,
+    fontSize,
+    completeOnboarding,
+    login,
+    loginAsGuest,
+    completeProfile,
+    grantLocation,
+    logout,
+    exitGuestSession,
+    refreshProfileData,
+    toggleDarkMode,
+    setAppFontSize,
+    updateLocation,
+    changeAppLanguage,
+    favorites,
+    toggleFavoriteContext,
+  }), [
+    isLoading,
+    isOnboarded,
+    language,
+    userToken,
+    isGuest,
+    isProfileComplete,
+    hasLocationPermission,
+    userProfile,
+    isProfileLoading,
+    isDarkMode,
+    fontSize,
+    favorites
+  ]);
+
   return (
-    <AppContext.Provider
-      value={{
-        isLoading,
-        isOnboarded,
-        language,
-        userToken,
-        isGuest,
-        isProfileComplete,
-        hasLocationPermission,
-        userProfile,
-        isProfileLoading,
-        isDarkMode,
-        fontSize,
-        completeOnboarding,
-        login,
-        loginAsGuest,
-        completeProfile,
-        grantLocation,
-        logout,
-        exitGuestSession,
-        refreshProfileData,
-        toggleDarkMode,
-        setAppFontSize,
-        updateLocation,
-        changeAppLanguage,
-        favorites,
-        toggleFavoriteContext,
-      }}
-    >
+    <AppContext.Provider value={contextValue}>
       {children}
     </AppContext.Provider>
   );

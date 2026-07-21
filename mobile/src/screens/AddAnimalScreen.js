@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useRef } from 'react';
+import React, { useState, useEffect, useContext, useRef, useMemo, useCallback } from 'react';
 import {
   StyleSheet,
   View,
@@ -268,6 +268,56 @@ export default function AddAnimalScreen({ navigation }) {
   // Step 9: Submission/Upload status
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+
+  // Production-Grade Field-Level Validation State & Helpers
+  const [fieldErrors, setFieldErrors] = useState({});
+
+  const clearFieldError = (key) => {
+    setFieldErrors(prev => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const setFieldError = (key, msg) => {
+    setFieldErrors(prev => ({ ...prev, [key]: msg }));
+  };
+
+  const validatePriceValue = (val) => {
+    if (!val || !val.toString().trim()) {
+      return 'कृपया अपेक्षित किंमत प्रविष्ट करा. / Please enter expected price.';
+    }
+    const cleanStr = val.toString().trim();
+    if (!/^\d+(\.\d{1,2})?$/.test(cleanStr)) {
+      return 'कृपया वैध संख्यात्मक किंमत प्रविष्ट करा. / Please enter a valid numeric price.';
+    }
+    const num = Number(cleanStr);
+    if (isNaN(num) || num <= 0) {
+      return 'किंमत ० पेक्षा जास्त असणे आवश्यक आहे. / Price must be greater than 0.';
+    }
+    return null;
+  };
+
+  const validateTitleValue = (val) => {
+    if (!val || !val.toString().trim()) {
+      return 'कृपया जाहिरातीचे नाव प्रविष्ट करा. / Please enter listing title.';
+    }
+    if (val.toString().trim().length < 3) {
+      return 'नाव किमान ३ अक्षरांचे असणे आवश्यक आहे. / Title must be at least 3 characters.';
+    }
+    return null;
+  };
+
+  const renderFieldError = (key) => {
+    if (!fieldErrors[key]) return null;
+    return (
+      <AppText style={{ fontSize: 12, color: '#EF4444', fontWeight: '700', marginTop: 4 }}>
+        ⚠️ {fieldErrors[key]}
+      </AppText>
+    );
+  };
 
   const showAlert = (title, message, buttons = null) => {
     if (Platform.OS === 'web') {
@@ -686,6 +736,8 @@ export default function AddAnimalScreen({ navigation }) {
 
   // Submit Listing Workflow (Step 9)
   const handlePublishListing = async () => {
+    if (isSubmitting) return;
+
     const state = selectedState?.name;
     const district = selectedDistrict?.name;
     const taluka = selectedTaluka?.name;
@@ -706,46 +758,72 @@ export default function AddAnimalScreen({ navigation }) {
 
     // 2. Perform detailed validation check
     const missingFields = [];
+    const newFieldErrors = {};
     const validPhotos = photos.filter(p => p && p.uri);
 
-
     if (validPhotos.length < 5) {
-      missingFields.push(t('addAnimal.photosRequired', { count: validPhotos.length }));
+      const photoMsg = t('addAnimal.photosRequired', { count: validPhotos.length });
+      missingFields.push(photoMsg);
+      newFieldErrors.photos = photoMsg;
     }
     if (!video) {
-      missingFields.push(t('addAnimal.videoRequired'));
+      const videoMsg = t('addAnimal.videoRequired');
+      missingFields.push(videoMsg);
+      newFieldErrors.video = videoMsg;
     }
+
+    const titleErr = validateTitleValue(title);
+    if (titleErr) {
+      missingFields.push(t('addAnimal.previewLabelTitle'));
+      newFieldErrors.title = titleErr;
+    }
+
     if (isOtherCategory) {
-      if (!title || !title.trim()) {
-        missingFields.push('प्राण्याचे नाव (Animal Name)');
-      }
       if (!customBreedText || !customBreedText.trim()) {
         missingFields.push('जात (Breed Name)');
+        newFieldErrors.breed = 'कृपया जातीचे नाव प्रविष्ट करा. / Please enter breed name.';
       }
     } else {
-      if (!title || !title.trim()) {
-        missingFields.push(t('addAnimal.previewLabelTitle'));
-      }
       if (!selectedBreed) {
         missingFields.push(t('addAnimal.breedPlaceholder'));
+        newFieldErrors.breed = 'कृपया जात निवडा. / Please select a breed.';
       } else if (isOtherBreedSelected && (!customBreedText || !customBreedText.trim())) {
         missingFields.push('इतर जात नमूद करा / Enter Breed');
+        newFieldErrors.breed = 'कृपया इतर जात नमूद करा. / Please enter custom breed.';
       }
     }
-    if (!price || !price.toString().trim()) {
+
+    const priceErr = validatePriceValue(price);
+    if (priceErr) {
       missingFields.push(t('addAnimal.expectedPriceLabel'));
+      newFieldErrors.price = priceErr;
     }
+
     if (!selectedState) {
       missingFields.push(t('addAnimal.stateLabel'));
+      newFieldErrors.state = 'कृपया राज्य निवडा. / Please select state.';
     }
     if (!selectedDistrict) {
       missingFields.push(t('addAnimal.districtLabel'));
+      newFieldErrors.district = 'कृपया जिल्हा निवडा. / Please select district.';
     }
     if (!selectedTaluka) {
       missingFields.push(t('addAnimal.talukaLabel'));
+      newFieldErrors.taluka = 'कृपया तालुका निवडा. / Please select taluka.';
     }
 
+    setFieldErrors(newFieldErrors);
+
     if (missingFields.length > 0) {
+      let firstInvalidStep = 1;
+      if (!selectedCategory) firstInvalidStep = 1;
+      else if (newFieldErrors.photos) firstInvalidStep = 2;
+      else if (newFieldErrors.video) firstInvalidStep = 3;
+      else if (newFieldErrors.title || newFieldErrors.breed) firstInvalidStep = 4;
+      else if (newFieldErrors.price) firstInvalidStep = 6;
+      else if (newFieldErrors.state || newFieldErrors.district || newFieldErrors.taluka) firstInvalidStep = 7;
+
+      setCurrentStep(firstInvalidStep);
       const errMsg = t('addAnimal.missingFieldsError', { fields: missingFields.join('\n- ') });
       showAlert(t('common.error'), errMsg);
       return;
@@ -760,9 +838,28 @@ export default function AddAnimalScreen({ navigation }) {
       ? `इतर - ${customBreedText.trim()}`
       : selectedBreed?.name || '';
 
+    const isValidObjectId = (val) => typeof val === 'string' && /^[0-9a-fA-F]{24}$/.test(val);
+
+    const rawBreedId = selectedBreed?._id || selectedBreed?.id;
+    const categoryIdVal = selectedCategory?._id || selectedCategory?.id;
+
+    // Resolve valid 24-character hexadecimal MongoDB ObjectId for breedId
+    let finalBreedId = isValidObjectId(rawBreedId) ? rawBreedId : null;
+
+    if (!finalBreedId) {
+      // Find matching breed in fetched API breeds list
+      const matchedApiBreed = (breeds || []).find(b => isValidObjectId(b._id || b.id));
+      if (matchedApiBreed) {
+        finalBreedId = matchedApiBreed._id || matchedApiBreed.id;
+      } else {
+        // Fallback to category ObjectId if no specific breed ObjectId is available
+        finalBreedId = isValidObjectId(categoryIdVal) ? categoryIdVal : null;
+      }
+    }
+
     const basePayload = {
-      categoryId: selectedCategory._id || selectedCategory.id,
-      breedId: selectedBreed?._id || selectedBreed?.id || (breeds && breeds[0] ? breeds[0]._id : selectedCategory._id),
+      categoryId: categoryIdVal,
+      breedId: finalBreedId,
       title: title,
       description: description,
       price: Number(price),
@@ -781,7 +878,7 @@ export default function AddAnimalScreen({ navigation }) {
       state: selectedState?.name || '',
       district: selectedDistrict?.name || '',
       taluka: selectedTaluka?.name || '',
-      village: (typeof selectedVillage === 'object' ? selectedVillage?.name : selectedVillage) || '',
+      village: (typeof selectedVillage === 'object' ? selectedVillage?.name : selectedVillage) || selectedTaluka?.name || 'N/A',
       pincode: pincode || '',
       formattedAddress: formattedAddress || [typeof selectedVillage === 'object' ? selectedVillage?.name : selectedVillage, selectedTaluka?.name, selectedDistrict?.name, selectedState?.name].filter(Boolean).join(', '),
       latitude: latitude,
@@ -903,12 +1000,15 @@ export default function AddAnimalScreen({ navigation }) {
         throw new Error(body.message || 'Server error');
       }
     } catch (err) {
-      const isNetworkError = err.message && (
+      const isNetworkError = !err.response && err.message && (
         err.message.includes('Network') ||
         err.message.includes('network') ||
         err.message.includes('timeout') ||
         err.message.includes('connect')
       );
+
+      const status = err.response?.status;
+      let userFriendlyMsg = '';
 
       if (isNetworkError) {
         await saveDraftLocally(basePayload);
@@ -917,9 +1017,30 @@ export default function AddAnimalScreen({ navigation }) {
           t('addAnimal.savedAsDraft'),
           [{ text: 'OK', onPress: () => navigation.navigate('MyListings') }]
         );
-      } else {
-        showAlert(t('common.error'), err.message || t('addAnimal.publishFailed'));
+        return;
       }
+
+      if (status === 400) {
+        userFriendlyMsg = 'कृपया प्रविष्ट केलेली माहिती तपासा आणि पुन्हा प्रयत्न करा. / Please check the entered information and try again.';
+      } else if (status === 401) {
+        userFriendlyMsg = 'कृपया पुन्हा लॉगिन करा. / Please login again to continue.';
+      } else if (status === 403) {
+        userFriendlyMsg = 'तुम्हाला ही कृती करण्याची परवानगी नाही. / You do not have permission to perform this action.';
+      } else if (status === 404) {
+        userFriendlyMsg = 'मागणी केलेले संसाधन सापडले नाही. / Requested resource was not found.';
+      } else if (status === 409) {
+        userFriendlyMsg = 'ही जाहिरात आधीपासून अस्तित्वात आहे. / This listing already exists.';
+      } else if (status === 422) {
+        userFriendlyMsg = 'कृपया प्रविष्ट केलेली माहिती तपासा. / Please verify the entered information.';
+      } else if (status === 429) {
+        userFriendlyMsg = 'खूप जास्त विनंत्या. कृपया थोड्या वेळाने प्रयत्न करा. / Too many requests. Please try again shortly.';
+      } else if (status >= 500) {
+        userFriendlyMsg = 'सर्व्हर त्रुटी. कृपया थोड्या वेळाने प्रयत्न करा. / Something went wrong on our side. Please try again later.';
+      } else {
+        userFriendlyMsg = err.response?.data?.message || err.message || t('addAnimal.publishFailed');
+      }
+
+      showAlert(t('common.error'), userFriendlyMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -1797,29 +1918,38 @@ export default function AddAnimalScreen({ navigation }) {
                 <View style={styles.inputGroup}>
                   <AppText style={styles.largeFieldLabel}>प्राण्याचे नाव / Animal Name *</AppText>
                   <TextInput
-                    style={styles.largeInput}
+                    style={[styles.largeInput, fieldErrors.title && { borderColor: '#EF4444' }]}
                     placeholder="उदा. ससा / बदक / उंट (e.g. Rabbit / Duck / Camel)"
                     value={title}
                     onChangeText={(txt) => {
                       setTitle(txt);
                       setIsTitleUserEdited(txt.trim().length > 0);
+                      if (fieldErrors.title) clearFieldError('title');
+                    }}
+                    onBlur={() => {
+                      const err = validateTitleValue(title);
+                      if (err) setFieldError('title', err);
+                      else clearFieldError('title');
                     }}
                   />
+                  {renderFieldError('title')}
                 </View>
 
                 <View style={styles.inputGroup}>
                   <AppText style={styles.largeFieldLabel}>जात / Breed Name *</AppText>
                   <TextInput
-                    style={styles.largeInput}
+                    style={[styles.largeInput, fieldErrors.breed && { borderColor: '#EF4444' }]}
                     placeholder="उदा. देशी / ससा जात (e.g. Desi / Rabbit Breed)"
                     value={customBreedText}
                     onChangeText={(txt) => {
                       setCustomBreedText(txt);
+                      if (fieldErrors.breed) clearFieldError('breed');
                       if (!selectedBreed || selectedBreed.id !== 'custom_other') {
                         setSelectedBreed({ id: 'custom_other', name: txt, _id: selectedCategory?._id });
                       }
                     }}
                   />
+                  {renderFieldError('breed')}
                 </View>
               </>
             ) : (
@@ -1827,14 +1957,21 @@ export default function AddAnimalScreen({ navigation }) {
                 <View style={styles.inputGroup}>
                   <AppText style={styles.largeFieldLabel}>जाहिरातीचे नाव / Listing Title *</AppText>
                   <TextInput
-                    style={styles.largeInput}
+                    style={[styles.largeInput, fieldErrors.title && { borderColor: '#EF4444' }]}
                     placeholder="उदा. २ वर्षांची जर्सी गाय"
                     value={title}
                     onChangeText={(txt) => {
                       setTitle(txt);
                       setIsTitleUserEdited(txt.trim().length > 0);
+                      if (fieldErrors.title) clearFieldError('title');
+                    }}
+                    onBlur={() => {
+                      const err = validateTitleValue(title);
+                      if (err) setFieldError('title', err);
+                      else clearFieldError('title');
                     }}
                   />
+                  {renderFieldError('title')}
                 </View>
 
                 <View style={styles.inputGroup}>
@@ -1843,10 +1980,11 @@ export default function AddAnimalScreen({ navigation }) {
                     <ActivityIndicator size="small" color="#16A34A" />
                   ) : (
                     <TouchableOpacity
-                      style={styles.dropdownSelector}
+                      style={[styles.dropdownSelector, fieldErrors.breed && { borderColor: '#EF4444' }]}
                       onPress={() => {
                         setBreedSearchQuery('');
                         setIsBreedModalVisible(true);
+                        if (fieldErrors.breed) clearFieldError('breed');
                       }}
                       activeOpacity={0.8}
                     >
@@ -1856,6 +1994,7 @@ export default function AddAnimalScreen({ navigation }) {
                       <Ionicons name="chevron-down" size={20} color="#64748B" />
                     </TouchableOpacity>
                   )}
+                  {renderFieldError('breed')}
                 </View>
 
                 {isOtherBreedSelected && (
@@ -2106,12 +2245,21 @@ export default function AddAnimalScreen({ navigation }) {
             <View style={styles.inputGroup}>
               <AppText style={styles.largeFieldLabel}>अपेक्षित किंमत / Expected Price (₹) *</AppText>
               <TextInput
-                style={[styles.largeInput, { fontSize: 24, fontWeight: '700' }]}
+                style={[styles.largeInput, { fontSize: 24, fontWeight: '700' }, fieldErrors.price && { borderColor: '#EF4444' }]}
                 keyboardType="numeric"
                 placeholder="उदा. ५०,०००"
                 value={price}
-                onChangeText={setPrice}
+                onChangeText={(txt) => {
+                  setPrice(txt);
+                  if (fieldErrors.price) clearFieldError('price');
+                }}
+                onBlur={() => {
+                  const err = validatePriceValue(price);
+                  if (err) setFieldError('price', err);
+                  else clearFieldError('price');
+                }}
               />
+              {renderFieldError('price')}
             </View>
 
             <View style={styles.toggleRow}>

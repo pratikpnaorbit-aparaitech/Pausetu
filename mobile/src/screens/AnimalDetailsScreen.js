@@ -2,7 +2,7 @@
 // Redesigned premium livestock details page with dynamic zoom views, spec cards, maps trackers, and call CTAs.
 
 import React, { useState, useRef, useCallback, useEffect, useContext, useMemo } from 'react';
-import { StyleSheet, View, ScrollView, Image, TouchableOpacity, Dimensions, Modal, Share, FlatList, SafeAreaView, ActivityIndicator, Linking, Alert, Platform, TextInput, Animated, PanResponder } from 'react-native';
+import { StyleSheet, View, ScrollView, Image, TouchableOpacity, Dimensions, useWindowDimensions, Modal, Share, FlatList, SafeAreaView, ActivityIndicator, Linking, Alert, Platform, TextInput, Animated, PanResponder } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import SectionHeader from '../components/SectionHeader';
@@ -14,12 +14,11 @@ import { AppContext } from '../context/AppContext';
 import { reverseGeocodeWithCache, formatLocationDisplay } from '../utils/geocoder';
 import { isUserVerified } from '../utils/verificationUtils';
 
-const { width } = Dimensions.get('window');
-// Dynamic gallery height: 4:3 portrait ratio — shows the full animal without cropping.
-// Caps at 420px so the gallery doesn't dominate on very large screens.
-const GALLERY_HEIGHT = Math.min(Math.round(width * (4 / 3)), 420);
+const { width: INITIAL_WIDTH } = Dimensions.get('window');
+// Dynamic gallery height fallback
+const GALLERY_HEIGHT = Math.min(Math.round(INITIAL_WIDTH * (4 / 3)), 420);
 
-const ImageWithLoader = ({ uri, style, resizeMode = 'contain', onPress }) => {
+const ImageWithLoader = ({ uri, style, resizeMode = 'cover', onPress }) => {
   const [loading, setLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -32,17 +31,24 @@ const ImageWithLoader = ({ uri, style, resizeMode = 'contain', onPress }) => {
     fadeAnim.setValue(0);
   }, [uri, fadeAnim]);
 
+  const isValidUri = useMemo(() => {
+    if (!uri || typeof uri !== 'string') return false;
+    const trimmed = uri.trim();
+    if (trimmed === '' || trimmed === 'null' || trimmed === 'undefined') return false;
+    if (trimmed.endsWith('/null') || trimmed.endsWith('/undefined')) return false;
+    return true;
+  }, [uri]);
+
   const source = useMemo(() => {
-    if (hasError || !uri || typeof uri !== 'string' || uri.trim() === '' || uri.includes('undefined') || uri.includes('null')) {
+    if (hasError || !isValidUri) {
       return { uri: fallbackUri };
     }
     return { uri };
-  }, [uri, hasError]);
+  }, [uri, hasError, isValidUri]);
 
   const handleLoadStart = useCallback(() => {
-    fadeAnim.setValue(0);
     setLoading(true);
-  }, [uri, fadeAnim]);
+  }, []);
 
   const handleLoadEnd = useCallback(() => {
     setLoading(false);
@@ -51,7 +57,7 @@ const ImageWithLoader = ({ uri, style, resizeMode = 'contain', onPress }) => {
       duration: 280,
       useNativeDriver: true,
     }).start();
-  }, [uri, fadeAnim]);
+  }, [fadeAnim]);
 
   const handleError = useCallback((e) => {
     const errObj = e?.nativeEvent?.error || e;
@@ -107,6 +113,7 @@ const ImageWithLoader = ({ uri, style, resizeMode = 'contain', onPress }) => {
 
 // Interactive full-screen zoom component with double-tap toggle & gesture pan tracking
 const ZoomableImage = ({ uri, isActive }) => {
+  const { width: screenW, height: screenH } = useWindowDimensions();
   const scale = useRef(new Animated.Value(1)).current;
   const pan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   const [currentScale, setCurrentScale] = useState(1);
@@ -115,9 +122,11 @@ const ZoomableImage = ({ uri, isActive }) => {
   // Reset zoom & panning when active slide changes
   useEffect(() => {
     if (!isActive) {
+      pan.flattenOffset();
+      pan.setValue({ x: 0, y: 0 });
       Animated.parallel([
-        Animated.timing(scale, { toValue: 1, duration: 200, useNativeDriver: true }),
-        Animated.timing(pan, { toValue: { x: 0, y: 0 }, duration: 200, useNativeDriver: true }),
+        Animated.timing(scale, { toValue: 1, duration: 200, useNativeDriver: false }),
+        Animated.timing(pan, { toValue: { x: 0, y: 0 }, duration: 200, useNativeDriver: false }),
       ]).start(() => {
         setCurrentScale(1);
       });
@@ -126,9 +135,10 @@ const ZoomableImage = ({ uri, isActive }) => {
 
   const handleDoubleTap = () => {
     const nextScale = currentScale > 1 ? 1 : 2.5;
+    pan.flattenOffset();
     Animated.parallel([
-      Animated.spring(scale, { toValue: nextScale, useNativeDriver: true, friction: 6 }),
-      Animated.spring(pan, { toValue: { x: 0, y: 0 }, useNativeDriver: true, friction: 6 }),
+      Animated.spring(scale, { toValue: nextScale, useNativeDriver: false, friction: 6 }),
+      Animated.spring(pan, { toValue: { x: 0, y: 0 }, useNativeDriver: false, friction: 6 }),
     ]).start(() => {
       setCurrentScale(nextScale);
     });
@@ -150,11 +160,7 @@ const ZoomableImage = ({ uri, isActive }) => {
         return currentScale > 1 && (Math.abs(gestureState.dx) > 2 || Math.abs(gestureState.dy) > 2);
       },
       onPanResponderGrant: () => {
-        pan.setOffset({
-          x: pan.x._value,
-          y: pan.y._value,
-        });
-        pan.setValue({ x: 0, y: 0 });
+        pan.extractOffset();
       },
       onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], { useNativeDriver: false }),
       onPanResponderRelease: () => {
@@ -164,35 +170,31 @@ const ZoomableImage = ({ uri, isActive }) => {
   ).current;
 
   return (
-    <View style={styles.fullScreenImageSlide} onTouchEnd={handleTouchEnd} {...panResponder.panHandlers}>
-      <ScrollView
-        contentContainerStyle={styles.fullScreenScrollViewContent}
-        maximumZoomScale={4}
-        minimumZoomScale={1}
-        showsHorizontalScrollIndicator={false}
-        showsVerticalScrollIndicator={false}
-        centerContent
-      >
-        <Animated.Image
-          source={{ uri }}
-          style={[
-            styles.fullScreenImage,
-            {
-              transform: [
-                { scale: scale },
-                { translateX: pan.x },
-                { translateY: pan.y }
-              ]
-            }
-          ]}
-          resizeMode="contain"
-        />
-      </ScrollView>
+    <View
+      style={{ width: screenW, height: screenH, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000000' }}
+      onTouchEnd={handleTouchEnd}
+      {...panResponder.panHandlers}
+    >
+      <Animated.Image
+        source={{ uri }}
+        style={{
+          width: screenW,
+          height: screenH,
+          transform: [
+            { scale: scale },
+            { translateX: pan.x },
+            { translateY: pan.y }
+          ]
+        }}
+        resizeMode="contain"
+      />
     </View>
   );
 };
 
 export default function AnimalDetailsScreen({ route, navigation }) {
+  const { width } = useWindowDimensions();
+  const galleryHeight = Math.min(Math.round(width * (4 / 3)), 420);
 
   const passedAnimal = route.params?.animal || null;
   const animalId = passedAnimal?._id || passedAnimal?.id || null;
@@ -211,24 +213,15 @@ export default function AnimalDetailsScreen({ route, navigation }) {
   const [isReported, setIsReported] = useState(false);
   const [isLiking, setIsLiking] = useState(false);
 
-  const handleOpenZoom = useCallback((index, uri) => {
-    setZoomImageIndex(index);
-    setZoomImageUri(uri || null);
-    setIsZoomVisible(true);
-  }, []);
-
-  const handleCloseZoom = useCallback(() => {
-    setIsZoomVisible(false);
-    setZoomImageUri(null);
-  }, []);
-  
   // Complaint state
   const [isComplaintModalVisible, setIsComplaintModalVisible] = useState(false);
   const [complaintText, setComplaintText] = useState('');
   const [isSubmittingComplaint, setIsSubmittingComplaint] = useState(false);
-  
-  const { t } = useTranslation();
 
+  const scrollRef = useRef(null);
+  const zoomFlatListRef = useRef(null);
+
+  const { t } = useTranslation();
   const { userProfile, isGuest, userToken, favorites, toggleFavoriteContext, refreshProfileData } = useContext(AppContext);
   const normalizedAnimalId = String(animalId || '').trim();
   const isWishlisted = favorites ? favorites.includes(normalizedAnimalId) : false;
@@ -260,7 +253,10 @@ export default function AnimalDetailsScreen({ route, navigation }) {
   const getUri = useCallback((item) => {
     if (!item) return '';
     if (typeof item === 'string') return item;
-    return item.uri || item.url || '';
+    if (typeof item === 'object') {
+      return item.uri || item.url || item.fileUrl || item.path || '';
+    }
+    return '';
   }, []);
 
   const mediaSlides = useMemo(() => {
@@ -319,6 +315,31 @@ export default function AnimalDetailsScreen({ route, navigation }) {
 
     return slides;
   }, [animal?.photos, animal?.video, detectIsVideo, getUri]);
+
+  const handleOpenZoom = useCallback((index, uri) => {
+    const targetUri = uri || (mediaSlides[index]?.type === 'image' ? mediaSlides[index]?.uri : null);
+    setZoomImageIndex(index);
+    setZoomImageUri(targetUri);
+    setIsZoomVisible(true);
+  }, [mediaSlides]);
+
+  const handleCloseZoom = useCallback(() => {
+    setIsZoomVisible(false);
+    setZoomImageUri(null);
+  }, []);
+
+  useEffect(() => {
+    if (isZoomVisible && zoomFlatListRef.current && zoomImageIndex >= 0 && zoomImageIndex < mediaSlides.length) {
+      const timer = setTimeout(() => {
+        try {
+          zoomFlatListRef.current?.scrollToIndex({ index: zoomImageIndex, animated: false });
+        } catch (e) {
+          // Safe fallback
+        }
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [isZoomVisible, zoomImageIndex, mediaSlides.length]);
 
   const firstVideoInSlides = useMemo(() => {
     return mediaSlides.find(s => s.type === 'video')?.uri || null;
@@ -443,6 +464,17 @@ export default function AnimalDetailsScreen({ route, navigation }) {
 
   useEffect(() => {
     let cancelled = false;
+
+    // Reset animal & gallery scroll state immediately when target listing changes
+    setAnimal(passedAnimal);
+    setActiveSlide(0);
+    if (scrollRef.current) {
+      try {
+        scrollRef.current.scrollTo({ x: 0, animated: false });
+      } catch (e) {
+        // Safe check if unmounted
+      }
+    }
 
     const fetchAnimalDetails = async () => {
       if (!animalId) {
@@ -577,8 +609,6 @@ export default function AnimalDetailsScreen({ route, navigation }) {
     fetchSimilar();
   }, [animal?.categoryId, animal?._id, animal?.id]);
 
-
-  const scrollRef = useRef(null);
 
   const handleScroll = (event) => {
     const slide = Math.round(event.nativeEvent.contentOffset.x / width);
@@ -845,18 +875,43 @@ export default function AnimalDetailsScreen({ route, navigation }) {
     return t(`animalDetails.${normalized}`, { defaultValue: genderVal });
   };
 
-  // Compilation of detailed specifications layout list (9-item specifications grid)
+  const isDairyCategory = useMemo(() => {
+    if (animal.gender === 'Male') return false;
+    const cat = (
+      animal.categorySlug ||
+      animal.categoryId?.slug ||
+      animal.categoryName ||
+      animal.categoryId?.name ||
+      animal.category ||
+      ''
+    ).toLowerCase();
+
+    if (!cat) return true;
+    if (cat.includes('horse') || cat.includes('घोडा')) return false;
+    if (cat.includes('sheep') || cat.includes('मेंढी')) return false;
+    if (cat.includes('other') || cat.includes('इतर')) return false;
+    if (cat.includes('bull') || cat.includes('ox')) return false;
+    if (cat.includes('donkey') || cat.includes('mule')) return false;
+
+    return (
+      cat.includes('cow') || cat.includes('गाय') ||
+      cat.includes('buffalo') || cat.includes('म्हैस') ||
+      cat.includes('goat') || cat.includes('शेळी')
+    );
+  }, [animal.gender, animal.categorySlug, animal.categoryId, animal.categoryName, animal.category]);
+
+  // Compilation of detailed specifications layout list (category-aware specifications grid)
   const detailsItems = [
     { label: t('buy.breedLabel', { defaultValue: 'Breed' }), value: animal.breed || 'Unknown', icon: 'cow' },
     { label: t('buy.ageLabel', { defaultValue: 'Age' }), value: getFormattedAge(animal.age), icon: 'calendar-clock' },
-    { label: t('buy.milkLabel', { defaultValue: 'Milk Yield' }), value: getFormattedMilkYield(animal.milkYield), icon: 'water' },
+    isDairyCategory ? { label: t('buy.milkLabel', { defaultValue: 'Milk Yield' }), value: getFormattedMilkYield(animal.milkYield), icon: 'water' } : null,
     { label: t('buy.weightLabel', { defaultValue: 'Weight' }), value: getFormattedWeight(animal.weight), icon: 'scale' },
     { label: t('animalDetails.gender', { defaultValue: 'Gender' }), value: getFormattedGender(animal.gender), icon: 'gender-male-female' },
     { label: t('animalDetails.color', { defaultValue: 'Color' }), value: getFormattedColor(animal.color), icon: 'palette' },
-    { label: t('buy.pregnantLabel', { defaultValue: 'Pregnancy' }), value: animal.pregnant ? t('animalDetails.yes') : t('animalDetails.no'), icon: 'baby-carriage' },
+    (isDairyCategory && animal.gender !== 'Male') ? { label: t('buy.pregnantLabel', { defaultValue: 'Pregnancy' }), value: animal.pregnant ? t('animalDetails.yes') : t('animalDetails.no'), icon: 'baby-carriage' } : null,
     { label: t('buy.vaccinatedLabel', { defaultValue: 'Vaccinated' }), value: animal.health?.vaccinated || animal.vaccination === 'yes' ? t('animalDetails.yes') : t('animalDetails.no'), icon: 'needle' },
     { label: t('buy.healthLabel', { defaultValue: 'Health Status' }), value: animal.health?.healthy || animal.health === 'yes' || !animal.health?.sick ? t('animalDetails.healthy') : t('animalDetails.treatment', { defaultValue: 'Treatment' }), icon: 'heart-pulse' },
-  ];
+  ].filter(Boolean);
 
   if (loading) {
     return (
@@ -930,7 +985,7 @@ export default function AnimalDetailsScreen({ route, navigation }) {
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Image/Video Gallery Slider */}
-        <View style={styles.galleryContainer}>
+        <View style={[styles.galleryContainer, { height: galleryHeight }]}>
           <ScrollView
             horizontal
             pagingEnabled
@@ -938,15 +993,16 @@ export default function AnimalDetailsScreen({ route, navigation }) {
             onScroll={handleScroll}
             scrollEventThrottle={16}
             ref={scrollRef}
+            style={{ width: '100%' }}
           >
             {mediaSlides.map((slide, index) => {
               if (slide.type === 'image') {
                 return (
-                  <View key={index} style={styles.galleryImageWrap}>
+                  <View key={`hero-slide-${index}-${slide.uri}`} style={[styles.galleryImageWrap, { width, height: galleryHeight }]}>
                     <ImageWithLoader
                       uri={slide.uri}
-                      style={styles.galleryImage}
-                      resizeMode="contain"
+                      style={[styles.galleryImage, { width, height: galleryHeight }]}
+                      resizeMode="cover"
                       onPress={() => handleOpenZoom(index, slide.uri)}
                     />
                     <TouchableOpacity
@@ -971,11 +1027,11 @@ export default function AnimalDetailsScreen({ route, navigation }) {
                 };
                 
                 return (
-                  <View key={index} style={styles.videoSlide}>
+                  <View key={index} style={[styles.videoSlide, { width, height: galleryHeight }]}>
                     <ImageWithLoader
                       uri={slide.thumbnail || firstImage || resolveMediaUrl(null)}
-                      style={styles.galleryImage}
-                      resizeMode="contain"
+                      style={[styles.galleryImage, { width, height: galleryHeight }]}
+                      resizeMode="cover"
                       onPress={(e) => {
                         console.log('[VideoPlayer] Play button/thumbnail tapped');
                         handlePlay();
@@ -1338,6 +1394,7 @@ export default function AnimalDetailsScreen({ route, navigation }) {
 
           {/* Swipeable Horizontal Gallery List */}
           <FlatList
+            ref={zoomFlatListRef}
             data={mediaSlides}
             horizontal
             pagingEnabled
@@ -1582,21 +1639,20 @@ const styles = StyleSheet.create({
     width: '100%',
     height: GALLERY_HEIGHT,
     position: 'relative',
-    // Dark background: letterbox bars are barely noticeable and look premium (OLX / Cars24 style)
     backgroundColor: '#0F172A',
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
     overflow: 'hidden',
   },
   galleryImageWrap: {
-    width: width,
+    width: '100%',
     height: GALLERY_HEIGHT,
     position: 'relative',
     overflow: 'hidden',
     backgroundColor: '#0F172A',
   },
   galleryImage: {
-    width: width,
+    width: '100%',
     height: GALLERY_HEIGHT,
     overflow: 'hidden',
     backgroundColor: '#0F172A',
@@ -1616,7 +1672,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(241, 245, 249, 0.4)',
   },
   placeholderSlide: {
-    width: width,
+    width: '100%',
     height: GALLERY_HEIGHT,
     justifyContent: 'center',
     alignItems: 'center',
@@ -1640,7 +1696,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   videoSlide: {
-    width: width,
+    width: '100%',
     height: GALLERY_HEIGHT,
     position: 'relative',
     overflow: 'hidden',
@@ -2154,13 +2210,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#000000',
   },
   fullScreenGalleryHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingTop: Platform.OS === 'android' ? 40 : 12,
     paddingBottom: 12,
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     zIndex: 10,
   },
   fullScreenCloseBtn: {
@@ -2199,7 +2259,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   fullScreenImageSlide: {
-    width: width,
+    width: INITIAL_WIDTH,
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
@@ -2209,14 +2269,14 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    width: width,
+    width: INITIAL_WIDTH,
   },
   fullScreenImage: {
-    width: width,
+    width: INITIAL_WIDTH,
     height: '100%',
   },
   fullScreenVideoSlide: {
-    width: width,
+    width: INITIAL_WIDTH,
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
@@ -2230,7 +2290,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   fullScreenPlaceholderSlide: {
-    width: width,
+    width: INITIAL_WIDTH,
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
@@ -2259,7 +2319,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.5)',
   },
   placeholderSlide: {
-    width: width,
+    width: INITIAL_WIDTH,
     height: GALLERY_HEIGHT,
     justifyContent: 'center',
     alignItems: 'center',
