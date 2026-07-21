@@ -361,17 +361,7 @@ export default function SellScreen({ navigation }) {
           <SellerCtaCard
             listingsCount={listings.length}
             t={t}
-            onPress={() => {
-              if (listings.length > 0) {
-                Alert.alert(
-                  t('common.info', { defaultValue: 'Info' }),
-                  t('common.comingSoon'),
-                  [{ text: 'OK' }]
-                );
-              } else {
-                navigation.navigate('AddAnimal');
-              }
-            }}
+            onPress={() => navigation.navigate('AddAnimal')}
           />
         </View>
 

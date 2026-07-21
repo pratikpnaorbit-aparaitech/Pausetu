@@ -341,9 +341,15 @@ export const AppProvider = ({ children }) => {
       setIsProfileComplete(true);
     } catch (e) {
       console.error('[Context Error] Profile complete failed:', e);
-      await AsyncStorage.setItem('userProfile', JSON.stringify(profileData));
+      const fallbackProfile = {
+        ...userProfile,
+        ...profileData,
+        name: profileData.name || userProfile?.name,
+        verification: userProfile?.verification || { status: 'unverified' }
+      };
+      await AsyncStorage.setItem('userProfile', JSON.stringify(fallbackProfile));
       await AsyncStorage.setItem('isProfileComplete', 'true');
-      setUserProfile(profileData);
+      setUserProfile(fallbackProfile);
       setIsProfileComplete(true);
     }
   };

@@ -50,7 +50,7 @@ exports.updateProfile = asyncHandler(async (req, res, next) => {
     preferredLanguage
   } = req.body;
 
-  // 1. Mobile number validation (if provided)
+  // 1. Mobile number validation & verification tracking (if provided)
   if (mobile !== undefined) {
     if (mobile === '') {
       user.mobile = undefined;
@@ -58,6 +58,11 @@ exports.updateProfile = asyncHandler(async (req, res, next) => {
       const trimmedMobile = mobile.trim();
       if (!isValidMobile(trimmedMobile)) {
         return next(new AppError('Please provide a valid 10-digit mobile number', 400));
+      }
+      // Re-verification is triggered ONLY when mobile number actually changes from stored value
+      if (user.mobile && user.mobile !== trimmedMobile && user.verification && user.verification.status === 'approved') {
+        user.verification.status = 'unverified';
+        user.verification.approvedAt = undefined;
       }
       user.mobile = trimmedMobile;
     }
