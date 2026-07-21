@@ -113,6 +113,7 @@ const ImageWithLoader = ({ uri, style, resizeMode = 'cover', onPress }) => {
 
 // Interactive full-screen zoom component with double-tap toggle & gesture pan tracking
 const ZoomableImage = ({ uri, isActive }) => {
+  const { width: screenW, height: screenH } = useWindowDimensions();
   const scale = useRef(new Animated.Value(1)).current;
   const pan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   const [currentScale, setCurrentScale] = useState(1);
@@ -121,9 +122,11 @@ const ZoomableImage = ({ uri, isActive }) => {
   // Reset zoom & panning when active slide changes
   useEffect(() => {
     if (!isActive) {
+      pan.flattenOffset();
+      pan.setValue({ x: 0, y: 0 });
       Animated.parallel([
-        Animated.timing(scale, { toValue: 1, duration: 200, useNativeDriver: true }),
-        Animated.timing(pan, { toValue: { x: 0, y: 0 }, duration: 200, useNativeDriver: true }),
+        Animated.timing(scale, { toValue: 1, duration: 200, useNativeDriver: false }),
+        Animated.timing(pan, { toValue: { x: 0, y: 0 }, duration: 200, useNativeDriver: false }),
       ]).start(() => {
         setCurrentScale(1);
       });
@@ -132,9 +135,10 @@ const ZoomableImage = ({ uri, isActive }) => {
 
   const handleDoubleTap = () => {
     const nextScale = currentScale > 1 ? 1 : 2.5;
+    pan.flattenOffset();
     Animated.parallel([
-      Animated.spring(scale, { toValue: nextScale, useNativeDriver: true, friction: 6 }),
-      Animated.spring(pan, { toValue: { x: 0, y: 0 }, useNativeDriver: true, friction: 6 }),
+      Animated.spring(scale, { toValue: nextScale, useNativeDriver: false, friction: 6 }),
+      Animated.spring(pan, { toValue: { x: 0, y: 0 }, useNativeDriver: false, friction: 6 }),
     ]).start(() => {
       setCurrentScale(nextScale);
     });
@@ -156,11 +160,7 @@ const ZoomableImage = ({ uri, isActive }) => {
         return currentScale > 1 && (Math.abs(gestureState.dx) > 2 || Math.abs(gestureState.dy) > 2);
       },
       onPanResponderGrant: () => {
-        pan.setOffset({
-          x: pan.x._value,
-          y: pan.y._value,
-        });
-        pan.setValue({ x: 0, y: 0 });
+        pan.extractOffset();
       },
       onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], { useNativeDriver: false }),
       onPanResponderRelease: () => {
@@ -170,31 +170,24 @@ const ZoomableImage = ({ uri, isActive }) => {
   ).current;
 
   return (
-    <View style={styles.fullScreenImageSlide} onTouchEnd={handleTouchEnd} {...panResponder.panHandlers}>
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={styles.fullScreenScrollViewContent}
-        maximumZoomScale={4}
-        minimumZoomScale={1}
-        showsHorizontalScrollIndicator={false}
-        showsVerticalScrollIndicator={false}
-        centerContent
-      >
-        <Animated.Image
-          source={{ uri }}
-          style={[
-            styles.fullScreenImage,
-            {
-              transform: [
-                { scale: scale },
-                { translateX: pan.x },
-                { translateY: pan.y }
-              ]
-            }
-          ]}
-          resizeMode="contain"
-        />
-      </ScrollView>
+    <View
+      style={{ width: screenW, height: screenH, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000000' }}
+      onTouchEnd={handleTouchEnd}
+      {...panResponder.panHandlers}
+    >
+      <Animated.Image
+        source={{ uri }}
+        style={{
+          width: screenW,
+          height: screenH,
+          transform: [
+            { scale: scale },
+            { translateX: pan.x },
+            { translateY: pan.y }
+          ]
+        }}
+        resizeMode="contain"
+      />
     </View>
   );
 };
@@ -2217,13 +2210,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#000000',
   },
   fullScreenGalleryHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingTop: Platform.OS === 'android' ? 40 : 12,
     paddingBottom: 12,
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     zIndex: 10,
   },
   fullScreenCloseBtn: {

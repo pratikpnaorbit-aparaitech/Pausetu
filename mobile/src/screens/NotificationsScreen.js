@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { StyleSheet, View, SafeAreaView, FlatList, TouchableOpacity, Alert, Modal, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, SafeAreaView, FlatList, TouchableOpacity, Alert, Modal, ActivityIndicator, Platform } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import NotificationCard from '../components/NotificationCard';
 import { api } from '../api/api';
