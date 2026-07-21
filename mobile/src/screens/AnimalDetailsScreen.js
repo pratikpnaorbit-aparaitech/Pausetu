@@ -2262,7 +2262,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   fullScreenImageSlide: {
-    width: width,
+    width: INITIAL_WIDTH,
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
@@ -2272,14 +2272,14 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    width: width,
+    width: INITIAL_WIDTH,
   },
   fullScreenImage: {
-    width: width,
+    width: INITIAL_WIDTH,
     height: '100%',
   },
   fullScreenVideoSlide: {
-    width: width,
+    width: INITIAL_WIDTH,
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
@@ -2293,7 +2293,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   fullScreenPlaceholderSlide: {
-    width: width,
+    width: INITIAL_WIDTH,
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
@@ -2322,7 +2322,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.5)',
   },
   placeholderSlide: {
-    width: width,
+    width: INITIAL_WIDTH,
     height: GALLERY_HEIGHT,
     justifyContent: 'center',
     alignItems: 'center',
