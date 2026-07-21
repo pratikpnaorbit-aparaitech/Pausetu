@@ -881,18 +881,43 @@ export default function AnimalDetailsScreen({ route, navigation }) {
     return t(`animalDetails.${normalized}`, { defaultValue: genderVal });
   };
 
-  // Compilation of detailed specifications layout list (9-item specifications grid)
+  const isDairyCategory = useMemo(() => {
+    if (animal.gender === 'Male') return false;
+    const cat = (
+      animal.categorySlug ||
+      animal.categoryId?.slug ||
+      animal.categoryName ||
+      animal.categoryId?.name ||
+      animal.category ||
+      ''
+    ).toLowerCase();
+
+    if (!cat) return true;
+    if (cat.includes('horse') || cat.includes('घोडा')) return false;
+    if (cat.includes('sheep') || cat.includes('मेंढी')) return false;
+    if (cat.includes('other') || cat.includes('इतर')) return false;
+    if (cat.includes('bull') || cat.includes('ox')) return false;
+    if (cat.includes('donkey') || cat.includes('mule')) return false;
+
+    return (
+      cat.includes('cow') || cat.includes('गाय') ||
+      cat.includes('buffalo') || cat.includes('म्हैस') ||
+      cat.includes('goat') || cat.includes('शेळी')
+    );
+  }, [animal.gender, animal.categorySlug, animal.categoryId, animal.categoryName, animal.category]);
+
+  // Compilation of detailed specifications layout list (category-aware specifications grid)
   const detailsItems = [
     { label: t('buy.breedLabel', { defaultValue: 'Breed' }), value: animal.breed || 'Unknown', icon: 'cow' },
     { label: t('buy.ageLabel', { defaultValue: 'Age' }), value: getFormattedAge(animal.age), icon: 'calendar-clock' },
-    { label: t('buy.milkLabel', { defaultValue: 'Milk Yield' }), value: getFormattedMilkYield(animal.milkYield), icon: 'water' },
+    isDairyCategory ? { label: t('buy.milkLabel', { defaultValue: 'Milk Yield' }), value: getFormattedMilkYield(animal.milkYield), icon: 'water' } : null,
     { label: t('buy.weightLabel', { defaultValue: 'Weight' }), value: getFormattedWeight(animal.weight), icon: 'scale' },
     { label: t('animalDetails.gender', { defaultValue: 'Gender' }), value: getFormattedGender(animal.gender), icon: 'gender-male-female' },
     { label: t('animalDetails.color', { defaultValue: 'Color' }), value: getFormattedColor(animal.color), icon: 'palette' },
-    { label: t('buy.pregnantLabel', { defaultValue: 'Pregnancy' }), value: animal.pregnant ? t('animalDetails.yes') : t('animalDetails.no'), icon: 'baby-carriage' },
+    (isDairyCategory && animal.gender !== 'Male') ? { label: t('buy.pregnantLabel', { defaultValue: 'Pregnancy' }), value: animal.pregnant ? t('animalDetails.yes') : t('animalDetails.no'), icon: 'baby-carriage' } : null,
     { label: t('buy.vaccinatedLabel', { defaultValue: 'Vaccinated' }), value: animal.health?.vaccinated || animal.vaccination === 'yes' ? t('animalDetails.yes') : t('animalDetails.no'), icon: 'needle' },
     { label: t('buy.healthLabel', { defaultValue: 'Health Status' }), value: animal.health?.healthy || animal.health === 'yes' || !animal.health?.sick ? t('animalDetails.healthy') : t('animalDetails.treatment', { defaultValue: 'Treatment' }), icon: 'heart-pulse' },
-  ];
+  ].filter(Boolean);
 
   if (loading) {
     return (

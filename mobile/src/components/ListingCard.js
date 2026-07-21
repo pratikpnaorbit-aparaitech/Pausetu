@@ -1,4 +1,4 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useMemo } from 'react';
 import { View, StyleSheet, TouchableOpacity, Image, Share, Linking, Alert } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { resolveMediaUrl } from '../api/api';
@@ -23,6 +23,34 @@ export default function ListingCard({ item, onViewDetailsPress, style }) {
   const fallbackUrl = 'https://images.unsplash.com/photo-1546445317-29f4545e6d52?auto=format&fit=crop&w=300&q=80';
   const resolvedUrl = resolveMediaUrl(item.photos && item.photos.length > 0 ? item.photos[0] : null);
   const imageUrl = imageError ? fallbackUrl : resolvedUrl;
+
+  // Category-aware determination of milk applicability
+  const isMilkApplicable = useMemo(() => {
+    if (!item) return false;
+    if (item.gender === 'Male') return false;
+
+    const cat = (
+      item.categorySlug ||
+      item.categoryId?.slug ||
+      item.categoryName ||
+      item.categoryId?.name ||
+      item.category ||
+      ''
+    ).toString().toLowerCase();
+
+    if (!cat) return true;
+    if (cat.includes('horse') || cat.includes('घोडा')) return false;
+    if (cat.includes('sheep') || cat.includes('मेंढी')) return false;
+    if (cat.includes('other') || cat.includes('इतर')) return false;
+    if (cat.includes('bull') || cat.includes('ox')) return false;
+    if (cat.includes('donkey') || cat.includes('mule')) return false;
+
+    return (
+      cat.includes('cow') || cat.includes('गाय') ||
+      cat.includes('buffalo') || cat.includes('म्हैस') ||
+      cat.includes('goat') || cat.includes('शेळी')
+    );
+  }, [item?.gender, item?.categorySlug, item?.categoryId, item?.categoryName, item?.category]);
 
   const handleShare = async () => {
     try {
@@ -212,7 +240,7 @@ export default function ListingCard({ item, onViewDetailsPress, style }) {
         {/* 9. Animal Specification Cards (Age and Milk Capacity) */}
         <View style={styles.specsContainer}>
           {/* Left Card: Age */}
-          <View style={styles.specCard}>
+          <View style={[styles.specCard, !isMilkApplicable && { flex: 1, marginRight: 0 }]}>
             <Ionicons name="calendar-outline" size={20} color="#16A34A" style={styles.specIcon} />
             <View style={styles.specTextContainer}>
               <AppText style={styles.specLabel}>{t('buy.ageLabel', { defaultValue: 'Age' })}</AppText>
@@ -222,16 +250,18 @@ export default function ListingCard({ item, onViewDetailsPress, style }) {
             </View>
           </View>
 
-          {/* Right Card: Milk Capacity */}
-          <View style={styles.specCard}>
-            <MaterialCommunityIcons name="bottle-tonic-outline" size={20} color="#2563EB" style={styles.specIcon} />
-            <View style={styles.specTextContainer}>
-              <AppText style={styles.specLabel}>{t('buy.milkLabel', { defaultValue: 'Milk' })}</AppText>
-              <AppText style={styles.specValue} numberOfLines={1}>
-                {item.milkYield ? `${item.milkYield} L` : getUnavailableMilkText()}
-              </AppText>
+          {/* Right Card: Milk Capacity (Only rendered if applicable) */}
+          {isMilkApplicable && (
+            <View style={styles.specCard}>
+              <MaterialCommunityIcons name="bottle-tonic-outline" size={20} color="#2563EB" style={styles.specIcon} />
+              <View style={styles.specTextContainer}>
+                <AppText style={styles.specLabel}>{t('buy.milkLabel', { defaultValue: 'Milk' })}</AppText>
+                <AppText style={styles.specValue} numberOfLines={1}>
+                  {item.milkYield ? `${item.milkYield} L` : getUnavailableMilkText()}
+                </AppText>
+              </View>
             </View>
-          </View>
+          )}
         </View>
 
         {/* 10. Seller Profile Section */}
