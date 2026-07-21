@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+import React, { useContext, useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, Image, Share, Linking, Alert } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { resolveMediaUrl } from '../api/api';
@@ -19,7 +19,10 @@ export default function ListingCard({ item, onViewDetailsPress, style }) {
   const normalizedItemId = String(item?._id ?? item?.id ?? '').trim();
   const isWishlisted = favorites ? favorites.includes(normalizedItemId) : false;
   
-  const imageUrl = resolveMediaUrl(item.photos && item.photos.length > 0 ? item.photos[0] : null);
+  const [imageError, setImageError] = useState(false);
+  const fallbackUrl = 'https://images.unsplash.com/photo-1546445317-29f4545e6d52?auto=format&fit=crop&w=300&q=80';
+  const resolvedUrl = resolveMediaUrl(item.photos && item.photos.length > 0 ? item.photos[0] : null);
+  const imageUrl = imageError ? fallbackUrl : resolvedUrl;
 
   const handleShare = async () => {
     try {
@@ -107,7 +110,10 @@ export default function ListingCard({ item, onViewDetailsPress, style }) {
             source={{ uri: imageUrl }} 
             style={styles.cardImage} 
             resizeMode="cover"
-            onError={(e) => console.log('[Image Load Error] ListingCard:', e.nativeEvent.error, 'URL:', imageUrl)}
+            onError={(e) => {
+              console.log('[Image Load Error] ListingCard:', e.nativeEvent?.error || e, 'URL:', imageUrl);
+              if (!imageError) setImageError(true);
+            }}
           />
         ) : (
           <MaterialCommunityIcons name="image-outline" size={38} color="#94A3B8" />

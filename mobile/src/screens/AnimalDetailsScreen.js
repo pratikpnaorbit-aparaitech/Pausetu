@@ -32,17 +32,24 @@ const ImageWithLoader = ({ uri, style, resizeMode = 'contain', onPress }) => {
     fadeAnim.setValue(0);
   }, [uri, fadeAnim]);
 
+  const isValidUri = useMemo(() => {
+    if (!uri || typeof uri !== 'string') return false;
+    const trimmed = uri.trim();
+    if (trimmed === '' || trimmed === 'null' || trimmed === 'undefined') return false;
+    if (trimmed.endsWith('/null') || trimmed.endsWith('/undefined')) return false;
+    return true;
+  }, [uri]);
+
   const source = useMemo(() => {
-    if (hasError || !uri || typeof uri !== 'string' || uri.trim() === '' || uri.includes('undefined') || uri.includes('null')) {
+    if (hasError || !isValidUri) {
       return { uri: fallbackUri };
     }
     return { uri };
-  }, [uri, hasError]);
+  }, [uri, hasError, isValidUri]);
 
   const handleLoadStart = useCallback(() => {
-    fadeAnim.setValue(0);
     setLoading(true);
-  }, [uri, fadeAnim]);
+  }, []);
 
   const handleLoadEnd = useCallback(() => {
     setLoading(false);
@@ -51,7 +58,7 @@ const ImageWithLoader = ({ uri, style, resizeMode = 'contain', onPress }) => {
       duration: 280,
       useNativeDriver: true,
     }).start();
-  }, [uri, fadeAnim]);
+  }, [fadeAnim]);
 
   const handleError = useCallback((e) => {
     const errObj = e?.nativeEvent?.error || e;
@@ -166,6 +173,7 @@ const ZoomableImage = ({ uri, isActive }) => {
   return (
     <View style={styles.fullScreenImageSlide} onTouchEnd={handleTouchEnd} {...panResponder.panHandlers}>
       <ScrollView
+        style={{ flex: 1, width: width }}
         contentContainerStyle={styles.fullScreenScrollViewContent}
         maximumZoomScale={4}
         minimumZoomScale={1}
@@ -211,24 +219,15 @@ export default function AnimalDetailsScreen({ route, navigation }) {
   const [isReported, setIsReported] = useState(false);
   const [isLiking, setIsLiking] = useState(false);
 
-  const handleOpenZoom = useCallback((index, uri) => {
-    setZoomImageIndex(index);
-    setZoomImageUri(uri || null);
-    setIsZoomVisible(true);
-  }, []);
-
-  const handleCloseZoom = useCallback(() => {
-    setIsZoomVisible(false);
-    setZoomImageUri(null);
-  }, []);
-  
   // Complaint state
   const [isComplaintModalVisible, setIsComplaintModalVisible] = useState(false);
   const [complaintText, setComplaintText] = useState('');
   const [isSubmittingComplaint, setIsSubmittingComplaint] = useState(false);
-  
-  const { t } = useTranslation();
 
+  const scrollRef = useRef(null);
+  const zoomFlatListRef = useRef(null);
+
+  const { t } = useTranslation();
   const { userProfile, isGuest, userToken, favorites, toggleFavoriteContext, refreshProfileData } = useContext(AppContext);
   const normalizedAnimalId = String(animalId || '').trim();
   const isWishlisted = favorites ? favorites.includes(normalizedAnimalId) : false;
@@ -260,7 +259,10 @@ export default function AnimalDetailsScreen({ route, navigation }) {
   const getUri = useCallback((item) => {
     if (!item) return '';
     if (typeof item === 'string') return item;
-    return item.uri || item.url || '';
+    if (typeof item === 'object') {
+      return item.uri || item.url || item.fileUrl || item.path || '';
+    }
+    return '';
   }, []);
 
   const mediaSlides = useMemo(() => {
@@ -319,6 +321,31 @@ export default function AnimalDetailsScreen({ route, navigation }) {
 
     return slides;
   }, [animal?.photos, animal?.video, detectIsVideo, getUri]);
+
+  const handleOpenZoom = useCallback((index, uri) => {
+    const targetUri = uri || (mediaSlides[index]?.type === 'image' ? mediaSlides[index]?.uri : null);
+    setZoomImageIndex(index);
+    setZoomImageUri(targetUri);
+    setIsZoomVisible(true);
+  }, [mediaSlides]);
+
+  const handleCloseZoom = useCallback(() => {
+    setIsZoomVisible(false);
+    setZoomImageUri(null);
+  }, []);
+
+  useEffect(() => {
+    if (isZoomVisible && zoomFlatListRef.current && zoomImageIndex >= 0 && zoomImageIndex < mediaSlides.length) {
+      const timer = setTimeout(() => {
+        try {
+          zoomFlatListRef.current?.scrollToIndex({ index: zoomImageIndex, animated: false });
+        } catch (e) {
+          // Safe fallback
+        }
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [isZoomVisible, zoomImageIndex, mediaSlides.length]);
 
   const firstVideoInSlides = useMemo(() => {
     return mediaSlides.find(s => s.type === 'video')?.uri || null;
@@ -443,6 +470,17 @@ export default function AnimalDetailsScreen({ route, navigation }) {
 
   useEffect(() => {
     let cancelled = false;
+
+    // Reset animal & gallery scroll state immediately when target listing changes
+    setAnimal(passedAnimal);
+    setActiveSlide(0);
+    if (scrollRef.current) {
+      try {
+        scrollRef.current.scrollTo({ x: 0, animated: false });
+      } catch (e) {
+        // Safe check if unmounted
+      }
+    }
 
     const fetchAnimalDetails = async () => {
       if (!animalId) {
@@ -577,8 +615,6 @@ export default function AnimalDetailsScreen({ route, navigation }) {
     fetchSimilar();
   }, [animal?.categoryId, animal?._id, animal?.id]);
 
-
-  const scrollRef = useRef(null);
 
   const handleScroll = (event) => {
     const slide = Math.round(event.nativeEvent.contentOffset.x / width);
@@ -942,7 +978,7 @@ export default function AnimalDetailsScreen({ route, navigation }) {
             {mediaSlides.map((slide, index) => {
               if (slide.type === 'image') {
                 return (
-                  <View key={index} style={styles.galleryImageWrap}>
+                  <View key={`hero-slide-${index}-${slide.uri}`} style={styles.galleryImageWrap}>
                     <ImageWithLoader
                       uri={slide.uri}
                       style={styles.galleryImage}
@@ -1338,6 +1374,7 @@ export default function AnimalDetailsScreen({ route, navigation }) {
 
           {/* Swipeable Horizontal Gallery List */}
           <FlatList
+            ref={zoomFlatListRef}
             data={mediaSlides}
             horizontal
             pagingEnabled
