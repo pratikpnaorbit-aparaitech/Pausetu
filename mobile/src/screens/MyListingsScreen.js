@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useMemo } from 'react';
+import React, { useState, useEffect, useContext, useMemo, useRef } from 'react';
 import { StyleSheet, View, SafeAreaView, FlatList, TouchableOpacity, Image, Modal, Share, Alert, ActivityIndicator, TextInput } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppContext } from '../context/AppContext';
@@ -32,12 +32,17 @@ export default function MyListingsScreen({ navigation }) {
     }
   );
 
+  const isFetchingRef = useRef(false);
+
   const fetchMyListings = async () => {
     if (!userProfile || !userProfile.id || userToken === 'guest') {
       setListings([]);
       setLoading(false);
       return;
     }
+
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
 
     setLoading(true);
     setError(null);
@@ -49,6 +54,7 @@ export default function MyListingsScreen({ navigation }) {
     } catch (err) {
       setError(err.message || t('myListings.connectionFailed'));
     } finally {
+      isFetchingRef.current = false;
       setLoading(false);
     }
   };
@@ -198,6 +204,68 @@ export default function MyListingsScreen({ navigation }) {
     );
   }
 
+  const renderMyListingItem = useCallback(({ item }) => {
+    const mainImage = resolveMediaUrl(item.photos && item.photos.length > 0 ? item.photos[0] : null);
+
+    return (
+      <View style={styles.listingCard}>
+        <View style={styles.cardHeader}>
+          <Image source={{ uri: mainImage }} style={styles.cardThumbnail} />
+          <View style={styles.cardDetails}>
+            <View style={styles.titleRow}>
+              <AppText style={styles.cardTitle}>{item.title}</AppText>
+              <TouchableOpacity
+                style={styles.threeDotBtn}
+                onPress={() => setActiveMenuListing(item)}
+              >
+                <Ionicons name="ellipsis-vertical" size={18} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+            <AppText style={styles.cardSubtitle}>{item.breedId?.name || t('animalDetails.na')} • {item.categoryId?.name || t('buy.categories')}</AppText>
+            <AppText style={styles.cardPrice}>₹{Number(item.price).toLocaleString()}</AppText>
+            
+            <View style={styles.locationRow}>
+              <Ionicons name="location" size={12} color="#64748B" />
+              <AppText style={styles.locationText} numberOfLines={1}>{item.village}, {item.district}</AppText>
+            </View>
+          </View>
+        </View>
+
+        {item.status === 'rejected' && item.rejectionReason && (
+          <View style={styles.rejectionCard}>
+            <AppText style={styles.rejectionLabel}>{t('myListings.rejectionReason')}</AppText>
+            <AppText style={styles.rejectionText}>{item.rejectionReason}</AppText>
+          </View>
+        )}
+
+        <View style={styles.divider} />
+
+        {/* Performance Stats Overlay */}
+        <View style={styles.cardPerformanceRow}>
+          <View style={styles.perfStat}>
+            <Ionicons name="eye-outline" size={14} color="#64748B" />
+            <AppText style={styles.perfStatText}>{item.views || 0} {t('sell.views')}</AppText>
+          </View>
+          {renderStatusBadge(item.status)}
+        </View>
+
+        {/* Action buttons inside the card */}
+        <View style={styles.cardActionsRow}>
+          <TouchableOpacity style={styles.cardActionBtn} onPress={() => handleShareListing(item)}>
+            <Ionicons name="share-social-outline" size={16} color="#64748B" />
+            <AppText style={styles.cardActionBtnLabel}>{t('common.share')}</AppText>
+          </TouchableOpacity>
+          {item.status?.toLowerCase() !== 'sold' && (
+            <TouchableOpacity style={styles.cardActionBtn} onPress={() => handleMarkAsSold(item.id || item._id)}>
+              <Ionicons name="checkmark-done-circle-outline" size={16} color="#2563EB" />
+              <AppText style={[styles.cardActionBtnLabel, { color: '#2563EB' }]}>{t('myListings.markSold')}</AppText>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    );
+  }, [t]);
+
   return (
     <SafeAreaView style={styles.container}>
 
@@ -252,6 +320,10 @@ export default function MyListingsScreen({ navigation }) {
       <FlatList
         data={filteredListings}
         keyExtractor={(item) => item.id || item._id}
+        initialNumToRender={6}
+        maxToRenderPerBatch={6}
+        windowSize={5}
+        removeClippedSubviews={Platform.OS === 'android'}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
@@ -266,67 +338,7 @@ export default function MyListingsScreen({ navigation }) {
             </TouchableOpacity>
           </View>
         }
-        renderItem={({ item }) => {
-          const mainImage = resolveMediaUrl(item.photos && item.photos.length > 0 ? item.photos[0] : null);
-
-          return (
-            <View style={styles.listingCard}>
-              <View style={styles.cardHeader}>
-                <Image source={{ uri: mainImage }} style={styles.cardThumbnail} />
-                <View style={styles.cardDetails}>
-                  <View style={styles.titleRow}>
-                    <AppText style={styles.cardTitle}>{item.title}</AppText>
-                    <TouchableOpacity
-                      style={styles.threeDotBtn}
-                      onPress={() => setActiveMenuListing(item)}
-                    >
-                      <Ionicons name="ellipsis-vertical" size={18} color="#64748B" />
-                    </TouchableOpacity>
-                  </View>
-                  <AppText style={styles.cardSubtitle}>{item.breedId?.name || t('animalDetails.na')} • {item.categoryId?.name || t('buy.categories')}</AppText>
-                  <AppText style={styles.cardPrice}>₹{Number(item.price).toLocaleString()}</AppText>
-                  
-                  <View style={styles.locationRow}>
-                    <Ionicons name="location" size={12} color="#64748B" />
-                    <AppText style={styles.locationText} numberOfLines={1}>{item.village}, {item.district}</AppText>
-                  </View>
-                </View>
-              </View>
-
-              {item.status === 'rejected' && item.rejectionReason && (
-                <View style={styles.rejectionCard}>
-                  <AppText style={styles.rejectionLabel}>{t('myListings.rejectionReason')}</AppText>
-                  <AppText style={styles.rejectionText}>{item.rejectionReason}</AppText>
-                </View>
-              )}
-
-              <View style={styles.divider} />
-
-              {/* Performance Stats Overlay */}
-              <View style={styles.cardPerformanceRow}>
-                <View style={styles.perfStat}>
-                  <Ionicons name="eye-outline" size={14} color="#64748B" />
-                  <AppText style={styles.perfStatText}>{item.views || 0} {t('sell.views')}</AppText>
-                </View>
-                {renderStatusBadge(item.status)}
-              </View>
-
-              {/* Action buttons inside the card */}
-              <View style={styles.cardActionsRow}>
-                <TouchableOpacity style={styles.cardActionBtn} onPress={() => handleShareListing(item)}>
-                  <Ionicons name="share-social-outline" size={16} color="#64748B" />
-                  <AppText style={styles.cardActionBtnLabel}>{t('common.share')}</AppText>
-                </TouchableOpacity>
-                {item.status?.toLowerCase() !== 'sold' && (
-                  <TouchableOpacity style={styles.cardActionBtn} onPress={() => handleMarkAsSold(item.id || item._id)}>
-                    <Ionicons name="checkmark-done-circle-outline" size={16} color="#2563EB" />
-                    <AppText style={[styles.cardActionBtnLabel, { color: '#2563EB' }]}>{t('myListings.markSold')}</AppText>
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-          );
-        }}
+        renderItem={renderMyListingItem}
       />
 
       {/* Slide-Up Bottom Sheet Modal */}

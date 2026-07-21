@@ -8,7 +8,7 @@ import { useNavigation } from '@react-navigation/native';
 import AppText from './AppText';
 import { isUserVerified } from '../utils/verificationUtils';
 
-export default function ListingCard({ item, onViewDetailsPress, style }) {
+function ListingCard({ item, onViewDetailsPress, style }) {
   const { t, i18n } = useTranslation();
   const navigation = useNavigation();
   const { favorites, toggleFavoriteContext, isGuest, userToken } = useContext(AppContext);
@@ -640,3 +640,5 @@ const styles = StyleSheet.create({
     right: 16,
   },
 });
+
+export default React.memo(ListingCard);

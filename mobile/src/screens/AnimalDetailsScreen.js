@@ -2,7 +2,7 @@
 // Redesigned premium livestock details page with dynamic zoom views, spec cards, maps trackers, and call CTAs.
 
 import React, { useState, useRef, useCallback, useEffect, useContext, useMemo } from 'react';
-import { StyleSheet, View, ScrollView, Image, TouchableOpacity, Dimensions, Modal, Share, FlatList, SafeAreaView, ActivityIndicator, Linking, Alert, Platform, TextInput, Animated, PanResponder } from 'react-native';
+import { StyleSheet, View, ScrollView, Image, TouchableOpacity, Dimensions, useWindowDimensions, Modal, Share, FlatList, SafeAreaView, ActivityIndicator, Linking, Alert, Platform, TextInput, Animated, PanResponder } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import SectionHeader from '../components/SectionHeader';
@@ -14,12 +14,11 @@ import { AppContext } from '../context/AppContext';
 import { reverseGeocodeWithCache, formatLocationDisplay } from '../utils/geocoder';
 import { isUserVerified } from '../utils/verificationUtils';
 
-const { width } = Dimensions.get('window');
-// Dynamic gallery height: 4:3 portrait ratio — shows the full animal without cropping.
-// Caps at 420px so the gallery doesn't dominate on very large screens.
-const GALLERY_HEIGHT = Math.min(Math.round(width * (4 / 3)), 420);
+const { width: INITIAL_WIDTH } = Dimensions.get('window');
+// Dynamic gallery height fallback
+const GALLERY_HEIGHT = Math.min(Math.round(INITIAL_WIDTH * (4 / 3)), 420);
 
-const ImageWithLoader = ({ uri, style, resizeMode = 'contain', onPress }) => {
+const ImageWithLoader = ({ uri, style, resizeMode = 'cover', onPress }) => {
   const [loading, setLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -173,7 +172,7 @@ const ZoomableImage = ({ uri, isActive }) => {
   return (
     <View style={styles.fullScreenImageSlide} onTouchEnd={handleTouchEnd} {...panResponder.panHandlers}>
       <ScrollView
-        style={{ flex: 1, width: width }}
+        style={{ flex: 1 }}
         contentContainerStyle={styles.fullScreenScrollViewContent}
         maximumZoomScale={4}
         minimumZoomScale={1}
@@ -201,6 +200,8 @@ const ZoomableImage = ({ uri, isActive }) => {
 };
 
 export default function AnimalDetailsScreen({ route, navigation }) {
+  const { width } = useWindowDimensions();
+  const galleryHeight = Math.min(Math.round(width * (4 / 3)), 420);
 
   const passedAnimal = route.params?.animal || null;
   const animalId = passedAnimal?._id || passedAnimal?.id || null;
@@ -991,7 +992,7 @@ export default function AnimalDetailsScreen({ route, navigation }) {
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Image/Video Gallery Slider */}
-        <View style={styles.galleryContainer}>
+        <View style={[styles.galleryContainer, { height: galleryHeight }]}>
           <ScrollView
             horizontal
             pagingEnabled
@@ -999,15 +1000,16 @@ export default function AnimalDetailsScreen({ route, navigation }) {
             onScroll={handleScroll}
             scrollEventThrottle={16}
             ref={scrollRef}
+            style={{ width: '100%' }}
           >
             {mediaSlides.map((slide, index) => {
               if (slide.type === 'image') {
                 return (
-                  <View key={`hero-slide-${index}-${slide.uri}`} style={styles.galleryImageWrap}>
+                  <View key={`hero-slide-${index}-${slide.uri}`} style={[styles.galleryImageWrap, { width, height: galleryHeight }]}>
                     <ImageWithLoader
                       uri={slide.uri}
-                      style={styles.galleryImage}
-                      resizeMode="contain"
+                      style={[styles.galleryImage, { width, height: galleryHeight }]}
+                      resizeMode="cover"
                       onPress={() => handleOpenZoom(index, slide.uri)}
                     />
                     <TouchableOpacity
@@ -1032,11 +1034,11 @@ export default function AnimalDetailsScreen({ route, navigation }) {
                 };
                 
                 return (
-                  <View key={index} style={styles.videoSlide}>
+                  <View key={index} style={[styles.videoSlide, { width, height: galleryHeight }]}>
                     <ImageWithLoader
                       uri={slide.thumbnail || firstImage || resolveMediaUrl(null)}
-                      style={styles.galleryImage}
-                      resizeMode="contain"
+                      style={[styles.galleryImage, { width, height: galleryHeight }]}
+                      resizeMode="cover"
                       onPress={(e) => {
                         console.log('[VideoPlayer] Play button/thumbnail tapped');
                         handlePlay();
@@ -1644,21 +1646,20 @@ const styles = StyleSheet.create({
     width: '100%',
     height: GALLERY_HEIGHT,
     position: 'relative',
-    // Dark background: letterbox bars are barely noticeable and look premium (OLX / Cars24 style)
     backgroundColor: '#0F172A',
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
     overflow: 'hidden',
   },
   galleryImageWrap: {
-    width: width,
+    width: '100%',
     height: GALLERY_HEIGHT,
     position: 'relative',
     overflow: 'hidden',
     backgroundColor: '#0F172A',
   },
   galleryImage: {
-    width: width,
+    width: '100%',
     height: GALLERY_HEIGHT,
     overflow: 'hidden',
     backgroundColor: '#0F172A',
@@ -1678,7 +1679,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(241, 245, 249, 0.4)',
   },
   placeholderSlide: {
-    width: width,
+    width: '100%',
     height: GALLERY_HEIGHT,
     justifyContent: 'center',
     alignItems: 'center',
@@ -1702,7 +1703,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   videoSlide: {
-    width: width,
+    width: '100%',
     height: GALLERY_HEIGHT,
     position: 'relative',
     overflow: 'hidden',

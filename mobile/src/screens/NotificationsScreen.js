@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { StyleSheet, View, SafeAreaView, FlatList, TouchableOpacity, Alert, Modal, ActivityIndicator } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import NotificationCard from '../components/NotificationCard';
@@ -69,7 +69,12 @@ export default function NotificationsScreen({ navigation }) {
   const [isMenuVisible, setIsMenuVisible] = useState(false);
   const { t } = useTranslation();
 
+  const isFetchingRef = useRef(false);
+
   const fetchNotifications = async () => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+
     setLoading(true);
     try {
       const res = await api.getMyNotifications();
@@ -79,6 +84,7 @@ export default function NotificationsScreen({ navigation }) {
     } catch (err) {
       console.warn('Failed to load notifications:', err.message);
     } finally {
+      isFetchingRef.current = false;
       setLoading(false);
       setIsRefreshing(false);
     }
@@ -160,6 +166,14 @@ export default function NotificationsScreen({ navigation }) {
     fetchNotifications();
   };
 
+  const renderNotificationItem = useCallback(({ item }) => (
+    <NotificationCard
+      item={item}
+      onMarkAsRead={handleMarkAsRead}
+      onDelete={handleDeleteNotification}
+    />
+  ), [handleMarkAsRead, handleDeleteNotification]);
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Top Header */}
@@ -219,6 +233,10 @@ export default function NotificationsScreen({ navigation }) {
       <FlatList
         data={filteredNotifications}
         keyExtractor={(item) => item.id}
+        initialNumToRender={8}
+        maxToRenderPerBatch={8}
+        windowSize={5}
+        removeClippedSubviews={Platform.OS === 'android'}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         refreshing={isRefreshing}
@@ -244,13 +262,7 @@ export default function NotificationsScreen({ navigation }) {
             </TouchableOpacity>
           </View>
         }
-        renderItem={({ item }) => (
-          <NotificationCard
-            item={item}
-            onMarkAsRead={handleMarkAsRead}
-            onDelete={handleDeleteNotification}
-          />
-        )}
+        renderItem={renderNotificationItem}
       />
 
       {/* Options Menu Sheet Modal */}

@@ -7,7 +7,7 @@ import AppText from './AppText';
 const { width } = Dimensions.get('window');
 const SWIPE_THRESHOLD = -80; // Swipe threshold to show delete button
 
-export default function NotificationCard({ item, onMarkAsRead, onDelete }) {
+function NotificationCard({ item, onMarkAsRead, onDelete }) {
   const { t } = useTranslation();
   const translateX = useRef(new Animated.Value(0)).current;
 
@@ -245,3 +245,5 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
+
+export default React.memo(NotificationCard);

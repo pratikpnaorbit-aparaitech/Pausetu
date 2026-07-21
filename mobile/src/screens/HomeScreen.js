@@ -1,4 +1,4 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useMemo, useCallback } from 'react';
 import { StyleSheet, View, SafeAreaView, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -15,18 +15,24 @@ export default function HomeScreen() {
   const { userProfile, userToken } = useContext(AppContext);
   const { t } = useTranslation();
   const isGuest = userToken === 'guest';
-  const name = isGuest ? t('profile.guestUser') : userProfile?.name || 'User';
-  const role = isGuest ? t('profile.guestMode') : userProfile?.role || t('profile.farmer');
+  
+  const name = useMemo(() => isGuest ? t('profile.guestUser') : userProfile?.name || 'User', [isGuest, userProfile?.name, t]);
+  const role = useMemo(() => isGuest ? t('profile.guestMode') : userProfile?.role || t('profile.farmer'), [isGuest, userProfile?.role, t]);
 
-  const getInitial = (nameStr) => {
-    if (!nameStr || typeof nameStr !== 'string' || !nameStr.trim()) return '?';
-    return nameStr.trim().charAt(0).toUpperCase();
-  };
-  const userInitial = getInitial(name);
-  const profileImageUrl = (userProfile?.profilePhoto || userProfile?.photo) ? resolveMediaUrl(userProfile.profilePhoto || userProfile.photo) : null;
+  const userInitial = useMemo(() => {
+    if (!name || typeof name !== 'string' || !name.trim()) return '?';
+    return name.trim().charAt(0).toUpperCase();
+  }, [name]);
+
+  const profileImageUrl = useMemo(() => {
+    return (userProfile?.profilePhoto || userProfile?.photo) ? resolveMediaUrl(userProfile.profilePhoto || userProfile.photo) : null;
+  }, [userProfile?.profilePhoto, userProfile?.photo]);
 
   const { isPremium } = usePremium();
   const [showPremiumAdvisor, setShowPremiumAdvisor] = useState(false);
+
+  const handleOpenAdvisor = useCallback(() => setShowPremiumAdvisor(true), []);
+  const handleCloseAdvisor = useCallback(() => setShowPremiumAdvisor(false), []);
 
   return (
     <SafeAreaView style={styles.container}>

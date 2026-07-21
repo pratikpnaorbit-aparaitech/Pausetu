@@ -1,4 +1,4 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useMemo, useCallback } from 'react';
 import { StyleSheet, View, SafeAreaView, ScrollView, Image, TouchableOpacity, Alert, Modal, TextInput, ActivityIndicator, Platform, Text } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -211,21 +211,21 @@ export default function ProfileScreen({ navigation }) {
     }
   };
 
-  const getInitial = (nameStr) => {
+  const profileImageUrl = useMemo(() => {
+    return (userProfile?.profilePhoto || userProfile?.photo) ? resolveMediaUrl(userProfile.profilePhoto || userProfile.photo) : null;
+  }, [userProfile?.profilePhoto, userProfile?.photo]);
+
+  const userInitial = useMemo(() => {
+    const nameStr = userProfile?.name;
     if (!nameStr || typeof nameStr !== 'string' || !nameStr.trim()) return '?';
     return nameStr.trim().charAt(0).toUpperCase();
-  };
+  }, [userProfile?.name]);
 
-  const profileImageUrl = (userProfile?.profilePhoto || userProfile?.photo) ? resolveMediaUrl(userProfile.profilePhoto || userProfile.photo) : null;
-  console.log('[ProfileScreen] Stored Profile object:', userProfile);
-  console.log('[ProfileScreen] Final Image URI passed to Image:', profileImageUrl);
-
-  const userInitial = getInitial(userProfile?.name);
-  const displayName = userProfile?.name?.trim() ? userProfile.name : t('profile.notProvided');
-  const displayRole = userProfile?.role?.trim() ? userProfile.role : t('profile.notProvided');
-  const displayMobile = userProfile?.mobile?.trim() ? userProfile.mobile : t('profile.notProvided');
-  const displayEmail = userProfile?.email?.trim() ? userProfile.email : t('profile.notProvided');
-  const displayLocation = formatLocationDisplay(userProfile).formatted || t('profile.notConfigured');
+  const displayName = useMemo(() => userProfile?.name?.trim() ? userProfile.name : t('profile.notProvided'), [userProfile?.name, t]);
+  const displayRole = useMemo(() => userProfile?.role?.trim() ? userProfile.role : t('profile.notProvided'), [userProfile?.role, t]);
+  const displayMobile = useMemo(() => userProfile?.mobile?.trim() ? userProfile.mobile : t('profile.notProvided'), [userProfile?.mobile, t]);
+  const displayEmail = useMemo(() => userProfile?.email?.trim() ? userProfile.email : t('profile.notProvided'), [userProfile?.email, t]);
+  const displayLocation = useMemo(() => formatLocationDisplay(userProfile).formatted || t('profile.notConfigured'), [userProfile, t]);
 
   if (isProfileLoading && !userProfile) {
     return (
