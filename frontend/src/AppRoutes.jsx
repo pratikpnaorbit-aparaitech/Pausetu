@@ -4,6 +4,7 @@ import SidebarLayout from './layouts/SidebarLayout';
 import ConfirmModal from './components/ConfirmModal';
 import RejectionModal from './components/RejectionModal';
 import DetailsModal from './components/DetailsModal';
+import LoginPage from './pages/LoginPage';
 import { CheckCircle2, AlertCircle, AlertTriangle, Info, X, Search } from 'lucide-react';
 
 // Lazy Load Pages
@@ -108,6 +109,8 @@ function Toast({ toast, onDismiss }) {
 
 export default function AppRoutes() {
   const {
+    isAdminLoggedIn,
+    isAuthReady,
     currentView,
     toasts,
     confirmModal,
@@ -171,6 +174,20 @@ export default function AppRoutes() {
       default:                  return <DashboardPage />;
     }
   };
+
+  // Auth readiness gate
+  if (!isAuthReady) {
+    return (
+      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#0f172a' }}>
+        <PageSkeleton />
+      </div>
+    );
+  }
+
+  // Protected Routes Check
+  if (!isAdminLoggedIn) {
+    return <LoginPage />;
+  }
 
   return (
     <SidebarLayout>

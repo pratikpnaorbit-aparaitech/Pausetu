@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const Otp = require('../models/Otp');
 const asyncHandler = require('../utils/asyncHandler');
@@ -84,29 +85,6 @@ exports.verifyOtp = asyncHandler(async (req, res, next) => {
   }
   email = email.trim().toLowerCase();
   otp = otp.trim();
-
-  // Special admin local dev auto-login bypass
-  if (email === 'admin@pashusetu.com' && otp === '123456') {
-    let user = await User.findOne({ email });
-    if (!user) {
-      user = await User.create({
-        email,
-        name: 'Admin Nilesh',
-        role: 'admin'
-      });
-    }
-    const accessToken = generateToken({ id: user._id, role: user.role });
-    const refreshToken = generateRefreshToken({ id: user._id });
-    return res.status(200).json({
-      status: 'success',
-      message: 'Logged in successfully',
-      data: {
-        user,
-        accessToken,
-        refreshToken
-      }
-    });
-  }
 
   // 2. Fetch the latest OTP record for this email
   const otpRecord = await Otp.findOne({ email }).sort({ createdAt: -1 });
@@ -195,4 +173,77 @@ exports.getMe = asyncHandler(async (req, res, next) => {
     }
   });
 });
+
+/**
+ * Admin Login - POST /api/auth/admin-login
+ */
+exports.adminLogin = asyncHandler(async (req, res, next) => {
+  let { email, password } = req.body;
+
+  if (!email || !password) {
+    return next(new AppError('Please provide email and password', 400));
+  }
+  email = email.trim().toLowerCase();
+
+  if (!isValidEmail(email)) {
+    return next(new AppError('Please provide a valid email address', 400));
+  }
+
+  // Fetch admin user including password hash
+  let user = await User.findOne({ email }).select('+password');
+
+  // Seed system admin account if admin@pashusetu.com does not exist
+  if (!user && email === 'admin@pashusetu.com') {
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash('admin123', salt);
+    user = await User.create({
+      email,
+      password: hashedPassword,
+      name: 'Admin Nilesh',
+      role: 'admin'
+    });
+    user = await User.findOne({ email }).select('+password');
+  }
+
+  if (!user) {
+    return next(new AppError('Invalid email or password', 401));
+  }
+
+  if (user.role !== 'admin') {
+    return next(new AppError('Access denied. Administrator privileges required.', 403));
+  }
+
+  // Ensure user has a hashed password
+  if (!user.password) {
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash('admin123', salt);
+    await user.save();
+  }
+
+  // Compare submitted password against stored bcrypt hash
+  const isMatch = await bcrypt.compare(password, user.password);
+  if (!isMatch) {
+    return next(new AppError('Invalid email or password', 401));
+  }
+
+  // Generate tokens ONLY after successful password verification
+  const accessToken = generateToken({ id: user._id, role: user.role });
+  const refreshToken = generateRefreshToken({ id: user._id });
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Admin logged in successfully',
+    data: {
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      },
+      accessToken,
+      refreshToken
+    }
+  });
+});
+
 
