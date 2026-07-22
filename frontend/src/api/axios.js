@@ -1,6 +1,7 @@
 import axios from "axios";
 
-const API_BASE_URL =
+// Export API_BASE_URL so other files can import it
+export const API_BASE_URL =
   window.location.hostname === "localhost"
     ? "http://localhost:5000/api"
     : "https://pausetu.onrender.com/api";
@@ -13,14 +14,21 @@ const instance = axios.create({
   },
 });
 
-instance.interceptors.request.use((config) => {
-  const token = localStorage.getItem("pashusetu_admin_token");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+// Attach JWT token automatically
+instance.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("pashusetu_admin_token");
 
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Handle responses
 instance.interceptors.response.use(
   (response) => response.data,
   (error) => {
