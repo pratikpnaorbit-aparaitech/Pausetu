@@ -85,6 +85,14 @@ app.use('/api/premium', premiumRoutes);
 app.use('/api/complaints', complaintRoutes);
 app.use('/api', masterRoutes);
 
+app.get('/', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'PashuSetu Backend API is running 🚀',
+    health: '/api/health'
+  });
+});
+
 // Fallback for unhandled routes
 app.all('*', (req, res, next) => {
   next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
