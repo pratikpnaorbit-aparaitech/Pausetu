@@ -38,7 +38,7 @@ export default function SidebarLayout({ children }) {
     pendingVerificationCount,
     dashboardStats,
     adminDetails,
-    setIsAdminLoggedIn,
+    logoutAdmin,
     triggerConfirm,
     globalSearchQuery,
     setGlobalSearchQuery,
@@ -178,7 +178,7 @@ export default function SidebarLayout({ children }) {
 
           {/* Sign out */}
           <button
-            onClick={() => triggerConfirm('Logout', null, 'End your active administration session?', () => setIsAdminLoggedIn(false))}
+            onClick={() => triggerConfirm('Logout', null, 'End your active administration session?', () => logoutAdmin())}
             className="sidebar-signout-btn"
             aria-label="Sign out session"
           >

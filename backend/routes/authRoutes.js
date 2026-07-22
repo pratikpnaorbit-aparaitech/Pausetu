@@ -19,6 +19,7 @@ const otpLimiter = rateLimit({
 
 router.post('/send-otp', otpLimiter, authController.sendOtp);
 router.post('/verify-otp', authController.verifyOtp);
+router.post('/admin-login', authController.adminLogin);
 router.get('/me', protect, authController.getMe);
 
 module.exports = router;

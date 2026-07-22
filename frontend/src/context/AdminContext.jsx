@@ -45,7 +45,7 @@ const INITIAL_WIDGETS = [
 
 export const AdminProvider = ({ children }) => {
   const [currentView, setCurrentView] = useState('Dashboard');
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(true);
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
 
   // Auth readiness gate — prevents API calls before token is secured
   const [isAuthReady, setIsAuthReady] = useState(false);
@@ -107,50 +107,62 @@ export const AdminProvider = ({ children }) => {
     const existingToken = localStorage.getItem('pashusetu_admin_token');
 
     if (existingToken) {
-      // Decode the JWT exp claim locally — no network call required.
-      // JWT structure: header.payload.signature — all base64url encoded.
       try {
         const payloadBase64 = existingToken.split('.')[1];
-        // base64url → base64 padding
         const padded = payloadBase64.replace(/-/g, '+').replace(/_/g, '/')
           + '=='.slice(0, (4 - payloadBase64.length % 4) % 4);
         const payload = JSON.parse(atob(padded));
         const nowSeconds = Math.floor(Date.now() / 1000);
-        const safetyMarginSeconds = 60; // Re-auth 60s before actual expiry
+        const safetyMarginSeconds = 60; // 60s safety window
 
         if (payload.exp && payload.exp > nowSeconds + safetyMarginSeconds) {
-          // Token is valid and not expiring soon — fast path.
-          return;
+          setIsAdminLoggedIn(true);
+          return true;
         }
-        // Token is expired or expiring within 60s — fall through to slow path.
         localStorage.removeItem('pashusetu_admin_token');
       } catch {
-        // Could not decode — treat as invalid and fall through.
         localStorage.removeItem('pashusetu_admin_token');
       }
     }
 
-    // Slow path: exchange the admin bypass OTP to acquire a fresh token.
+    setIsAdminLoggedIn(false);
+    return false;
+  }, []);
+
+  const loginAdmin = useCallback(async (email, password, rememberMe = true) => {
     let authRes;
     try {
-      authRes = await axios.post('/auth/verify-otp', {
-        email: 'admin@pashusetu.com',
-        otp: '123456'
-      });
-    } catch (networkErr) {
-      throw new Error(
-        `Admin authentication failed: ${networkErr.message || 'Could not reach auth server.'}`
-      );
+      authRes = await axios.post('/auth/admin-login', { email, password });
+    } catch (err) {
+      throw new Error(err.response?.data?.message || err.message || 'Invalid email or password.');
     }
 
     const token = authRes?.accessToken || authRes?.data?.accessToken;
     if (!token) {
-      throw new Error(
-        'Admin authentication failed: server responded but returned no access token.'
-      );
+      throw new Error('Authentication failed: no access token returned by server.');
     }
 
     localStorage.setItem('pashusetu_admin_token', token);
+    setIsAdminLoggedIn(true);
+    setIsAuthReady(true);
+
+    if (authRes?.data?.user) {
+      setAdminDetails((prev) => ({
+        ...prev,
+        name: authRes.data.user.name || prev.name,
+        email: authRes.data.user.email || prev.email,
+        role: authRes.data.user.role === 'admin' ? 'Super Admin' : prev.role
+      }));
+    }
+
+    return authRes;
+  }, []);
+
+  const logoutAdmin = useCallback(() => {
+    localStorage.removeItem('pashusetu_admin_token');
+    sessionStorage.clear();
+    setIsAdminLoggedIn(false);
+    setConfirmModal({ visible: false, type: '', data: null, message: '', action: null });
   }, []);
 
   /**
@@ -333,20 +345,19 @@ export const AdminProvider = ({ children }) => {
     (async () => {
       try {
         await ensureAdminAuth();
-        setIsAuthReady(true);
       } catch (authErr) {
-        // Auth failed on cold start — surface error and do NOT load data.
         setApiError(authErr.message);
-        setIsLoading(false);
+      } finally {
+        setIsAuthReady(true);
       }
     })();
   }, [ensureAdminAuth]);
 
   useEffect(() => {
-    if (isAuthReady) {
+    if (isAuthReady && isAdminLoggedIn) {
       loadDashboardData();
     }
-  }, [isAuthReady, loadDashboardData]);
+  }, [isAuthReady, isAdminLoggedIn, loadDashboardData]);
 
 
 
@@ -532,6 +543,8 @@ export const AdminProvider = ({ children }) => {
         setCurrentView,
         isAdminLoggedIn,
         setIsAdminLoggedIn,
+        loginAdmin,
+        logoutAdmin,
         isAuthReady,
         animals,
         setAnimals,
