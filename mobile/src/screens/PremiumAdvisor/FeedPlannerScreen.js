@@ -2,8 +2,10 @@
 // Premium WhatsApp-style Guided Feed Planner Chatbot for Maharashtra dairy farmers.
 
 import React, { useState, useEffect, useRef, useContext } from 'react';
-import { StyleSheet, View, SafeAreaView, TouchableOpacity, ScrollView, FlatList, ActivityIndicator, Alert, Platform } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { StyleSheet, View, TouchableOpacity, ScrollView, FlatList, ActivityIndicator, Alert, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import CustomHeader from '../../components/CustomHeader';
 import { useTranslation } from 'react-i18next';
 import AppText from '../../components/AppText';
 import { usePremium } from '../../hooks/usePremium';
@@ -62,7 +64,7 @@ const QUESTIONS = [
   }
 ];
 
-function FeedPlannerChatAssistant({ onRestart }) {
+function FeedPlannerChatAssistant({ onRestart, onClose }) {
   const { t } = useTranslation();
   const { userProfile } = useContext(AppContext);
   const { unlockLifetimeFeedPlanner } = usePremium();
@@ -221,38 +223,55 @@ function FeedPlannerChatAssistant({ onRestart }) {
   const options = (currentQuestionIndex < QUESTIONS.length && !analyzing && !isComplete) ? activeQ.getOptions(answers) : [];
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header with Enterprise Status Badge */}
-      <View style={styles.header}>
-        <View style={styles.avatarContainer}>
-          <View style={styles.avatar}>
-            <MaterialCommunityIcons name="sprout" size={22} color="#FFFFFF" />
+    <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
+      {/* Header with Enterprise Status Badge using CustomHeader */}
+      <CustomHeader
+        title={t('feedPlanner.title')}
+        subtitle={isTyping || analyzing ? t('common.loading') : t('common.online')}
+        leftComponent={
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            {onClose ? (
+              <TouchableOpacity style={{ marginRight: 8, padding: 4 }} onPress={onClose} activeOpacity={0.7}>
+                <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+              </TouchableOpacity>
+            ) : null}
+            <View style={styles.avatarContainer}>
+              <View style={styles.avatar}>
+                <MaterialCommunityIcons name="sprout" size={22} color="#FFFFFF" />
+              </View>
+              <View style={styles.onlineDot} />
+            </View>
           </View>
-          <View style={styles.onlineDot} />
-        </View>
-        <View style={styles.headerInfo}>
-          <AppText style={styles.headerTitle} numberOfLines={1}>{t('feedPlanner.title')}</AppText>
-          <AppText style={styles.headerSubtitle}>
-            {isTyping || analyzing ? t('common.loading') : t('common.online')}
-          </AppText>
-        </View>
+        }
+        rightComponent={
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={[styles.headerStatusPill, hasAccess ? styles.pillUnlocked : styles.pillLocked]}>
+              <MaterialCommunityIcons
+                name={hasAccess ? 'lock-open-variant' : 'lock'}
+                size={11}
+                color={hasAccess ? '#059669' : '#DC2626'}
+                style={{ marginRight: 3 }}
+              />
+              <AppText style={[styles.headerStatusPillText, { color: hasAccess ? '#059669' : '#DC2626' }]}>
+                {hasAccess ? t('common.available', { defaultValue: 'Available' }) : t('common.premium', { defaultValue: 'Premium' })}
+              </AppText>
+            </View>
 
-        <View style={[styles.headerStatusPill, hasAccess ? styles.pillUnlocked : styles.pillLocked]}>
-          <MaterialCommunityIcons
-            name={hasAccess ? 'lock-open-variant' : 'lock'}
-            size={11}
-            color={hasAccess ? '#059669' : '#DC2626'}
-            style={{ marginRight: 3 }}
-          />
-          <AppText style={[styles.headerStatusPillText, { color: hasAccess ? '#059669' : '#DC2626' }]}>
-            {hasAccess ? t('common.available', { defaultValue: 'Available' }) : t('common.premium', { defaultValue: 'Premium' })}
-          </AppText>
-        </View>
-
-        <TouchableOpacity style={styles.restartBtn} onPress={handlePressRestart} aria-label="Restart feed planner">
-          <MaterialCommunityIcons name="refresh" size={20} color="#FFFFFF" />
-        </TouchableOpacity>
-      </View>
+            <TouchableOpacity style={styles.restartBtn} onPress={handlePressRestart} aria-label="Restart feed planner">
+              <MaterialCommunityIcons name="refresh" size={20} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+        }
+        centered={false}
+        backgroundColor="#16A34A"
+        textColor="#FFFFFF"
+        iconColor="#FFFFFF"
+        showBorder={false}
+        safeArea={true}
+        style={{
+          height: 64, // Chat-specific taller header height
+        }}
+      />
 
       <View style={styles.progressContainer}>
         <AppText style={styles.progressText}>
@@ -402,18 +421,7 @@ export default function FeedPlannerScreen({ onClose }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#E5DDD5' },
-  header: {
-    height: 64,
-    backgroundColor: '#16A34A',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-  },
+
   avatarContainer: { position: 'relative', marginRight: 10 },
   avatar: {
     width: 38,
@@ -434,9 +442,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#16A34A',
   },
-  headerInfo: { flex: 1 },
-  headerTitle: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
-  headerSubtitle: { fontSize: 11, color: 'rgba(255,255,255,0.85)', marginTop: 1 },
+
   restartBtn: {
     width: 36,
     height: 36,

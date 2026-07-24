@@ -1,5 +1,5 @@
 import React, { useState, useContext, useRef, useEffect } from 'react';
-import { StyleSheet, View, TouchableOpacity, Modal, Animated, Easing, TouchableWithoutFeedback, Platform } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, Modal, Animated, Easing, Pressable, Platform } from 'react-native';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { AppContext } from '../context/AppContext';
 import AppText from './AppText';
@@ -57,9 +57,9 @@ export default function LanguageSelector({ style }) {
         animationType="fade"
         onRequestClose={() => setIsOpen(false)}
       >
-        <TouchableWithoutFeedback onPress={() => setIsOpen(false)}>
+        <Pressable onPress={() => setIsOpen(false)}>
           <View style={styles.modalOverlay}>
-            <TouchableWithoutFeedback>
+            <Pressable>
               <Animated.View style={[
                 styles.dropdownMenu,
                 {
@@ -92,9 +92,9 @@ export default function LanguageSelector({ style }) {
                   );
                 })}
               </Animated.View>
-            </TouchableWithoutFeedback>
+            </Pressable>
           </View>
-        </TouchableWithoutFeedback>
+        </Pressable>
       </Modal>
     </View>
   );
@@ -141,11 +141,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     width: 140,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 8,
+      },
+      web: {
+        boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)',
+      }
+    }),
     borderWidth: 1,
     borderColor: '#F1F5F9',
     overflow: 'hidden',

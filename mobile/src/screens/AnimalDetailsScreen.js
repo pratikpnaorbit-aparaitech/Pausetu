@@ -2,7 +2,8 @@
 // Redesigned premium livestock details page with dynamic zoom views, spec cards, maps trackers, and call CTAs.
 
 import React, { useState, useRef, useCallback, useEffect, useContext, useMemo } from 'react';
-import { StyleSheet, View, ScrollView, Image, TouchableOpacity, Dimensions, useWindowDimensions, Modal, Share, FlatList, SafeAreaView, ActivityIndicator, Linking, Alert, Platform, TextInput, Animated, PanResponder } from 'react-native';
+import { StyleSheet, View, ScrollView, Image, TouchableOpacity, Dimensions, useWindowDimensions, Modal, Share, FlatList, ActivityIndicator, Linking, Alert, Platform, TextInput, Animated, PanResponder } from 'react-native';
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import SectionHeader from '../components/SectionHeader';
@@ -193,6 +194,7 @@ const ZoomableImage = ({ uri, isActive }) => {
 };
 
 export default function AnimalDetailsScreen({ route, navigation }) {
+  const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const galleryHeight = Math.min(Math.round(width * (4 / 3)), 420);
 
@@ -650,9 +652,9 @@ export default function AnimalDetailsScreen({ route, navigation }) {
       Alert.alert(t('animalDetails.phoneNotAvailable'), t('animalDetails.phoneNotAvailableMsg'));
       return;
     }
-    const cleaned = phone.replace(/[^0-9]/g, '');
+    const cleaned = String(phone).replace(/[^0-9]/g, '');
     const withCountry = cleaned.startsWith('91') ? cleaned : `91${cleaned}`;
-    const cleanPrice = animal.price ? animal.price.replace(/[^0-9,]/g, '') : '';
+    const cleanPrice = animal.price ? String(animal.price).replace(/[^0-9,]/g, '') : '';
     const messageText = t('animalDetails.whatsappShareMessage', {
       animalName: animal.name,
       breed: animal.breed,
@@ -832,7 +834,11 @@ export default function AnimalDetailsScreen({ route, navigation }) {
     }
   };
 
-  const numericPrice = Number(animal.price?.replace(/[^0-9]/g, '') || 65000);
+  console.log('[AnimalDetailsScreen] typeof animal?.price:', typeof animal?.price, 'Value:', animal?.price);
+
+  const numericPrice = typeof animal?.price === 'number'
+    ? (isNaN(animal.price) ? 65000 : animal.price)
+    : Number(String(animal?.price || '').replace(/[^0-9]/g, '') || 65000);
   const aiEstPrice = Math.round(numericPrice * 1.07);
   const priceDiff = aiEstPrice - numericPrice;
   const isGoodDeal = priceDiff > 0;
@@ -860,18 +866,18 @@ export default function AnimalDetailsScreen({ route, navigation }) {
 
   const getFormattedColor = (colorVal) => {
     if (!colorVal) return '--';
-    const normalized = colorVal.trim().toLowerCase();
+    const normalized = String(colorVal).trim().toLowerCase();
     const translationKey = `animalDetails.color_${normalized}`;
     const translated = t(translationKey);
     if (translated === translationKey) {
-      return colorVal.charAt(0).toUpperCase() + colorVal.slice(1);
+      return String(colorVal).charAt(0).toUpperCase() + String(colorVal).slice(1);
     }
     return translated;
   };
 
   const getFormattedGender = (genderVal) => {
     if (!genderVal) return t('animalDetails.female');
-    const normalized = genderVal.trim().toLowerCase();
+    const normalized = String(genderVal).trim().toLowerCase();
     return t(`animalDetails.${normalized}`, { defaultValue: genderVal });
   };
 
@@ -948,7 +954,7 @@ export default function AnimalDetailsScreen({ route, navigation }) {
   return (
     <View style={styles.container}>
       {/* Absolute Transparent Header Overlay */}
-      <View style={styles.absoluteHeader}>
+      <View style={[styles.absoluteHeader, { top: (insets?.top || 0) + 8 }]}>
         <TouchableOpacity style={styles.headerCircleButton} onPress={() => navigation.goBack()} activeOpacity={0.7}>
           <Ionicons name="arrow-back" size={22} color="#0F172A" />
         </TouchableOpacity>

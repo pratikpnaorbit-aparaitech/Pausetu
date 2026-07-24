@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { StyleSheet, View, SafeAreaView, FlatList, TouchableOpacity, ScrollView } from 'react-native';
+import { StyleSheet, View, FlatList, TouchableOpacity, ScrollView } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import AppText from '../../components/AppText';

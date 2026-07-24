@@ -17,12 +17,24 @@ const notificationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['info', 'alert', 'success', 'chat'],
+      enum: ['info', 'alert', 'success', 'chat', 'warning', 'error'],
       default: 'info'
     },
     isRead: {
       type: Boolean,
       default: false
+    },
+    relatedId: {
+      type: String,
+      default: null
+    },
+    targetScreen: {
+      type: String,
+      default: null
+    },
+    metadata: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {}
     }
   },
   {

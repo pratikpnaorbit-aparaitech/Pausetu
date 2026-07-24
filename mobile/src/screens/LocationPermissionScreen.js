@@ -1,5 +1,6 @@
 import React, { useContext } from 'react';
-import { StyleSheet, View, TouchableOpacity, SafeAreaView } from 'react-native';
+import { StyleSheet, View, TouchableOpacity} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { AppContext } from '../context/AppContext';
 import { useTranslation } from 'react-i18next';

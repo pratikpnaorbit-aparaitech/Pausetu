@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, TouchableOpacity, ScrollView, SafeAreaView, ActivityIndicator, Alert } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import AppText from '../../components/AppText';
+import CustomHeader from '../../components/CustomHeader';
 import { PLANS, PAYMENT_PROVIDERS } from '../../constants/premiumConstants';
 import { usePremium } from '../../hooks/usePremium';
 
@@ -43,14 +45,10 @@ export default function PremiumAdvisorPaymentScreen({ onPaymentSuccess, onBack }
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={onBack}>
-          <Ionicons name="arrow-back" size={24} color="#0F172A" />
-        </TouchableOpacity>
-        <AppText style={styles.headerTitle}>
-          {t('premiumAdvisor.paymentScreen.title')}
-        </AppText>
-      </View>
+            <CustomHeader
+        title={t('premiumAdvisor.paymentScreen.title')}
+        onBackPress={onBack}
+      />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <AppText style={styles.subtitle}>

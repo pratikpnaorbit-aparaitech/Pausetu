@@ -1,11 +1,14 @@
-import React, { useState, useEffect, useContext, useMemo, useRef } from 'react';
-import { StyleSheet, View, SafeAreaView, FlatList, TouchableOpacity, Image, Modal, Share, Alert, ActivityIndicator, TextInput } from 'react-native';
+import React, { useState, useEffect, useContext, useMemo, useRef, useCallback } from 'react';
+import { StyleSheet, View, FlatList, TouchableOpacity, Image, Modal, Share, Alert, ActivityIndicator, TextInput, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppContext } from '../context/AppContext';
 import { animalApi } from '../api/animalApi';
 import { resolveMediaUrl } from '../api/api';
 import { useTranslation } from 'react-i18next';
 import AppText from '../components/AppText';
+import CustomHeader from '../components/CustomHeader';
 import { useAutoRefresh } from '../hooks/useAutoRefresh';
 import { REFRESH_EVENTS } from '../services/refreshManager';
 
@@ -172,38 +175,6 @@ export default function MyListingsScreen({ navigation }) {
     );
   };
 
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <AppText style={styles.headerTitle}>{t('myListings.title')}</AppText>
-        </View>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color="#16A34A" />
-          <AppText style={{ marginTop: 12, color: '#64748B' }}>{t('myListings.loading')}</AppText>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (error) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <AppText style={styles.headerTitle}>{t('myListings.title')}</AppText>
-        </View>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
-          <Ionicons name="cloud-offline-outline" size={48} color="#EF4444" />
-          <AppText style={{ fontSize: 16, fontWeight: '700', marginTop: 16 }}>{t('myListings.connectionFailed')}</AppText>
-          <AppText style={{ textAlign: 'center', color: '#64748B', marginTop: 8, marginBottom: 20 }}>{error}</AppText>
-          <TouchableOpacity style={styles.addAnimalBtn} onPress={fetchMyListings}>
-            <AppText style={styles.addAnimalBtnText}>{t('myListings.retryConnection')}</AppText>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
   const renderMyListingItem = useCallback(({ item }) => {
     const mainImage = resolveMediaUrl(item.photos && item.photos.length > 0 ? item.photos[0] : null);
 
@@ -266,40 +237,72 @@ export default function MyListingsScreen({ navigation }) {
     );
   }, [t]);
 
-  return (
-    <SafeAreaView style={styles.container}>
-
-      {/* Top Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.headerBackBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={22} color="#0F172A" />
-        </TouchableOpacity>
-
-        {isSearchActive ? (
-          <TextInput
-            style={styles.searchInput}
-            placeholder={t('myListings.searchPlaceholder')}
-            placeholderTextColor="#94A3B8"
-            autoFocus={true}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-        ) : (
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
           <AppText style={styles.headerTitle}>{t('myListings.title')}</AppText>
-        )}
+        </View>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color="#16A34A" />
+          <AppText style={{ marginTop: 12, color: '#64748B' }}>{t('myListings.loading')}</AppText>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
-        <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={styles.headerActionBtn}
-            onPress={() => {
-              setIsSearchActive(!isSearchActive);
-              if (isSearchActive) setSearchQuery('');
-            }}
-          >
-            <Ionicons name={isSearchActive ? "close" : "search-outline"} size={22} color="#0F172A" />
+  if (error) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <AppText style={styles.headerTitle}>{t('myListings.title')}</AppText>
+        </View>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+          <Ionicons name="cloud-offline-outline" size={48} color="#EF4444" />
+          <AppText style={{ fontSize: 16, fontWeight: '700', marginTop: 16 }}>{t('myListings.connectionFailed')}</AppText>
+          <AppText style={{ textAlign: 'center', color: '#64748B', marginTop: 8, marginBottom: 20 }}>{error}</AppText>
+          <TouchableOpacity style={styles.addAnimalBtn} onPress={fetchMyListings}>
+            <AppText style={styles.addAnimalBtnText}>{t('myListings.retryConnection')}</AppText>
           </TouchableOpacity>
         </View>
-      </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.container}>
+      {/* Top Header */}
+      <CustomHeader
+        title={
+          isSearchActive ? (
+            <TextInput
+              style={styles.searchInput}
+              placeholder={t('myListings.searchPlaceholder')}
+              placeholderTextColor="#94A3B8"
+              autoFocus={true}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+          ) : (
+            t('myListings.title')
+          )
+        }
+        onBackPress={() => navigation.goBack()}
+        centered={false}
+        rightComponent={
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={styles.headerActionBtn}
+              onPress={() => {
+                setIsSearchActive(!isSearchActive);
+                if (isSearchActive) setSearchQuery('');
+              }}
+            >
+              <Ionicons name={isSearchActive ? "close" : "search-outline"} size={22} color="#0F172A" />
+            </TouchableOpacity>
+          </View>
+        }
+      />
 
       {/* Tabs Row */}
       <View style={styles.tabsContainer}>
@@ -323,7 +326,7 @@ export default function MyListingsScreen({ navigation }) {
         initialNumToRender={6}
         maxToRenderPerBatch={6}
         windowSize={5}
-        removeClippedSubviews={Platform.OS === 'android'}
+        removeClippedSubviews={false}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={

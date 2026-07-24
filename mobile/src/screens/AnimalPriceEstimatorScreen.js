@@ -7,6 +7,7 @@ import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { AppContext } from '../context/AppContext';
 import AppText from '../components/AppText';
+import CustomHeader from '../components/CustomHeader';
 import PriceCard from '../components/PriceCard';
 import ConfidenceMeter from '../components/ConfidenceMeter';
 import MarketTrendCard from '../components/MarketTrendCard';
@@ -111,17 +112,28 @@ export default function AnimalPriceEstimatorScreen() {
   };
 
   const renderHeader = () => (
-    <LinearGradient colors={['#16A34A', '#15803D']} style={styles.headerGradient}>
-      <View style={styles.headerContent}>
-        <View style={styles.headerTextWrap}>
-          <AppText style={styles.headerTitle}>{t('estimator.title', { defaultValue: 'किंमत अंदाजक' })}</AppText>
-          <AppText style={styles.headerSubtitle}>{t('estimator.subtitle', { defaultValue: 'AI द्वारे अचूक मूल्यांकन' })}</AppText>
-        </View>
+    <CustomHeader
+      title={t('estimator.title', { defaultValue: 'किंमत अंदाजक' })}
+      subtitle={t('estimator.subtitle', { defaultValue: 'AI द्वारे अचूक मूल्यांकन' })}
+      rightComponent={
         <TouchableOpacity style={styles.refreshBtn} onPress={handleReset} activeOpacity={0.7}>
           <Ionicons name="refresh" size={24} color="#FFFFFF" />
         </TouchableOpacity>
-      </View>
-    </LinearGradient>
+      }
+      centered={false}
+      gradientColors={['#16A34A', '#15803D']}
+      textColor="#FFFFFF"
+      iconColor="#FFFFFF"
+      showBorder={false}
+      safeArea={true}
+      titleStyle={{ fontSize: 22, fontWeight: '800' }}
+      subtitleStyle={{ fontSize: 14, fontWeight: '600', color: '#DCFCE7', marginTop: 4 }}
+      style={{
+        borderBottomLeftRadius: 30,
+        borderBottomRightRadius: 30,
+        marginBottom: 8,
+      }}
+    />
   );
 
   const renderQuestionBubble = (text) => (
@@ -384,38 +396,6 @@ const styles = StyleSheet.create({
   },
   
   // Header Styles
-  headerGradient: {
-    paddingTop: Platform.OS === 'ios' ? 50 : 40,
-    paddingBottom: 20,
-    paddingHorizontal: 24,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
-    shadowColor: '#16A34A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-    marginBottom: 8,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTextWrap: {
-    flex: 1,
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#DCFCE7',
-    marginTop: 4,
-  },
   refreshBtn: {
     width: 44,
     height: 44,

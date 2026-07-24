@@ -2,7 +2,8 @@
 // Beautiful premium unlock screen for the ₹1 Market Price AI Valuation.
 
 import React from 'react';
-import { StyleSheet, View, TouchableOpacity, ScrollView, SafeAreaView } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, ScrollView} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';

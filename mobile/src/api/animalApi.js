@@ -35,6 +35,7 @@ export const animalApi = {
       headers: {
         'Content-Type': 'multipart/form-data'
       },
+      timeout: 120000, // 2 minutes timeout for large media files
       onUploadProgress: (progressEvent) => {
         if (onProgress && progressEvent.total) {
           const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);

@@ -1,5 +1,5 @@
 import React, { useContext, useState, useMemo } from 'react';
-import { View, StyleSheet, TouchableOpacity, Image, Share, Linking, Alert } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Image, Share, Linking, Alert, Platform } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { resolveMediaUrl } from '../api/api';
 import { useTranslation } from 'react-i18next';
@@ -20,7 +20,7 @@ function ListingCard({ item, onViewDetailsPress, style }) {
   const isWishlisted = favorites ? favorites.includes(normalizedItemId) : false;
   
   const [imageError, setImageError] = useState(false);
-  const fallbackUrl = 'https://images.unsplash.com/photo-1546445317-29f4545e6d52?auto=format&fit=crop&w=300&q=80';
+  const fallbackUrl = 'https://images.unsplash.com/photo-1570042225831-d98fa7577f1e?auto=format&fit=crop&w=300&q=80';
   const resolvedUrl = resolveMediaUrl(item.photos && item.photos.length > 0 ? item.photos[0] : null);
   const imageUrl = imageError ? fallbackUrl : resolvedUrl;
 
@@ -130,6 +130,7 @@ function ListingCard({ item, onViewDetailsPress, style }) {
       style={[styles.card, style]} 
       onPress={onViewDetailsPress}
       activeOpacity={0.95}
+      onLayout={(e) => console.log('[ListingCard Layout] Card ID:', normalizedItemId, e.nativeEvent.layout)}
     >
       {/* 1. Animal Image */}
       <View style={styles.imageContainer}>
@@ -356,11 +357,20 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 20,
     overflow: 'hidden',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.05,
-    shadowRadius: 16,
-    elevation: 3,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.05,
+        shadowRadius: 16,
+      },
+      android: {
+        elevation: 3,
+      },
+      web: {
+        boxShadow: '0px 8px 16px rgba(15, 23, 42, 0.05)',
+      }
+    }),
   },
   imageContainer: {
     width: '100%',
@@ -423,11 +433,20 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+      web: {
+        boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
+      }
+    }),
   },
   cardDetails: {
     padding: 16,

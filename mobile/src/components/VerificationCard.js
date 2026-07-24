@@ -7,10 +7,10 @@ import {
   Linking,
   Modal,
   ActivityIndicator,
-  SafeAreaView,
   Animated,
   Platform
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { AppContext } from '../context/AppContext';

@@ -51,9 +51,16 @@ const animalSchema = new mongoose.Schema(
         }
       ]
     },
+    photoPublicIds: {
+      type: [String],
+      default: []
+    },
     video: {
       type: String,
       required: [true, 'Please upload a live video of the animal']
+    },
+    videoPublicId: {
+      type: String
     },
     gender: {
       type: String,

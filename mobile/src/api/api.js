@@ -3,7 +3,10 @@ import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
-export const API_BASE_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5000/api' : 'http://localhost:5000/api';
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 
+  (__DEV__ 
+    ? (Platform.OS === 'android' ? 'http://10.0.2.2:5000/api' : 'http://localhost:5000/api') 
+    : 'https://pausetu.onrender.com/api');
 
 const instance = axios.create({
   baseURL: API_BASE_URL,
@@ -211,7 +214,7 @@ export const api = {
 };
 
 export const resolveMediaUrl = (photo) => {
-  if (!photo) return 'https://images.unsplash.com/photo-1546445317-29f4545e6d52?auto=format&fit=crop&w=300&q=80';
+  if (!photo) return 'https://images.unsplash.com/photo-1570042225831-d98fa7577f1e?auto=format&fit=crop&w=300&q=80';
   
   let targetUrl = '';
   if (typeof photo === 'string') {
@@ -220,7 +223,7 @@ export const resolveMediaUrl = (photo) => {
     targetUrl = (photo.fileUrl || photo.url || photo.uri || photo.path || '').trim();
   }
   
-  if (!targetUrl || targetUrl === 'null' || targetUrl === 'undefined') return 'https://images.unsplash.com/photo-1546445317-29f4545e6d52?auto=format&fit=crop&w=300&q=80';
+  if (!targetUrl || targetUrl === 'null' || targetUrl === 'undefined') return 'https://images.unsplash.com/photo-1570042225831-d98fa7577f1e?auto=format&fit=crop&w=300&q=80';
   if (targetUrl.startsWith('http')) return targetUrl;
   
   const pathPart = targetUrl.startsWith('/') ? targetUrl : `/${targetUrl}`;

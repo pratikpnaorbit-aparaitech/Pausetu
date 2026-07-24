@@ -1,5 +1,6 @@
 import React, { useContext, useState, useCallback, useEffect, useRef } from 'react';
-import { StyleSheet, View, SafeAreaView, TouchableOpacity, TextInput, FlatList, Image, ActivityIndicator, Alert, Animated, Dimensions, Platform } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, TextInput, FlatList, Image, ActivityIndicator, Alert, Animated, Dimensions, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { AppContext } from '../context/AppContext';
@@ -205,7 +206,10 @@ const ListHeader = React.memo(({
       </TouchableOpacity>
 
       {/* Search Bar (Full Width) */}
-      <View style={styles.searchSection}>
+      <View 
+        style={styles.searchSection}
+        onLayout={(e) => console.log('[BuyScreen Layout] Search:', e.nativeEvent.layout)}
+      >
         <View style={styles.searchBarContainer}>
           <Ionicons name="search" size={18} color="#64748B" style={styles.searchIcon} />
           <TextInput
@@ -223,7 +227,10 @@ const ListHeader = React.memo(({
       <FilterCardEntry onFilterPress={onFilterPress} filterCount={filterCount} />
 
       {/* Browse Categories Section */}
-      <View style={styles.categoriesSection}>
+      <View 
+        style={styles.categoriesSection}
+        onLayout={(e) => console.log('[BuyScreen Layout] Categories:', e.nativeEvent.layout)}
+      >
         <AppText style={styles.categoriesTitle}>{t('buy.browseCategories')}</AppText>
         <FlatList
           ref={flatListRef}
@@ -232,6 +239,7 @@ const ListHeader = React.memo(({
           data={CATEGORIES}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.categoriesList}
+          style={styles.categoriesFlatList}
           getItemLayout={(data, index) => (
             { length: 98, offset: 98 * index, index }
           )}
@@ -501,6 +509,11 @@ export default function BuyScreen({ navigation }) {
     return list;
   }, [animalsList, selectedCategory, activeFilters, searchText]);
 
+  const renderCountRef = useRef(0);
+  renderCountRef.current += 1;
+  console.log("loading =", loading);
+  console.log("animals.length =", animalsList.length);
+
   const fetchLiveListings = async (showSpinner = true) => {
     if (showSpinner) setLoading(true);
     try {
@@ -534,6 +547,7 @@ export default function BuyScreen({ navigation }) {
   };
 
   useEffect(() => {
+    console.log("BuyScreen mounted");
     fetchLiveListings();
   }, [userProfile?.district]);
 
@@ -570,117 +584,130 @@ export default function BuyScreen({ navigation }) {
   }, []);
 
   return (
-    <View style={styles.container}>
-      <LinearGradient
-        colors={['#F8FCF7', '#F4FAEE', '#EEF8EC']}
-        style={StyleSheet.absoluteFillObject}
-      />
-      <Image
-        source={require('../../assets/farmer-bg.webp')}
-        style={[StyleSheet.absoluteFillObject, { opacity: 0.025 }]}
-        resizeMode="cover"
-      />
-      <SafeAreaView style={styles.safeArea}>
-        {/* Main Body Wrap */}
-        <View style={styles.contentWrapper}>
-          {/* Header Section */}
-          <View style={styles.header}>
-            <View style={styles.logoAndBrand}>
-              <View style={styles.logoCircle}>
-                <Image source={require('../../assets/logo-icon.png')} style={styles.logoIconImage} resizeMode="contain" />
-              </View>
-              {/* Title and Tagline */}
-              <View style={styles.brandTextContainer}>
-                <AppText style={styles.headerTitle}>
-                  {t('app.name')}
-                </AppText>
-                <AppText style={styles.headerTagline}>{t('buy.marketplaceCare')}</AppText>
-              </View>
+    <LinearGradient
+      colors={['#F8FCF7', '#F4FAEE', '#EEF8EC']}
+      style={styles.safeArea}
+    >
+      <SafeAreaView 
+        style={styles.safeArea}
+        onLayout={(e) => {
+          console.log('[BuyScreen Layout] Root Container:', e.nativeEvent.layout);
+          console.log('[BuyScreen Layout] SafeArea:', e.nativeEvent.layout);
+        }}
+      >
+        <Image
+          source={require('../../assets/farmer-bg.webp')}
+          style={[StyleSheet.absoluteFillObject, { opacity: 0.025 }]}
+          resizeMode="cover"
+        />
+        <View 
+          style={styles.contentWrapper}
+          onLayout={(e) => console.log('[BuyScreen Layout] Content Container:', e.nativeEvent.layout)}
+        >
+        {/* Header Section */}
+        <View 
+          style={styles.header}
+          onLayout={(e) => console.log('[BuyScreen Layout] Header:', e.nativeEvent.layout)}
+        >
+          <View style={styles.logoAndBrand}>
+            <View style={styles.logoCircle}>
+              <Image source={require('../../assets/logo-icon.png')} style={styles.logoIconImage} resizeMode="contain" />
             </View>
-
-            {/* Right Controls */}
-            <View style={styles.headerActions}>
-              <LanguageSelector style={{ marginRight: 8 }} />
-              <TouchableOpacity style={styles.notificationHeaderBtn} onPress={() => navigation.navigate('Notifications')}>
-                <Ionicons name="notifications-outline" size={20} color="#0F172A" />
-                <View style={styles.notificationHeaderBadge} />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.avatarCircle} onPress={() => navigation.navigate('Profile')}>
-                {profileImageUrl ? (
-                  <Image source={{ uri: profileImageUrl }} style={styles.avatarImage} resizeMode="cover" />
-                ) : (
-                  <AppText style={styles.avatarText}>{userInitial}</AppText>
-                )}
-              </TouchableOpacity>
+            {/* Title and Tagline */}
+            <View style={styles.brandTextContainer}>
+              <AppText style={styles.headerTitle}>
+                {t('app.name')}
+              </AppText>
+              <AppText style={styles.headerTagline}>{t('buy.marketplaceCare')}</AppText>
             </View>
           </View>
 
-          {loading ? (
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-              <ActivityIndicator size="large" color="#16A34A" />
-              <AppText style={{ marginTop: 12, color: '#64748B', fontWeight: '600' }}>{t('buy.loadingListings')}</AppText>
-            </View>
-          ) : (
-            <FlatList
-              ref={mainListRef}
-              data={filteredAnimals}
-              keyExtractor={(item) => item.id}
-              initialNumToRender={5}
-              maxToRenderPerBatch={5}
-              windowSize={5}
-              updateCellsBatchingPeriod={50}
-              removeClippedSubviews={Platform.OS === 'android'}
-              ListHeaderComponent={
-                <ListHeader
-                  selectedCategory={selectedCategory}
-                  setSelectedCategory={setSelectedCategory}
-                  onViewDetails={handleViewDetails}
-                  featuredAnimals={filteredAnimals.slice(0, 3)}
-                  userProfile={userProfile}
-                  onChangeLocation={handleLocationTap}
-                  searchText={searchText}
-                  setSearchText={setSearchText}
-                  onFilterPress={() => setIsFilterVisible(true)}
-                  filterCount={getActiveFilterCount()}
-                />
-              }
-              ListFooterComponent={
-                <ListFooter
-                  onViewDetails={handleViewDetails}
-                  recommendedAnimals={filteredAnimals.slice(2, 5)}
-                  selectedCategory={selectedCategory}
-                  searchText={searchText}
-                />
-              }
-              ListEmptyComponent={
-                <View style={styles.emptyStateContainer}>
-                  <View style={styles.emptyIconWrapper}>
-                    <Ionicons name="paw" size={48} color="#16A34A" />
-                  </View>
-                  <AppText style={styles.emptyStateTitle}>{t('buy.noAnimalsCategoryTitle')}</AppText>
-                  <AppText style={styles.emptyStateSubtitle}>{t('buy.noAnimalsCategorySubtitle')}</AppText>
-                  <TouchableOpacity
-                    style={styles.emptyStateButton}
-                    activeOpacity={0.8}
-                    onPress={handleViewAllAnimals}
-                  >
-                    <AppText style={styles.emptyStateButtonText}>{t('buy.noAnimalsCategoryButton')}</AppText>
-                  </TouchableOpacity>
-                </View>
-              }
-              contentContainerStyle={styles.scrollContent}
-              showsVerticalScrollIndicator={false}
-              renderItem={renderBuyItem}
-            />
-          )}
-
-          {/* Floating Action Button (FAB) */}
-          <TouchableOpacity style={styles.fab} activeOpacity={0.85} onPress={handleNavigateToSell}>
-            <MaterialCommunityIcons name="plus" size={22} color="#FFFFFF" />
-            <AppText style={styles.fabLabel}>{t('buy.sellAnimal')}</AppText>
-          </TouchableOpacity>
+          {/* Right Controls */}
+          <View style={styles.headerActions}>
+            <LanguageSelector style={{ marginRight: 8 }} />
+            <TouchableOpacity style={styles.notificationHeaderBtn} onPress={() => navigation.navigate('Notifications')}>
+              <Ionicons name="notifications-outline" size={20} color="#0F172A" />
+              <View style={styles.notificationHeaderBadge} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.avatarCircle} onPress={() => navigation.navigate('Profile')}>
+              {profileImageUrl ? (
+                <Image source={{ uri: profileImageUrl }} style={styles.avatarImage} resizeMode="cover" />
+              ) : (
+                <AppText style={styles.avatarText}>{userInitial}</AppText>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
-      </SafeAreaView>
+
+        {loading ? (
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <ActivityIndicator size="large" color="#16A34A" />
+            <AppText style={{ marginTop: 12, color: '#64748B', fontWeight: '600' }}>{t('buy.loadingListings')}</AppText>
+          </View>
+        ) : (
+          <FlatList
+            ref={mainListRef}
+            onLayout={(e) => console.log('[BuyScreen Layout] FlatList:', e.nativeEvent.layout)}
+            data={filteredAnimals}
+            keyExtractor={(item) => item.id}
+            style={styles.mainFlatList}
+            initialNumToRender={8}
+            maxToRenderPerBatch={8}
+            windowSize={11}
+            updateCellsBatchingPeriod={50}
+            removeClippedSubviews={false}
+            keyboardShouldPersistTaps="handled"
+            ListHeaderComponent={
+              <ListHeader
+                selectedCategory={selectedCategory}
+                setSelectedCategory={setSelectedCategory}
+                onViewDetails={handleViewDetails}
+                featuredAnimals={filteredAnimals.slice(0, 3)}
+                userProfile={userProfile}
+                onChangeLocation={handleLocationTap}
+                searchText={searchText}
+                setSearchText={setSearchText}
+                onFilterPress={() => setIsFilterVisible(true)}
+                filterCount={getActiveFilterCount()}
+              />
+            }
+            ListFooterComponent={
+              <ListFooter
+                onViewDetails={handleViewDetails}
+                recommendedAnimals={filteredAnimals.slice(2, 5)}
+                selectedCategory={selectedCategory}
+                searchText={searchText}
+              />
+            }
+            ListEmptyComponent={
+              <View style={styles.emptyStateContainer}>
+                <View style={styles.emptyIconWrapper}>
+                  <Ionicons name="paw" size={48} color="#16A34A" />
+                </View>
+                <AppText style={styles.emptyStateTitle}>{t('buy.noAnimalsCategoryTitle')}</AppText>
+                <AppText style={styles.emptyStateSubtitle}>{t('buy.noAnimalsCategorySubtitle')}</AppText>
+                <TouchableOpacity
+                  style={styles.emptyStateButton}
+                  activeOpacity={0.8}
+                  onPress={handleViewAllAnimals}
+                >
+                  <AppText style={styles.emptyStateButtonText}>{t('buy.noAnimalsCategoryButton')}</AppText>
+                </TouchableOpacity>
+              </View>
+            }
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            renderItem={renderBuyItem}
+          />
+        )}
+      </View>
+
+      {/* Floating Action Button (FAB) */}
+      <TouchableOpacity style={styles.fab} activeOpacity={0.85} onPress={handleNavigateToSell}>
+        <MaterialCommunityIcons name="plus" size={22} color="#FFFFFF" />
+        <AppText style={styles.fabLabel}>{t('buy.sellAnimal')}</AppText>
+      </TouchableOpacity>
+
       <LocationPicker
         visible={isLocationPickerVisible}
         onClose={() => setIsLocationPickerVisible(false)}
@@ -692,7 +719,8 @@ export default function BuyScreen({ navigation }) {
         initialFilters={activeFilters}
         onApply={handleApplyFilters}
       />
-    </View>
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
 
@@ -707,6 +735,13 @@ const styles = StyleSheet.create({
   contentWrapper: {
     flex: 1,
     position: 'relative',
+    zIndex: 1,
+  },
+  categoriesFlatList: {
+    height: 130,
+  },
+  mainFlatList: {
+    flex: 1,
   },
   header: {
     flexDirection: 'row',

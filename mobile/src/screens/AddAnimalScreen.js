@@ -2,7 +2,6 @@ import React, { useState, useEffect, useContext, useRef, useMemo, useCallback } 
 import {
   StyleSheet,
   View,
-  SafeAreaView,
   ScrollView,
   TextInput,
   Text,
@@ -17,14 +16,18 @@ import {
   FlatList,
   LayoutAnimation
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Camera, CameraView } from 'expo-camera';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppContext } from '../context/AppContext';
 import { useTranslation } from 'react-i18next';
 import AppText from '../components/AppText';
+import CustomHeader from '../components/CustomHeader';
 import { animalApi } from '../api/animalApi';
 import { reverseGeocodeWithCache } from '../utils/geocoder';
 import { refreshManager, REFRESH_EVENTS } from '../services/refreshManager';
@@ -213,6 +216,10 @@ export default function AddAnimalScreen({ navigation }) {
   const [cameraPermission, setCameraPermission] = useState(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [photoPreview, setPhotoPreview] = useState(null);
+  // Fullscreen camera modal state (camera MUST be fullscreen on Android to show live preview)
+  const [showCameraModal, setShowCameraModal] = useState(false);
+  const [showVideoCameraModal, setShowVideoCameraModal] = useState(false);
+  const [videoCameraFacing, setVideoCameraFacing] = useState('back');
 
   // Step 3: Video Recording variables
   const [video, setVideo] = useState(null); // Stores captured video URI or uploaded URL
@@ -220,6 +227,16 @@ export default function AddAnimalScreen({ navigation }) {
   const [videoTimer, setVideoTimer] = useState(0);
   const [videoPreview, setVideoPreview] = useState(null);
   const videoIntervalRef = useRef(null);
+
+  const videoPlayer = useVideoPlayer(videoPreview?.uri || null, (player) => {
+    player.loop = true;
+  });
+
+  useEffect(() => {
+    if (videoPlayer && videoPreview?.uri) {
+      videoPlayer.replace(videoPreview.uri);
+    }
+  }, [videoPreview?.uri, videoPlayer]);
 
   // Step 5: Health
   const [isVaccinated, setIsVaccinated] = useState(false);
@@ -287,25 +304,25 @@ export default function AddAnimalScreen({ navigation }) {
 
   const validatePriceValue = (val) => {
     if (!val || !val.toString().trim()) {
-      return 'कृपया अपेक्षित किंमत प्रविष्ट करा. / Please enter expected price.';
+      return t('addAnimal.errPriceMin');
     }
     const cleanStr = val.toString().trim();
     if (!/^\d+(\.\d{1,2})?$/.test(cleanStr)) {
-      return 'कृपया वैध संख्यात्मक किंमत प्रविष्ट करा. / Please enter a valid numeric price.';
+      return t('addAnimal.errPriceMin');
     }
     const num = Number(cleanStr);
     if (isNaN(num) || num <= 0) {
-      return 'किंमत ० पेक्षा जास्त असणे आवश्यक आहे. / Price must be greater than 0.';
+      return t('addAnimal.errPriceMin');
     }
     return null;
   };
 
   const validateTitleValue = (val) => {
     if (!val || !val.toString().trim()) {
-      return 'कृपया जाहिरातीचे नाव प्रविष्ट करा. / Please enter listing title.';
+      return t('addAnimal.errTitleReq');
     }
     if (val.toString().trim().length < 3) {
-      return 'नाव किमान ३ अक्षरांचे असणे आवश्यक आहे. / Title must be at least 3 characters.';
+      return t('addAnimal.errTitleMin');
     }
     return null;
   };
@@ -333,14 +350,15 @@ export default function AddAnimalScreen({ navigation }) {
     }
   };
 
-  // Check camera permissions
+  // Check camera and microphone permissions
   useEffect(() => {
     (async () => {
       try {
-        const { status } = await Camera.requestCameraPermissionsAsync();
-        setCameraPermission(status === 'granted');
+        const { status: cameraStatus } = await Camera.requestCameraPermissionsAsync();
+        const { status: micStatus } = await Camera.requestMicrophonePermissionsAsync();
+        setCameraPermission(cameraStatus === 'granted' && micStatus === 'granted');
       } catch (err) {
-        console.warn('Camera permission check failed:', err.message);
+        console.warn('Camera/Microphone permission check failed:', err.message);
         setCameraPermission(false);
       }
     })();
@@ -456,10 +474,11 @@ export default function AddAnimalScreen({ navigation }) {
       try {
         const photo = await cameraRef.current.takePictureAsync({
           quality: 0.85,
-          skipProcessing: true
+          skipProcessing: false
         });
         if (photo && photo.uri) {
           setPhotoPreview(photo.uri);
+          setShowCameraModal(false); // Close fullscreen camera modal → show captured preview
           return;
         }
       } catch (err) {
@@ -481,7 +500,7 @@ export default function AddAnimalScreen({ navigation }) {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions?.Images || 'images',
+        mediaTypes: 'images',
         allowsEditing: true,
         quality: 0.85
       });
@@ -514,9 +533,10 @@ export default function AddAnimalScreen({ navigation }) {
     updatedPhotos[currentPhotoIndex] = null;
     setPhotos(updatedPhotos);
     setPhotoPreview(null);
+    setShowCameraModal(true); // Re-open fullscreen camera modal for retake
   };
 
-  // Video capture states
+  // Video capture states — video camera opened via fullscreen modal
   const handleStartRecording = async () => {
     if (Platform.OS === 'web') return;
     setIsVideoRecording(true);
@@ -545,6 +565,7 @@ export default function AddAnimalScreen({ navigation }) {
             duration: durationSec || 30,
             fileSize: Math.round(6.2 * 1024 * 1024)
           });
+          setShowVideoCameraModal(false); // Close fullscreen video camera modal → show preview
         }
       } catch (err) {
         console.warn('Native video recording failed:', err.message);
@@ -561,6 +582,7 @@ export default function AddAnimalScreen({ navigation }) {
       clearInterval(videoIntervalRef.current);
     }
     setIsVideoRecording(false);
+    setShowVideoCameraModal(false); // Always close video camera modal when stopping
 
     const finalDuration = forcedDuration !== undefined && typeof forcedDuration === 'number' ? forcedDuration : videoTimer;
 
@@ -571,12 +593,7 @@ export default function AddAnimalScreen({ navigation }) {
         console.warn('Failed to stop camera recording:', err.message);
       }
     } else {
-      console.warn('[Camera] No camera reference found to stop recording. Simulator fallback.');
-      setVideoPreview({
-        uri: 'c:/Users/Nilesh Rajpure/OneDrive/Desktop/Pashusetu/backend/uploads/profile-anonymous-1783575388790-732234302.mp4',
-        duration: finalDuration || 20,
-        fileSize: Math.round(6.2 * 1024 * 1024)
-      });
+      console.warn('[Camera] No camera reference found to stop recording.');
     }
   };
 
@@ -606,7 +623,7 @@ export default function AddAnimalScreen({ navigation }) {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions?.Videos || 'videos',
+        mediaTypes: 'videos',
         allowsEditing: true,
         quality: 0.85
       });
@@ -703,21 +720,73 @@ export default function AddAnimalScreen({ navigation }) {
       const stateName = geocoded?.state || 'Maharashtra';
       const districtName = geocoded?.district || 'Pune';
       const talukaName = geocoded?.taluka || 'Baramati';
+      const villageName = geocoded?.village || '';
 
       if (geocoded?.pincode) setPincode(geocoded.pincode);
       if (geocoded?.formattedAddress) setFormattedAddress(geocoded.formattedAddress);
 
+      // Match State
       const matchedState = states.find(s => s.name && (s.name.toLowerCase().includes(stateName.toLowerCase()) || stateName.toLowerCase().includes(s.name.toLowerCase()))) || { name: stateName };
       setSelectedState(matchedState);
-      if (matchedState._id) fetchDistricts(matchedState._id);
 
-      const matchedDistrict = districts.find(d => d.name && (d.name.toLowerCase().includes(districtName.toLowerCase()) || districtName.toLowerCase().includes(d.name.toLowerCase()))) || { name: districtName };
+      let loadedDistricts = [];
+      if (matchedState._id) {
+        try {
+          const body = await animalApi.getDistricts(matchedState._id);
+          if (body.status === 'success') {
+            loadedDistricts = body.data.districts;
+            setDistricts(loadedDistricts);
+          }
+        } catch (err) {
+          console.warn('Error pre-fetching districts:', err);
+        }
+      }
+
+      // Match District
+      const matchedDistrict = loadedDistricts.find(d => d.name && (d.name.toLowerCase().includes(districtName.toLowerCase()) || districtName.toLowerCase().includes(d.name.toLowerCase()))) || { name: districtName };
       setSelectedDistrict(matchedDistrict);
-      if (matchedDistrict._id) fetchTalukas(matchedDistrict._id);
 
-      const matchedTaluka = talukas.find(t => t.name && (t.name.toLowerCase().includes(talukaName.toLowerCase()) || talukaName.toLowerCase().includes(t.name.toLowerCase()))) || { name: talukaName };
+      let loadedTalukas = [];
+      if (matchedDistrict._id) {
+        try {
+          const body = await animalApi.getTalukas(matchedDistrict._id);
+          if (body.status === 'success') {
+            loadedTalukas = body.data.talukas;
+            setTalukas(loadedTalukas);
+          }
+        } catch (err) {
+          console.warn('Error pre-fetching talukas:', err);
+        }
+      }
+
+      // Match Taluka
+      const matchedTaluka = loadedTalukas.find(t => t.name && (t.name.toLowerCase().includes(talukaName.toLowerCase()) || talukaName.toLowerCase().includes(t.name.toLowerCase()))) || { name: talukaName };
       setSelectedTaluka(matchedTaluka);
-      if (matchedTaluka._id) fetchVillages(matchedTaluka._id);
+
+      let loadedVillages = [];
+      if (matchedTaluka._id) {
+        try {
+          const body = await animalApi.getVillages(matchedTaluka._id);
+          if (body.status === 'success') {
+            loadedVillages = body.data.villages;
+            setVillages(loadedVillages);
+          }
+        } catch (err) {
+          console.warn('Error pre-fetching villages:', err);
+        }
+      }
+
+      // Match Village (Make optional if GPS resolution is imprecise or not matched in database)
+      if (villageName) {
+        const matchedVillage = loadedVillages.find(v => v.name && (v.name.toLowerCase().includes(villageName.toLowerCase()) || villageName.toLowerCase().includes(v.name.toLowerCase())));
+        if (matchedVillage) {
+          setSelectedVillage(matchedVillage);
+        } else {
+          setSelectedVillage(null);
+        }
+      } else {
+        setSelectedVillage(null);
+      }
 
       setGpsSuccess(true);
     } catch (e) {
@@ -922,7 +991,7 @@ export default function AddAnimalScreen({ navigation }) {
             formData.append('file', blob, filename);
           } else {
             formData.append('file', {
-              uri: photo.uri,
+              uri: Platform.OS === 'android' ? (photo.uri.startsWith('file://') ? photo.uri : `file://${photo.uri}`) : photo.uri,
               name: filename,
               type: 'image/jpeg'
             });
@@ -958,7 +1027,7 @@ export default function AddAnimalScreen({ navigation }) {
           videoFormData.append('file', blob, 'video.mp4');
         } else {
           videoFormData.append('file', {
-            uri: video.uri,
+            uri: Platform.OS === 'android' ? (video.uri.startsWith('file://') ? video.uri : `file://${video.uri}`) : video.uri,
             name: 'video.mp4',
             type: 'video/mp4'
           });
@@ -1174,7 +1243,6 @@ export default function AddAnimalScreen({ navigation }) {
         );
 
       case 2:
-        const currentReq = PHOTO_STEPS[currentPhotoIndex];
         const isPhotoAccepted = !!photos[currentPhotoIndex];
         const completedPhotosCount = photos.filter(p => !!p).length;
         const isVideoRecorded = !!video;
@@ -1221,75 +1289,51 @@ export default function AddAnimalScreen({ navigation }) {
               marginBottom: 20
             }}>
               {photoPreview ? (
-                <View style={{ width: '100%', height: 240, borderRadius: 14, overflow: 'hidden', backgroundColor: '#F8FAFC' }}>
-                  <Image source={{ uri: photoPreview }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                </View>
+                <Image
+                  key={photoPreview}
+                  source={{ uri: photoPreview }}
+                  style={{ width: '100%', height: 240, borderRadius: 14, backgroundColor: '#F8FAFC' }}
+                  resizeMode="cover"
+                />
               ) : (
-                <View style={[styles.cameraBox, { overflow: 'hidden', height: 240, borderRadius: 14, borderStyle: 'none' }]}>
-                  {cameraPermission ? (
-                    <>
-                      <CameraView
-                        ref={cameraRef}
-                        style={StyleSheet.absoluteFillObject}
-                        facing="back"
-                      />
-
-                      {/* Semi-transparent overlay to ensure text is highly readable */}
-                      <View style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        backgroundColor: 'rgba(15, 23, 42, 0.6)',
-                        padding: 10,
-                        alignItems: 'center'
-                      }}>
-                        <AppText
-                          style={{
-                            fontSize: 13,
-                            fontWeight: '700',
-                            color: '#FFFFFF',
-                            textAlign: 'center',
-                          }}
-                        >
-                          {t(currentReq.nameKey)}
-                        </AppText>
-                      </View>
-
-                      <TouchableOpacity style={[styles.shutterBtn, { position: 'absolute', bottom: 12 }]} onPress={handleCapturePhoto}>
-                        <View style={styles.shutterBtnInner} />
-                      </TouchableOpacity>
-                    </>
-                  ) : (
-                    <View style={{ alignItems: 'center', justifyContent: 'center', padding: 20, flex: 1 }}>
-                      <MaterialCommunityIcons name="camera-off" size={50} color="#94A3B8" />
-                      <AppText style={{ fontSize: 14, fontWeight: '700', color: '#1E293B', marginTop: 8, textAlign: 'center' }}>
-                        {t(currentReq.nameKey)}
-                      </AppText>
-                      <AppText style={{ fontSize: 12, color: '#64748B', textAlign: 'center', marginTop: 4, paddingHorizontal: 10 }}>
-                        Camera is not supported in this browser. Please upload from gallery.
-                      </AppText>
-                      <TouchableOpacity
-                        style={{
-                          backgroundColor: '#16A34A',
-                          paddingHorizontal: 20,
-                          paddingVertical: 10,
-                          borderRadius: 10,
-                          marginTop: 12,
-                          flexDirection: 'row',
-                          alignItems: 'center'
-                        }}
-                        onPress={handlePickImage}
-                      >
-                        <Ionicons name="image-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                        <AppText style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>
-                          गॅलरीतून निवडा / Upload
-                        </AppText>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                </View>
+                /* Camera not yet opened — show tap-to-open button */
+                <TouchableOpacity
+                  style={[styles.cameraBox, { height: 240, borderRadius: 14, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0F172A' }]}
+                  activeOpacity={0.85}
+                  onPress={async () => {
+                    if (!cameraPermission) {
+                      try {
+                        const { status: cameraStatus } = await Camera.requestCameraPermissionsAsync();
+                        const { status: micStatus } = await Camera.requestMicrophonePermissionsAsync();
+                        const granted = cameraStatus === 'granted' && micStatus === 'granted';
+                        setCameraPermission(granted);
+                        if (granted) setShowCameraModal(true);
+                      } catch (err) {
+                        console.warn('Camera permission request failed:', err.message);
+                      }
+                    } else {
+                      setShowCameraModal(true);
+                    }
+                  }}
+                >
+                  <Ionicons name="camera" size={52} color="#FFFFFF" />
+                  <AppText style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 15, marginTop: 12 }}>
+                    {t(PHOTO_STEPS[currentPhotoIndex]?.nameKey)}
+                  </AppText>
+                  <AppText style={{ color: 'rgba(255,255,255,0.7)', fontWeight: '500', fontSize: 12, marginTop: 6, textAlign: 'center', paddingHorizontal: 24 }}>
+                    {t('addAnimal.tapToOpenCamera')}
+                  </AppText>
+                  {/* Upload from gallery fallback */}
+                  <TouchableOpacity
+                    style={{ marginTop: 14, backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 18, paddingVertical: 8, borderRadius: 10, flexDirection: 'row', alignItems: 'center' }}
+                    onPress={(e) => { e.stopPropagation(); handlePickImage(); }}
+                  >
+                    <Ionicons name="image-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                    <AppText style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>{t('addAnimal.chooseFromGallery')}</AppText>
+                  </TouchableOpacity>
+                </TouchableOpacity>
               )}
+
 
               {/* Preview Actions Row */}
               {photoPreview && (
@@ -1348,7 +1392,7 @@ export default function AddAnimalScreen({ navigation }) {
                       onPress={handleConfirmPhoto}
                     >
                       <Ionicons name="checkmark-circle-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-                      <AppText style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>फोटो वापरा / Use Photo</AppText>
+                      <AppText style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>{t('addAnimal.usePhotoBtn')}</AppText>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -1367,30 +1411,26 @@ export default function AddAnimalScreen({ navigation }) {
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
                 <Ionicons name="information-circle" size={20} color="#1D4ED8" style={{ marginRight: 8 }} />
                 <AppText style={{ fontSize: 14, fontWeight: '700', color: '#1E3A8A' }}>
-                  मार्गदर्शक सूचना / Instructions
+                  {t('addAnimal.instructionsHeader')}
                 </AppText>
               </View>
 
               <AppText style={{ fontSize: 14, fontWeight: '700', color: '#1E293B', marginBottom: 8 }}>
-                {t(currentReq.nameKey)}
+                {t(PHOTO_STEPS[currentPhotoIndex]?.nameKey)}
               </AppText>
 
               <View style={{ paddingLeft: 4 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
                   <AppText style={{ color: '#1D4ED8', marginRight: 8, fontSize: 12 }}>✔</AppText>
                   <AppText style={{ fontSize: 12.5, color: '#1E293B', fontWeight: '500' }}>
-                    {t(currentReq.instructionKey)}
+                    {t(PHOTO_STEPS[currentPhotoIndex]?.instructionKey)}
                   </AppText>
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
                   <AppText style={{ color: '#1D4ED8', marginRight: 8, fontSize: 12 }}>✔</AppText>
                   <AppText style={{ fontSize: 12.5, color: '#475569' }}>
-                    {t(currentReq.instructionKey)}
+                    {t('addAnimal.goodLightingNote')}
                   </AppText>
-                </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                  <AppText style={{ color: '#1D4ED8', marginRight: 8, fontSize: 12 }}>✔</AppText>
-                  <AppText style={{ fontSize: 12.5, color: '#475569' }}>Good lighting and no blur (चांगला प्रकाश आणि स्पष्ट फोटो)</AppText>
                 </View>
               </View>
             </View>
@@ -1398,7 +1438,7 @@ export default function AddAnimalScreen({ navigation }) {
             {/* Required Media Checklist */}
             <View style={{ marginBottom: 20 }}>
               <AppText style={{ fontSize: 14, fontWeight: '700', color: '#1E293B', marginBottom: 12 }}>
-                आवश्यक मीडिया यादी / Required Media Checklist
+                {t('addAnimal.requiredMediaChecklist')}
               </AppText>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
                 {PHOTO_STEPS.map((step, idx) => {
@@ -1470,7 +1510,7 @@ export default function AddAnimalScreen({ navigation }) {
                     flex: 1,
                     marginRight: 4
                   }} numberOfLines={1}>
-                    व्हिडिओ / Video
+                    {t('addAnimal.steps.recordVideo')}
                   </AppText>
                   {isVideoRecorded ? (
                     <Ionicons name="checkmark-circle" size={18} color="#16A34A" />
@@ -1659,8 +1699,21 @@ export default function AddAnimalScreen({ navigation }) {
                 marginBottom: 20
               }}>
                 {videoPreview ? (
-                  <View style={{ width: '100%', padding: 16, borderRadius: 14, backgroundColor: '#F8FAFC', justifyContent: 'center', alignItems: 'center' }}>
-                    <Ionicons name="videocam" size={64} color={videoPreview.duration < 20 ? '#EF4444' : '#16A34A'} />
+                  <View key="video-preview-container" style={{ width: '100%', padding: 16, borderRadius: 14, backgroundColor: '#F8FAFC', justifyContent: 'center', alignItems: 'center' }}>
+                    {videoPreview.uri && Platform.OS !== 'web' ? (
+                        <View style={{ width: '100%', height: 200, borderRadius: 10, overflow: 'hidden', marginBottom: 8 }}>
+                          <VideoView
+                            key={videoPreview.uri}
+                            style={StyleSheet.absoluteFillObject}
+                            player={videoPlayer}
+                            allowsFullscreen
+                            allowsPictureInPicture
+                            nativeControls={true}
+                          />
+                        </View>
+                      ) : (
+                        <Ionicons name="videocam" size={64} color={videoPreview.duration < 20 ? '#EF4444' : '#16A34A'} />
+                      )}
                     <AppText style={{ fontSize: 15, fontWeight: '800', color: '#1E293B', marginTop: 8 }}>{t('addAnimal.videoDuration', { duration: videoPreview.duration < 10 ? `0${videoPreview.duration}` : videoPreview.duration })}</AppText>
                     {videoPreview.duration < 20 && (
                       <View style={{ padding: 12, backgroundColor: '#FEF2F2', borderRadius: 8, marginTop: 10, borderWidth: 1, borderColor: '#FEE2E2', width: '100%' }}>
@@ -1669,66 +1722,68 @@ export default function AddAnimalScreen({ navigation }) {
                       </View>
                     )}
                   </View>
-                ) : isVideoRecording ? (
-                  <View style={[styles.cameraBox, { overflow: 'hidden', height: 240, borderRadius: 14, borderStyle: 'none' }]}>
-                    {cameraPermission ? (
-                      <CameraView
-                        ref={cameraRef}
-                        style={StyleSheet.absoluteFillObject}
-                        mode="video"
-                        facing="back"
-                      />
-                    ) : (
-                      <View style={{ alignItems: 'center', justifyContent: 'center', flex: 1 }}>
-                        <ActivityIndicator size="large" color="#16A34A" />
-                      </View>
-                    )}
-                  </View>
                 ) : (
-                  <View style={[styles.cameraBox, { overflow: 'hidden', height: 240, borderRadius: 14, borderStyle: 'none', backgroundColor: '#F8FAFC', justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
-                    {cameraPermission ? (
-                      <>
-                        <CameraView
-                          ref={cameraRef}
-                          style={StyleSheet.absoluteFillObject}
-                          mode="video"
-                          facing="back"
-                        />
-                        <View style={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          backgroundColor: 'rgba(15, 23, 42, 0.6)',
-                          padding: 10,
-                          alignItems: 'center'
-                        }}>
-                          <AppText style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF', textAlign: 'center' }}>{t('addAnimal.cameraBoxTitle')}</AppText>
-                        </View>
-                      </>
-                    ) : (
-                      <View style={{ alignItems: 'center', justifyContent: 'center', flex: 1 }}>
-                        <MaterialCommunityIcons name="video-off" size={50} color="#94A3B8" />
-                        <AppText style={{ fontSize: 14, fontWeight: '700', color: '#1E293B', marginTop: 8, textAlign: 'center' }}>{t('addAnimal.cameraUnsupportedTitle')}</AppText>
-                        <AppText style={{ fontSize: 12, color: '#64748B', textAlign: 'center', marginTop: 4, paddingHorizontal: 10 }}>{t('addAnimal.cameraUnsupportedSub')}</AppText>
-                        <TouchableOpacity
-                          style={{
-                            backgroundColor: '#16A34A',
-                            paddingHorizontal: 20,
-                            paddingVertical: 10,
-                            borderRadius: 10,
-                            marginTop: 12,
-                            flexDirection: 'row',
-                            alignItems: 'center'
-                          }}
-                          onPress={handlePickVideo}
-                        >
-                          <Ionicons name="cloud-upload-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                          <AppText style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>{t('addAnimal.uploadVideoBtn')}</AppText>
-                        </TouchableOpacity>
-                      </View>
-                    )}
-                  </View>
+                  /* No video yet — show tap-to-open button for fullscreen video camera */
+                  <TouchableOpacity
+                    style={[styles.cameraBox, { height: 240, borderRadius: 14, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0F172A' }]}
+                    activeOpacity={0.85}
+                    onPress={async () => {
+                      let hasPerm = cameraPermission;
+                      if (!hasPerm) {
+                        try {
+                          const { status: cameraStatus } = await Camera.requestCameraPermissionsAsync();
+                          const { status: micStatus } = await Camera.requestMicrophonePermissionsAsync();
+                          hasPerm = cameraStatus === 'granted' && micStatus === 'granted';
+                          setCameraPermission(hasPerm);
+                        } catch (err) {
+                          console.warn('Camera permission request failed:', err.message);
+                        }
+                      }
+
+                      if (hasPerm) {
+                        Alert.alert(
+                          t('addAnimal.recordVideoPromptTitle', { defaultValue: 'Record Video' }),
+                          t('addAnimal.recordVideoPromptMessage', { defaultValue: 'Choose recording option:' }),
+                          [
+                            {
+                              text: t('addAnimal.recordFront', { defaultValue: 'Record with Front Camera' }),
+                              onPress: () => {
+                                setVideoCameraFacing('front');
+                                setShowVideoCameraModal(true);
+                              }
+                            },
+                            {
+                              text: t('addAnimal.recordBack', { defaultValue: 'Record with Back Camera' }),
+                              onPress: () => {
+                                setVideoCameraFacing('back');
+                                setShowVideoCameraModal(true);
+                              }
+                            },
+                            {
+                              text: t('addAnimal.chooseFromGallery', { defaultValue: 'Choose Video from Gallery' }),
+                              onPress: () => {
+                                handlePickVideo();
+                              }
+                            },
+                            {
+                              text: t('common.cancel', { defaultValue: 'Cancel' }),
+                              style: 'cancel'
+                            }
+                          ]
+                        );
+                      } else {
+                        Alert.alert(t('common.permissionDenied'), t('addAnimal.cameraUnsupportedSub'));
+                      }
+                    }}
+                  >
+                    <Ionicons name="videocam" size={52} color="#FFFFFF" />
+                    <AppText style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 15, marginTop: 12 }}>
+                      {t('addAnimal.cameraBoxTitle')}
+                    </AppText>
+                    <AppText style={{ color: 'rgba(255,255,255,0.7)', fontWeight: '500', fontSize: 12, marginTop: 6, textAlign: 'center', paddingHorizontal: 24 }}>
+                      Tap to open options for video recording
+                    </AppText>
+                  </TouchableOpacity>
                 )}
 
                 {/* Timer Progress Indicator below the preview */}
@@ -1955,10 +2010,11 @@ export default function AddAnimalScreen({ navigation }) {
             ) : (
               <>
                 <View style={styles.inputGroup}>
-                  <AppText style={styles.largeFieldLabel}>जाहिरातीचे नाव / Listing Title *</AppText>
+                  <AppText style={styles.largeFieldLabel}>{t('addAnimal.listingTitleLabel')}</AppText>
                   <TextInput
                     style={[styles.largeInput, fieldErrors.title && { borderColor: '#EF4444' }]}
-                    placeholder="उदा. २ वर्षांची जर्सी गाय"
+                    placeholder={t('addAnimal.listingTitlePlaceholder')}
+                    placeholderTextColor="#94A3B8"
                     value={title}
                     onChangeText={(txt) => {
                       setTitle(txt);
@@ -1975,7 +2031,7 @@ export default function AddAnimalScreen({ navigation }) {
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <AppText style={styles.largeFieldLabel}>जात / Breed *</AppText>
+                  <AppText style={styles.largeFieldLabel}>{t('addAnimal.selectBreedLabel')}</AppText>
                   {loadingBreeds ? (
                     <ActivityIndicator size="small" color="#16A34A" />
                   ) : (
@@ -1989,7 +2045,7 @@ export default function AddAnimalScreen({ navigation }) {
                       activeOpacity={0.8}
                     >
                       <AppText style={[styles.dropdownSelectorText, !selectedBreed && { color: '#94A3B8' }]}>
-                        {selectedBreed ? selectedBreed.name : 'जात निवडा / Select Breed'}
+                        {selectedBreed ? selectedBreed.name : t('addAnimal.selectBreedModal')}
                       </AppText>
                       <Ionicons name="chevron-down" size={20} color="#64748B" />
                     </TouchableOpacity>
@@ -1999,10 +2055,11 @@ export default function AddAnimalScreen({ navigation }) {
 
                 {isOtherBreedSelected && (
                   <View style={styles.inputGroup}>
-                    <AppText style={styles.largeFieldLabel}>इतर जात नमूद करा / Enter Breed *</AppText>
+                    <AppText style={styles.largeFieldLabel}>{t('addAnimal.otherBreedLabel')}</AppText>
                     <TextInput
                       style={styles.largeInput}
-                      placeholder="उदा. गीर क्रॉस (e.g. Gir Cross)"
+                      placeholder={t('addAnimal.customBreedPlaceholder')}
+                      placeholderTextColor="#94A3B8"
                       value={customBreedText}
                       onChangeText={setCustomBreedText}
                     />
@@ -2013,21 +2070,23 @@ export default function AddAnimalScreen({ navigation }) {
 
             <View style={styles.rowInputs}>
               <View style={[styles.inputGroup, { width: '48%' }]}>
-                <AppText style={styles.largeFieldLabel}>वय / Age (वर्ष) *</AppText>
+                <AppText style={styles.largeFieldLabel}>{t('addAnimal.ageLabel')}</AppText>
                 <TextInput
                   style={styles.largeInput}
                   keyboardType="numeric"
-                  placeholder="उदा. ३"
+                  placeholder={t('addAnimal.agePlaceholder')}
+                  placeholderTextColor="#94A3B8"
                   value={age}
                   onChangeText={setAge}
                 />
               </View>
               <View style={[styles.inputGroup, { width: '48%' }]}>
-                <AppText style={styles.largeFieldLabel}>वजन (पर्यायी) / Weight (kg)</AppText>
+                <AppText style={styles.largeFieldLabel}>{t('addAnimal.weightLabel')}</AppText>
                 <TextInput
                   style={styles.largeInput}
                   keyboardType="numeric"
-                  placeholder="उदा. ३५०"
+                  placeholder={t('addAnimal.weightPlaceholder')}
+                  placeholderTextColor="#94A3B8"
                   value={weight}
                   onChangeText={setWeight}
                 />
@@ -2035,7 +2094,7 @@ export default function AddAnimalScreen({ navigation }) {
             </View>
 
             <View style={styles.inputGroup}>
-              <AppText style={styles.largeFieldLabel}>लिंग / Gender *</AppText>
+              <AppText style={styles.largeFieldLabel}>{t('addAnimal.genderLabel')}</AppText>
               <View style={styles.pillRow}>
                 {['Female', 'Male'].map((g) => (
                   <TouchableOpacity
@@ -2043,28 +2102,32 @@ export default function AddAnimalScreen({ navigation }) {
                     style={[styles.pillOption, gender === g && styles.selectedPillOption]}
                     onPress={() => setGender(g)}
                   >
-                    <AppText style={[styles.pillText, gender === g && styles.selectedPillText]}>{g === 'Female' ? 'मादी (Female)' : 'नर (Male)'}</AppText>
+                    <AppText style={[styles.pillText, gender === g && styles.selectedPillText]}>
+                      {g === 'Female' ? t('addAnimal.genderFemale') : t('addAnimal.genderMale')}
+                    </AppText>
                   </TouchableOpacity>
                 ))}
               </View>
             </View>
 
             <View style={styles.inputGroup}>
-              <AppText style={styles.largeFieldLabel}>रंग (पर्यायी) / Color</AppText>
+              <AppText style={styles.largeFieldLabel}>{t('addAnimal.colorLabel')}</AppText>
               <TextInput
                 style={styles.largeInput}
-                placeholder="उदा. काळा, पांढरा, तपकिरी"
+                placeholder={t('addAnimal.colorPlaceholder')}
+                placeholderTextColor="#94A3B8"
                 value={color}
                 onChangeText={setColor}
               />
             </View>
 
             <View style={styles.inputGroup}>
-              <AppText style={styles.largeFieldLabel}>इतर माहिती (पर्यायी) / Description</AppText>
+              <AppText style={styles.largeFieldLabel}>{t('addAnimal.descriptionLabel')}</AppText>
               <TextInput
                 style={[styles.largeInput, { height: 70 }]}
                 multiline
-                placeholder="जनावराविषयी अधिक माहिती लिहा..."
+                placeholder={t('addAnimal.descriptionPlaceholder')}
+                placeholderTextColor="#94A3B8"
                 value={description}
                 onChangeText={setDescription}
               />
@@ -2099,21 +2162,21 @@ export default function AddAnimalScreen({ navigation }) {
               </View>
               <View style={{ flex: 1 }}>
                 <AppText style={{ fontSize: 15, fontWeight: '800', color: '#1E3A8A', marginBottom: 2 }}>
-                  🩺 आरोग्य माहिती
+                  🩺 {t('addAnimal.healthCardTitle')}
                 </AppText>
                 <AppText style={{ fontSize: 12.5, color: '#3B82F6', fontWeight: '500', lineHeight: 17 }}>
-                  ही माहिती भरल्याने खरेदीदारांचा विश्वास वाढतो.
+                  {t('addAnimal.healthCardSub')}
                 </AppText>
               </View>
             </View>
 
-            <AppText style={styles.wizardLabel}>आरोग्याची माहिती / Health Details</AppText>
+            <AppText style={styles.wizardLabel}>{t('addAnimal.healthCardTitle')}</AppText>
 
             {/* Vaccinated Toggle */}
             <View style={styles.toggleRow}>
               <View style={{ flex: 1, marginRight: 12 }}>
-                <AppText style={styles.toggleTitle}>लसीकरण (पर्यायी) / Vaccinated</AppText>
-                <AppText style={styles.toggleSubtitle}>नियमित सरकारी लसी पूर्ण झाल्या आहेत</AppText>
+                <AppText style={styles.toggleTitle}>{t('addAnimal.vaccinatedTitle')}</AppText>
+                <AppText style={styles.toggleSubtitle}>{t('addAnimal.vaccinatedSub')}</AppText>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <View style={{
@@ -2125,7 +2188,7 @@ export default function AddAnimalScreen({ navigation }) {
                   borderColor: isVaccinated ? '#BBF7D0' : '#E2E8F0'
                 }}>
                   <AppText style={{ fontSize: 12, fontWeight: '700', color: isVaccinated ? '#16A34A' : '#64748B' }}>
-                    {isVaccinated ? '✅ होय' : '❌ नाही'}
+                    {isVaccinated ? '✅ ' + t('common.yes', { defaultValue: 'Yes' }) : '❌ ' + t('common.no', { defaultValue: 'No' })}
                   </AppText>
                 </View>
                 <Switch
@@ -2139,8 +2202,8 @@ export default function AddAnimalScreen({ navigation }) {
             {/* Healthy Toggle */}
             <View style={styles.toggleRow}>
               <View style={{ flex: 1, marginRight: 12 }}>
-                <AppText style={styles.toggleTitle}>निरोगी (पर्यायी) / Healthy</AppText>
-                <AppText style={styles.toggleSubtitle}>कोणतीही जखम किंवा आजार नाही</AppText>
+                <AppText style={styles.toggleTitle}>{t('addAnimal.healthyTitle')}</AppText>
+                <AppText style={styles.toggleSubtitle}>{t('addAnimal.healthySub')}</AppText>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <View style={{
@@ -2152,7 +2215,7 @@ export default function AddAnimalScreen({ navigation }) {
                   borderColor: isHealthy ? '#BBF7D0' : '#E2E8F0'
                 }}>
                   <AppText style={{ fontSize: 12, fontWeight: '700', color: isHealthy ? '#16A34A' : '#64748B' }}>
-                    {isHealthy ? '✅ होय' : '❌ नाही'}
+                    {isHealthy ? '✅ ' + t('common.yes', { defaultValue: 'Yes' }) : '❌ ' + t('common.no', { defaultValue: 'No' })}
                   </AppText>
                 </View>
                 <Switch
@@ -2167,8 +2230,8 @@ export default function AddAnimalScreen({ navigation }) {
             {gender === 'Female' && (
               <View style={styles.toggleRow}>
                 <View style={{ flex: 1, marginRight: 12 }}>
-                  <AppText style={styles.toggleTitle}>गर्भधारणा (पर्यायी) / Pregnant</AppText>
-                  <AppText style={styles.toggleSubtitle}>{t('addAnimal.togglePregnantSub')}</AppText>
+                  <AppText style={styles.toggleTitle}>{t('addAnimal.pregnantTitle')}</AppText>
+                  <AppText style={styles.toggleSubtitle}>{t('addAnimal.pregnantSub')}</AppText>
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <View style={{
@@ -2180,7 +2243,7 @@ export default function AddAnimalScreen({ navigation }) {
                     borderColor: isPregnant ? '#BBF7D0' : '#E2E8F0'
                   }}>
                     <AppText style={{ fontSize: 12, fontWeight: '700', color: isPregnant ? '#16A34A' : '#64748B' }}>
-                      {isPregnant ? '✅ होय' : '❌ नाही'}
+                      {isPregnant ? '✅ ' + t('common.yes', { defaultValue: 'Yes' }) : '❌ ' + t('common.no', { defaultValue: 'No' })}
                     </AppText>
                   </View>
                   <Switch
@@ -2202,7 +2265,7 @@ export default function AddAnimalScreen({ navigation }) {
             {/* Pregnancy Month Selector (Female + Pregnant Only) */}
             {gender === 'Female' && isPregnant && (
               <View style={[styles.inputGroup, { marginTop: 4 }]}>
-                <AppText style={styles.largeFieldLabel}>🤰 गर्भधारणेचा महिना (पर्यायी) / Pregnancy Month</AppText>
+                <AppText style={styles.largeFieldLabel}>{t('addAnimal.pregnancyMonthLabel')}</AppText>
                 <TouchableOpacity
                   style={styles.dropdownSelector}
                   onPress={() => setIsPregnancyModalVisible(true)}
@@ -2210,13 +2273,13 @@ export default function AddAnimalScreen({ navigation }) {
                 >
                   <AppText style={[styles.dropdownSelectorText, !pregnancyMonth && { color: '#94A3B8' }]}>
                     {pregnancyMonth
-                      ? PREGNANCY_MONTH_OPTIONS.find((m) => m.id === Number(pregnancyMonth))?.label + ' (' + PREGNANCY_MONTH_OPTIONS.find((m) => m.id === Number(pregnancyMonth))?.en + ')'
-                      : 'महिना निवडा... / Select Month'}
+                      ? PREGNANCY_MONTH_OPTIONS.find((m) => m.id === Number(pregnancyMonth))?.label
+                      : t('addAnimal.pregnancyMonthSelect')}
                   </AppText>
                   <Ionicons name="chevron-down" size={20} color="#64748B" />
                 </TouchableOpacity>
                 <AppText style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>
-                  माहित असल्यासच निवडा. हा पर्याय ऐच्छिक आहे.
+                  {t('addAnimal.pregnancyMonthNote')}
                 </AppText>
               </View>
             )}
@@ -2224,11 +2287,12 @@ export default function AddAnimalScreen({ navigation }) {
             {/* Milk Capacity (Female Cow, Buffalo, Goat Only) */}
             {showMilkCapacity && (
               <View style={styles.inputGroup}>
-                <AppText style={styles.largeFieldLabel}>दूध देण्याची क्षमता (पर्यायी) / Milk Capacity (लिटर/दिवस)</AppText>
+                <AppText style={styles.largeFieldLabel}>{t('addAnimal.milkCapacityLabel')}</AppText>
                 <TextInput
                   style={styles.largeInput}
                   keyboardType="numeric"
-                  placeholder="उदा. १२ लिटर प्रतिदिन"
+                  placeholder={t('addAnimal.milkCapacityPlaceholder')}
+                  placeholderTextColor="#94A3B8"
                   value={milkCapacity}
                   onChangeText={setMilkCapacity}
                 />
@@ -2240,14 +2304,15 @@ export default function AddAnimalScreen({ navigation }) {
       case 6:
         return (
           <View style={styles.wizardCard}>
-            <AppText style={styles.wizardLabel}>किंमत ठरवा / Set Price</AppText>
+            <AppText style={styles.wizardLabel}>{t('addAnimal.priceCardTitle')}</AppText>
 
             <View style={styles.inputGroup}>
-              <AppText style={styles.largeFieldLabel}>अपेक्षित किंमत / Expected Price (₹) *</AppText>
+              <AppText style={styles.largeFieldLabel}>{t('addAnimal.priceLabel')}</AppText>
               <TextInput
                 style={[styles.largeInput, { fontSize: 24, fontWeight: '700' }, fieldErrors.price && { borderColor: '#EF4444' }]}
                 keyboardType="numeric"
-                placeholder="उदा. ५०,०००"
+                placeholder={t('addAnimal.pricePlaceholder')}
+                placeholderTextColor="#94A3B8"
                 value={price}
                 onChangeText={(txt) => {
                   setPrice(txt);
@@ -2297,49 +2362,54 @@ export default function AddAnimalScreen({ navigation }) {
 
             {/* Top GPS Action Card */}
             <View style={{
-              backgroundColor: '#F0FDF4',
+              backgroundColor: gpsSuccess ? '#F0FDF4' : '#F8FAFC',
               borderRadius: 16,
-              padding: 16,
-              marginBottom: 20,
+              padding: 14,
+              marginBottom: 16,
               borderWidth: 1.5,
-              borderColor: '#BBF7D0'
+              borderColor: gpsSuccess ? '#86EFAC' : '#E2E8F0'
             }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
                 <View style={{
-                  width: 42,
-                  height: 42,
-                  borderRadius: 21,
-                  backgroundColor: '#DCFCE7',
+                  width: 38,
+                  height: 38,
+                  borderRadius: 19,
+                  backgroundColor: gpsSuccess ? '#DCFCE7' : '#F1F5F9',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  marginRight: 12
+                  marginRight: 10
                 }}>
-                  <Ionicons name="location" size={22} color="#16A34A" />
+                  <Ionicons name="location" size={20} color={gpsSuccess ? '#16A34A' : '#64748B'} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <AppText style={{ fontSize: 16, fontWeight: '700', color: '#14532D' }}>
-                    📍 सध्याचे स्थान वापरा / Use Current Location
+                  <AppText style={{ fontSize: 15, fontWeight: '700', color: '#1E293B' }}>
+                    📍 {t('addAnimal.useCurrentLocationTitle')}
                   </AppText>
-                  <AppText style={{ fontSize: 12.5, color: '#166534', marginTop: 2 }}>
-                    GPS द्वारे राज्य, जिल्हा, तालुका व गाव आपोआप भरा.
+                  <AppText style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
+                    {t('addAnimal.useCurrentLocationSub')}
                   </AppText>
                 </View>
               </View>
 
               <TouchableOpacity
                 style={{
-                  backgroundColor: '#16A34A',
+                  backgroundColor: gpsSuccess ? '#15803D' : '#16A34A',
                   borderRadius: 12,
-                  paddingVertical: 13,
+                  paddingVertical: 12,
                   paddingHorizontal: 16,
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  shadowColor: '#16A34A',
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.25,
-                  shadowRadius: 4,
-                  elevation: 3
+                  ...Platform.select({
+                    ios: {
+                      shadowColor: '#16A34A',
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.2,
+                      shadowRadius: 4,
+                    },
+                    android: { elevation: 3 },
+                    web: { boxShadow: '0px 2px 4px rgba(22, 163, 74, 0.2)' }
+                  })
                 }}
                 onPress={() => {
                   console.log('[GPS DEBUG] Button pressed - onPress entered');
@@ -2349,22 +2419,38 @@ export default function AddAnimalScreen({ navigation }) {
                 activeOpacity={0.85}
               >
                 {gpsLoading ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />
+                    <AppText style={{ fontSize: 14, fontWeight: '700', color: '#FFFFFF' }}>
+                      📍 {t('addAnimal.detectingLocation')}
+                    </AppText>
+                  </View>
                 ) : (
                   <>
-                    <Ionicons name="navigate-circle" size={22} color="#FFFFFF" style={{ marginRight: 8 }} />
-                    <AppText style={{ fontSize: 15, fontWeight: '800', color: '#FFFFFF' }}>
-                      माझे सध्याचे स्थान वापरा
+                    <Ionicons name={gpsSuccess ? "refresh-circle" : "navigate-circle"} size={20} color="#FFFFFF" style={{ marginRight: 6 }} />
+                    <AppText style={{ fontSize: 14, fontWeight: '800', color: '#FFFFFF' }}>
+                      {gpsSuccess ? t('addAnimal.refreshLocationBtn') : t('addAnimal.useCurrentLocationBtn')}
                     </AppText>
                   </>
                 )}
               </TouchableOpacity>
 
               {gpsSuccess && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10, justifyContent: 'center' }}>
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginTop: 10,
+                  justifyContent: 'center',
+                  backgroundColor: '#DCFCE7',
+                  paddingVertical: 6,
+                  paddingHorizontal: 10,
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: '#BBF7D0'
+                }}>
                   <Ionicons name="checkmark-circle" size={16} color="#16A34A" style={{ marginRight: 4 }} />
-                  <AppText style={{ fontSize: 12.5, color: '#15803D', fontWeight: '600' }}>
-                    स्थान प्राप्त झाले! खालील माहिती तपासा किंवा बदला.
+                  <AppText style={{ fontSize: 12, color: '#15803D', fontWeight: '700' }}>
+                    ✅ {t('addAnimal.locationSuccess')}
                   </AppText>
                 </View>
               )}
@@ -2584,23 +2670,43 @@ export default function AddAnimalScreen({ navigation }) {
               </View>
             </Modal>
 
-            {/* Village Input & Suggestions */}
+            {/* Village Input & Guidance */}
             {selectedTaluka && (
               <View style={styles.inputGroup}>
-                <AppText style={styles.largeFieldLabel}>गाव (पर्यायी) / Village (Optional)</AppText>
+                <AppText style={styles.largeFieldLabel}>{t('addAnimal.villagePlaceholder')}</AppText>
+
+                {gpsSuccess && (!selectedVillage || (typeof selectedVillage === 'string' && !selectedVillage.trim())) && (
+                  <View style={{
+                    backgroundColor: '#FEF3C7',
+                    borderWidth: 1,
+                    borderColor: '#FDE68A',
+                    borderRadius: 10,
+                    padding: 10,
+                    marginBottom: 8,
+                    flexDirection: 'row',
+                    alignItems: 'center'
+                  }}>
+                    <Ionicons name="information-circle" size={18} color="#D97706" style={{ marginRight: 6 }} />
+                    <AppText style={{ fontSize: 12, color: '#92400E', fontWeight: '600', flex: 1, lineHeight: 16 }}>
+                      {t('addAnimal.villageGpsWarning')}
+                    </AppText>
+                  </View>
+                )}
+
                 <TextInput
                   style={[styles.largeInput, { marginBottom: 4 }]}
-                  placeholder="तुमच्या गावाचे नाव टाका (माहित असल्यास)"
+                  placeholder={t('addAnimal.villagePlaceholder')}
+                  placeholderTextColor="#94A3B8"
                   value={typeof selectedVillage === 'object' ? (selectedVillage?.name || '') : (selectedVillage || '')}
                   onChangeText={(text) => setSelectedVillage(text)}
                 />
                 <AppText style={{ fontSize: 12, color: '#64748B', marginTop: 4, marginBottom: 8 }}>
-                  GPS द्वारे गावाचे नाव नेहमी अचूक मिळेलच असे नाही. माहित असल्यास गावाचे नाव भरा.
+                  {t('addAnimal.villageNote')}
                 </AppText>
                 {filteredVillages && filteredVillages.length > 0 && (
                   <View style={{ marginTop: 8 }}>
                     <AppText style={{ fontSize: 13, color: '#64748B', marginBottom: 8, fontWeight: '600' }}>
-                      पडताळणी यादीतील गाव निवडा / Select from Master List:
+                      {t('addAnimal.selectMasterVillage')}
                     </AppText>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', paddingVertical: 4 }}>
                       {filteredVillages.map((v) => {
@@ -2714,17 +2820,12 @@ export default function AddAnimalScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Sticky Wizard Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color="#0F172A" />
-        </TouchableOpacity>
-        <View style={styles.headerTitleContainer}>
-          <AppText style={styles.headerTitle}>{t('addAnimal.headerTitle')}</AppText>
-          <AppText style={styles.headerSubtitle}>{t('addAnimal.headerSubtitle', { current: currentStep, stepName: t(STEPS[currentStep - 1].titleKey) })}</AppText>
-        </View>
-        <View style={styles.placeholderBox} />
-      </View>
+            {/* Sticky Wizard Header */}
+      <CustomHeader
+        title={t('addAnimal.headerTitle')}
+        subtitle={t('addAnimal.headerSubtitle', { current: currentStep, stepName: t(STEPS[currentStep - 1].titleKey) })}
+        onBackPress={() => navigation.goBack()}
+      />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {renderStepContent()}
@@ -2873,6 +2974,140 @@ export default function AddAnimalScreen({ navigation }) {
           </View>
         </View>
       </Modal>
+
+      {/* ═══════════════════════════════════════════════════
+          FULLSCREEN PHOTO CAMERA MODAL
+          CameraView MUST be fullscreen on Android — embedding
+          inside a ScrollView causes the grey preview bug.
+      ═══════════════════════════════════════════════════ */}
+      <Modal
+        visible={showCameraModal}
+        animationType="slide"
+        statusBarTranslucent
+        onRequestClose={() => setShowCameraModal(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: '#000000' }}>
+          <CameraView
+            ref={cameraRef}
+            style={StyleSheet.absoluteFillObject}
+            facing="back"
+          />
+          {/* Instruction bar */}
+          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, paddingTop: 48, paddingHorizontal: 16, paddingBottom: 16, backgroundColor: 'rgba(0,0,0,0.45)' }}>
+            <AppText style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 16, textAlign: 'center' }}>
+              {PHOTO_STEPS[currentPhotoIndex] ? t(PHOTO_STEPS[currentPhotoIndex].nameKey) : ''}
+            </AppText>
+            <AppText style={{ color: 'rgba(255,255,255,0.75)', fontSize: 12, textAlign: 'center', marginTop: 4 }}>
+              Position the animal in the frame and press capture
+            </AppText>
+          </View>
+          {/* Bottom controls */}
+          <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, paddingBottom: 48, paddingHorizontal: 24, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+              {/* Gallery button */}
+              <TouchableOpacity
+                style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' }}
+                onPress={() => { setShowCameraModal(false); handlePickImage(); }}
+              >
+                <Ionicons name="image-outline" size={26} color="#FFFFFF" />
+              </TouchableOpacity>
+              {/* Shutter button */}
+              <TouchableOpacity
+                style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: '#FFFFFF', borderWidth: 5, borderColor: 'rgba(255,255,255,0.5)', justifyContent: 'center', alignItems: 'center' }}
+                onPress={handleCapturePhoto}
+                activeOpacity={0.8}
+              >
+                <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#FFFFFF' }} />
+              </TouchableOpacity>
+              {/* Close button */}
+              <TouchableOpacity
+                style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' }}
+                onPress={() => setShowCameraModal(false)}
+              >
+                <Ionicons name="close" size={26} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ═══════════════════════════════════════════════════
+          FULLSCREEN VIDEO CAMERA MODAL
+      ═══════════════════════════════════════════════════ */}
+      <Modal
+        visible={showVideoCameraModal}
+        animationType="slide"
+        statusBarTranslucent
+        onRequestClose={() => { handleStopRecording(); setShowVideoCameraModal(false); }}
+      >
+        <View style={{ flex: 1, backgroundColor: '#000000' }}>
+          <CameraView
+            ref={cameraRef}
+            style={StyleSheet.absoluteFillObject}
+            mode="video"
+            facing={videoCameraFacing}
+          />
+          {/* Recording indicator */}
+          {isVideoRecording && (
+            <View style={{ position: 'absolute', top: 52, left: 0, right: 0, alignItems: 'center' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(239,68,68,0.9)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 }}>
+                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#FFFFFF', marginRight: 8 }} />
+                <AppText style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 15 }}>
+                  REC {videoTimer < 10 ? `0${videoTimer}` : videoTimer}s / 30s
+                </AppText>
+              </View>
+              {/* Progress bar */}
+              <View style={{ width: '70%', height: 4, backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 2, marginTop: 10 }}>
+                <View style={{ width: `${(videoTimer / 30) * 100}%`, height: '100%', backgroundColor: '#EF4444', borderRadius: 2 }} />
+              </View>
+            </View>
+          )}
+          {/* Instruction bar (when not recording) */}
+          {!isVideoRecording && (
+            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, paddingTop: 48, paddingHorizontal: 16, paddingBottom: 16, backgroundColor: 'rgba(0,0,0,0.45)' }}>
+              <AppText style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 16, textAlign: 'center' }}>
+                {t('addAnimal.cameraBoxTitle')}
+              </AppText>
+              <AppText style={{ color: 'rgba(255,255,255,0.75)', fontSize: 12, textAlign: 'center', marginTop: 4 }}>
+                Record 20–30 seconds showing the animal
+              </AppText>
+            </View>
+          )}
+          {/* Bottom controls */}
+          <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, paddingBottom: 48, paddingHorizontal: 24, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+              {/* Empty Spacer to maintain center alignment of Shutter button */}
+              <View style={{ width: 52 }} />
+              {/* Record / Stop button */}
+              {isVideoRecording ? (
+                <TouchableOpacity
+                  style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: '#EF4444', borderWidth: 5, borderColor: 'rgba(255,255,255,0.5)', justifyContent: 'center', alignItems: 'center' }}
+                  onPress={() => handleStopRecording()}
+                  activeOpacity={0.8}
+                >
+                  <View style={{ width: 30, height: 30, borderRadius: 4, backgroundColor: '#FFFFFF' }} />
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: '#EF4444', borderWidth: 5, borderColor: 'rgba(255,255,255,0.5)', justifyContent: 'center', alignItems: 'center' }}
+                  onPress={() => handleStartRecording()}
+                  activeOpacity={0.8}
+                >
+                  <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#FFFFFF' }} />
+                </TouchableOpacity>
+              )}
+              {/* Close button */}
+              <TouchableOpacity
+                style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' }}
+                onPress={() => { if (isVideoRecording) handleStopRecording(); setShowVideoCameraModal(false); }}
+              >
+                <Ionicons name="close" size={26} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
