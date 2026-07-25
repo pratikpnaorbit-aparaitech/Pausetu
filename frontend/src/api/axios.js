@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_BASE_URL =
+export const API_BASE_URL =
   window.location.hostname === "localhost"
     ? "http://localhost:5000/api"
     : "https://pausetu.onrender.com/api";
@@ -28,5 +28,8 @@ instance.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+export const axiosInstance = instance;
+export const api = instance;
 
 export default instance;
