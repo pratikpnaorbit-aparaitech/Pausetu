@@ -2,7 +2,8 @@
 // Modern WhatsApp-style Guided Cattle Valuation Assistant screen with access check, lifetime unlock, and restart.
 
 import React, { useState, useEffect, useRef, useContext } from 'react';
-import { StyleSheet, View, SafeAreaView, TouchableOpacity, ScrollView, FlatList, ActivityIndicator, Alert, Platform } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, ScrollView, FlatList, ActivityIndicator, Alert, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import AppText from '../components/AppText';

@@ -18,5 +18,6 @@ router.get('/pending-count', protect, restrictTo('admin'), verificationControlle
 router.get('/pending', protect, restrictTo('admin'), verificationController.getPendingVerifications);
 router.get('/requests', protect, restrictTo('admin'), verificationController.getVerificationsByStatus);
 router.patch('/update/:id', protect, restrictTo('admin'), verificationController.updateVerificationStatus);
+router.delete('/:id', protect, restrictTo('admin'), verificationController.deleteVerification);
 
 module.exports = router;

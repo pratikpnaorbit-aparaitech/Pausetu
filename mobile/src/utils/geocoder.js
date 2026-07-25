@@ -12,9 +12,15 @@ const createResultObject = (village, taluka, district, state, pincode) => {
   const s = (state || '').trim();
   const p = (pincode || '').trim();
 
-  const addressParts = Array.from(new Set([v, t, d, s, p])).filter(Boolean);
+  // If village is identical to taluka or district, make it empty/optional
+  let finalVillage = v;
+  if (v.toLowerCase() === t.toLowerCase() || v.toLowerCase() === d.toLowerCase()) {
+    finalVillage = '';
+  }
+
+  const addressParts = Array.from(new Set([finalVillage, t, d, s, p])).filter(Boolean);
   return {
-    village: v || t || d || 'Murti',
+    village: finalVillage,
     taluka: t || d || 'Baramati',
     district: d || 'Pune',
     state: s || 'Maharashtra',
@@ -31,6 +37,7 @@ const geocodeWithExpo = async (lat, lng) => {
     const reverse = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
     if (reverse && reverse.length > 0) {
       const addr = reverse[0];
+      console.log('[Geocoder] Raw Expo reverseGeocodeAsync response:', addr);
       const isBusinessOrPoi = (name) => {
         if (!name) return true;
         const lower = name.toLowerCase();
@@ -39,14 +46,32 @@ const geocodeWithExpo = async (lat, lng) => {
       };
 
       const cleanName = (!isBusinessOrPoi(addr.name) ? addr.name : null);
-      const village = cleanName || addr.subregion || addr.city || addr.district || '';
-      const taluka = addr.district || addr.subregion || '';
-      const district = addr.city || addr.subregion || addr.district || '';
-      const state = addr.region || '';
+      const village = addr.subLocality || cleanName || addr.street || '';
+
+      // Priority mapping:
+      // State: administrativeArea OR region
+      const state = addr.administrativeArea || addr.region || '';
+
+      // District: subAdministrativeArea OR state_district OR subregion (avoid duplicating town/city in district)
+      let district = addr.subAdministrativeArea || addr.subregion;
+      if (!district && addr.district) {
+        const dLower = addr.district.toLowerCase();
+        const cityLower = (addr.city || '').toLowerCase();
+        const locLower = (addr.locality || '').toLowerCase();
+        if (dLower !== cityLower && dLower !== locLower) {
+          district = addr.district;
+        }
+      }
+      if (!district) {
+        district = addr.subregion || addr.district || '';
+      }
+
+      // Taluka: city OR locality OR subdistrict
+      const taluka = addr.city || addr.locality || addr.district || '';
       const pincode = addr.postalCode || '';
 
       if (state || district || taluka || village) {
-        console.log('[Geocoder] Expo reverseGeocodeAsync succeeded');
+        console.log('[Geocoder] Expo reverseGeocodeAsync mapped:', { village, taluka, district, state, pincode });
         return createResultObject(village, taluka, district, state, pincode);
       }
     }
@@ -67,14 +92,14 @@ const geocodeWithOSM = async (lat, lng) => {
       const data = await res.json();
       if (data && data.address) {
         const a = data.address;
-        const village = a.village || a.suburb || a.neighbourhood || a.hamlet || a.town || a.city_district || '';
-        const taluka = a.county || a.state_district || a.subdistrict || a.town || '';
+        const village = a.suburb || a.village || a.neighbourhood || a.hamlet || '';
+        const taluka = a.town || a.subdistrict || a.municipality || a.county || '';
         const district = a.state_district || a.county || a.city || '';
         const state = a.state || '';
         const pincode = a.postcode || '';
 
         if (state || district || taluka || village) {
-          console.log('[Geocoder] OpenStreetMap reverse geocoding succeeded');
+          console.log('[Geocoder] OpenStreetMap reverse geocoding mapped:', { village, taluka, district, state, pincode });
           return createResultObject(village, taluka, district, state, pincode);
         }
       }
@@ -95,9 +120,9 @@ const geocodeWithBigDataCloud = async (lat, lng) => {
     if (res.ok) {
       const data = await res.json();
       if (data) {
-        const village = data.locality || data.city || '';
-        const taluka = data.principalSubdivisionCode || data.locality || '';
-        const district = data.principalSubdivision || data.city || '';
+        const village = data.locality || '';
+        const taluka = data.localityInfo?.administrative?.find(item => item.adminLevel === 8)?.name || '';
+        const district = data.localityInfo?.administrative?.find(item => item.adminLevel === 6)?.name || data.city || '';
         const state = data.principalSubdivision || '';
         const pincode = data.postcode || '';
 

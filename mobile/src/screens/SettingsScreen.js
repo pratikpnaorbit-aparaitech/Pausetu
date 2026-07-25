@@ -1,11 +1,12 @@
 import React, { useState, useContext, useMemo, useCallback } from 'react';
 import {
-  StyleSheet, View, SafeAreaView, ScrollView,
+  StyleSheet, View, ScrollView,
   TouchableOpacity, Switch, Alert, Platform, Modal,
-  Linking, ActivityIndicator, Text,
-} from 'react-native';
+  Linking, ActivityIndicator, Text} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
+import CustomHeader from '../components/CustomHeader';
 import { AppContext } from '../context/AppContext';
 import { api } from '../api/api';
 import { useTranslation } from 'react-i18next';
@@ -351,18 +352,11 @@ export default function SettingsScreen({ navigation }) {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: T.bg }]}>
 
-      {/* ── Header ──────────────────────────────────────────────────── */}
-      <View style={[styles.header, { backgroundColor: T.card, borderBottomColor: T.border }]}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-          accessibilityLabel="Go back"
-        >
-          <Ionicons name="arrow-back" size={22} color={T.text} />
-        </TouchableOpacity>
-        <AppText style={[styles.headerTitle, { color: T.text }]}>{t('settings.title')}</AppText>
-        <View style={styles.placeholderBox} />
-      </View>
+            {/* ── Header ──────────────────────────────────────────────────── */}
+      <CustomHeader
+        title={t('settings.title')}
+        onBackPress={() => navigation.goBack()}
+      />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 

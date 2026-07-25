@@ -11,7 +11,9 @@ export const verificationApi = {
           name: u.fullName || u.name || 'Unnamed User',
           phone: u.mobile || u.phoneNumber || 'N/A',
           role: u.role || 'buyer',
-          receiptUrl: u.verification?.receiptUrl || '',
+          receiptUrl: u.verification?.receiptImage || u.verification?.receiptUrl || '',
+          receiptImage: u.verification?.receiptImage || u.verification?.receiptUrl || '',
+          receiptImagePublicId: u.verification?.receiptImagePublicId || u.verification?.receiptPublicId || '',
           farmerName: u.verification?.farmerName || '',
           dairyName: u.verification?.dairyName || '',
           receiptDate: u.verification?.receiptDate ? new Date(u.verification.receiptDate).toLocaleDateString() : '',
@@ -62,6 +64,16 @@ export const verificationApi = {
       return res;
     } catch (e) {
       console.error('[Verification API Update Settings Error]', e);
+      throw e;
+    }
+  },
+
+  deleteRequest: async (id) => {
+    try {
+      const res = await axios.delete(`/verification/${id}`);
+      return res && res.status === 'success';
+    } catch (e) {
+      console.error('[Verification API Delete Error]', e);
       throw e;
     }
   }

@@ -2,15 +2,14 @@ import React, { useState, useContext } from 'react';
 import {
   StyleSheet,
   View,
-  SafeAreaView,
   TouchableOpacity,
   ScrollView,
   Alert,
   ActivityIndicator,
   Platform,
   Image,
-  Modal,
-} from 'react-native';
+  Modal} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -20,6 +19,7 @@ import { AppContext } from '../context/AppContext';
 import { animalApi } from '../api/animalApi';
 import { verificationApi } from '../api/verificationApi';
 import AppText from '../components/AppText';
+import CustomHeader from '../components/CustomHeader';
 
 // ─── Date Picker Helper ───────────────────────────────────────────────────────
 
@@ -204,7 +204,7 @@ export default function VerificationScreen({ navigation }) {
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: 'images',
       allowsEditing: true,
       quality: 1,
     });
@@ -225,7 +225,7 @@ export default function VerificationScreen({ navigation }) {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: 'images',
       allowsEditing: true,
       quality: 1,
     });
@@ -435,22 +435,16 @@ export default function VerificationScreen({ navigation }) {
   // ── Main screen ─────────────────────────────────────────────────────────────
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => {
-            if (showForm) {
-              setShowForm(false);
-            } else {
-              navigation.goBack();
-            }
-          }}
-        >
-          <Ionicons name="arrow-back" size={24} color="#1E293B" />
-        </TouchableOpacity>
-        <AppText style={styles.headerTitle}>{t('verification.title')}</AppText>
-        <View style={{ width: 40 }} />
-      </View>
+            <CustomHeader
+        title={t('verification.title')}
+        onBackPress={() => {
+          if (showForm) {
+            setShowForm(false);
+          } else {
+            navigation.goBack();
+          }
+        }}
+      />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 

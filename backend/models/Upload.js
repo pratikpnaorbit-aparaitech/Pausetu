@@ -13,6 +13,9 @@ const uploadSchema = new mongoose.Schema(
       type: String,
       required: [true, 'File URL is required']
     },
+    publicId: {
+      type: String
+    },
     uploadedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

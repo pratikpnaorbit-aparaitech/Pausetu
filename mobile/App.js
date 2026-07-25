@@ -11,7 +11,7 @@ export default function App() {
     <I18nextProvider i18n={i18n}>
       <SafeAreaProvider>
         <AppProvider>
-          <StatusBar style="light" />
+          <StatusBar style="dark" translucent={false} backgroundColor="#FFFFFF" />
           <AppNavigator />
         </AppProvider>
       </SafeAreaProvider>

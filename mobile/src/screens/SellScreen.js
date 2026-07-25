@@ -1,5 +1,7 @@
 import React, { useContext, useEffect, useState, useMemo, useCallback } from 'react';
-import { StyleSheet, View, SafeAreaView, ScrollView, Image, TouchableOpacity, Dimensions, FlatList, Share, Alert, ActivityIndicator, Animated, Platform, AppState } from 'react-native';
+import { StyleSheet, View, ScrollView, Image, TouchableOpacity, Dimensions, FlatList, Share, Alert, ActivityIndicator, Animated, Platform, AppState } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppContext } from '../context/AppContext';
 import { api, resolveMediaUrl } from '../api/api';
@@ -180,6 +182,7 @@ export default function SellScreen({ navigation }) {
       .slice(0, 5)
       .map(a => ({
         id: a._id,
+        rawAnimal: a,
         name: a.title,
         breed: a.breedId?.name || 'Breed',
         price: `₹${a.price.toLocaleString()}`,
@@ -346,7 +349,7 @@ export default function SellScreen({ navigation }) {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.mainScrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Quick Statistics Grid */}
         <View style={styles.statsGrid}>
           {statsData.slice(0, 3).map((item) => (
@@ -438,8 +441,17 @@ export default function SellScreen({ navigation }) {
           data={recentListings}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listingsList}
+          style={styles.recentListingsFlatList}
           renderItem={({ item }) => (
-            <View style={styles.listingCard}>
+            <TouchableOpacity
+              style={styles.listingCard}
+              activeOpacity={0.85}
+              onPress={() => {
+                console.log("Recent Listing Pressed", item.id);
+                console.log("navigation.navigate('AnimalDetails', { animal: item.rawAnimal, id: item.id })");
+                navigation.navigate('AnimalDetails', { animal: item.rawAnimal, id: item.id });
+              }}
+            >
               <View style={styles.listingImageContainer}>
                 <Image source={{ uri: item.image }} style={styles.listingImage} resizeMode="cover" />
                 <View style={styles.activeBadge}>
@@ -476,7 +488,7 @@ export default function SellScreen({ navigation }) {
                   </TouchableOpacity>
                 </View>
               </View>
-            </View>
+            </TouchableOpacity>
           )}
         />
 
@@ -558,6 +570,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
+  },
+  mainScrollView: {
+    flex: 1,
+  },
+  recentListingsFlatList: {
+    height: 180,
   },
   header: {
     flexDirection: 'row',
@@ -683,7 +701,6 @@ const styles = StyleSheet.create({
     minHeight: 140,
     justifyContent: 'space-between',
     position: 'relative',
-    height: '100%',
   },
   ctaPatternCircle1: {
     position: 'absolute',

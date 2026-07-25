@@ -1,14 +1,54 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { StyleSheet, View, SafeAreaView, FlatList, TouchableOpacity, Alert, Modal, ActivityIndicator, Platform } from 'react-native';
+import { StyleSheet, View, FlatList, TouchableOpacity, Alert, Modal, ActivityIndicator, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import NotificationCard from '../components/NotificationCard';
+import CustomHeader from '../components/CustomHeader';
 import { api } from '../api/api';
 import { useTranslation } from 'react-i18next';
 import AppText from '../components/AppText';
 import { useAutoRefresh } from '../hooks/useAutoRefresh';
 import { REFRESH_EVENTS } from '../services/refreshManager';
 
-const mapBackendNotification = (n) => {
+const parseLocalizedText = (text, lang = 'en') => {
+  if (!text) return '';
+  if (text.includes(' / ')) {
+    const parts = text.split(' / ');
+    if (lang.startsWith('mr') || lang.startsWith('hi')) {
+      return parts[0].trim();
+    } else {
+      return parts[1] ? parts[1].trim() : parts[0].trim();
+    }
+  }
+  return text;
+};
+
+const formatRelativeTime = (dateStr, lang = 'en') => {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now - date;
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffHr = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMin < 1) {
+    return lang.startsWith('mr') ? 'आत्ताच' : lang.startsWith('hi') ? 'अभी' : 'Just now';
+  }
+  if (diffMin < 60) {
+    return lang.startsWith('mr') ? `${diffMin} मिनिटांपूर्वी` : lang.startsWith('hi') ? `${diffMin} मिनट पहले` : `${diffMin} min ago`;
+  }
+  if (diffHr < 24) {
+    return lang.startsWith('mr') ? `${diffHr} तासांपूर्वी` : lang.startsWith('hi') ? `${diffHr} घंटे पहले` : `${diffHr} hrs ago`;
+  }
+  if (diffDays === 1) {
+    return lang.startsWith('mr') ? 'काल' : lang.startsWith('hi') ? 'कल' : 'Yesterday';
+  }
+  return date.toLocaleDateString();
+};
+
+const mapBackendNotification = (n, lang = 'en') => {
   let category = 'System';
   let icon = 'cog-outline';
   let iconColor = '#64748B';
@@ -25,11 +65,11 @@ const mapBackendNotification = (n) => {
     badgeColor = '#DCFCE7';
     badgeTextColor = '#16A34A';
     priority = 'Low';
-  } else if (n.type === 'alert') {
+  } else if (n.type === 'alert' || n.type === 'error') {
     category = 'Listings';
     icon = 'alert-circle-outline';
     iconColor = '#EF4444';
-    badgeText = 'Rejected';
+    badgeText = 'Alert';
     badgeColor = '#FEE2E2';
     badgeTextColor = '#EF4444';
     priority = 'High';
@@ -37,25 +77,35 @@ const mapBackendNotification = (n) => {
     category = 'Messages';
     icon = 'account-question-outline';
     iconColor = '#3B82F6';
-    badgeText = 'New Message';
+    badgeText = 'Message';
     badgeColor = '#DBEAFE';
     badgeTextColor = '#2563EB';
     priority = 'High';
+  } else if (n.type === 'warning') {
+    category = 'System';
+    icon = 'warning-outline';
+    iconColor = '#D97706';
+    badgeText = 'Warning';
+    badgeColor = '#FEF3C7';
+    badgeTextColor = '#D97706';
+    priority = 'Medium';
   }
 
   return {
-    id: n._id,
+    id: n._id || n.id,
     category,
-    title: n.title,
-    description: n.message,
-    time: new Date(n.createdAt).toLocaleDateString(),
+    title: parseLocalizedText(n.title, lang),
+    description: parseLocalizedText(n.message, lang),
+    time: formatRelativeTime(n.createdAt, lang),
     isRead: n.isRead,
     icon,
     iconColor,
     badgeText,
     badgeColor,
     badgeTextColor,
-    priority
+    priority,
+    targetScreen: n.targetScreen,
+    relatedId: n.relatedId
   };
 };
 
@@ -67,7 +117,7 @@ export default function NotificationsScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isMenuVisible, setIsMenuVisible] = useState(false);
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const isFetchingRef = useRef(false);
 
@@ -79,7 +129,8 @@ export default function NotificationsScreen({ navigation }) {
     try {
       const res = await api.getMyNotifications();
       if (res.status === 'success') {
-        setNotifications((res.data.notifications || []).map(mapBackendNotification));
+        const lang = i18n.language || 'en';
+        setNotifications((res.data.notifications || []).map(n => mapBackendNotification(n, lang)));
       }
     } catch (err) {
       console.warn('Failed to load notifications:', err.message);
@@ -166,37 +217,65 @@ export default function NotificationsScreen({ navigation }) {
     fetchNotifications();
   };
 
+  const handlePressNotification = useCallback((item) => {
+    if (!item.isRead) {
+      handleMarkAsRead(item.id);
+    }
+
+    if (item.targetScreen === 'AnimalDetails' && item.relatedId) {
+      navigation.navigate('AnimalDetails', { id: item.relatedId });
+    } else if (item.targetScreen === 'Verification') {
+      navigation.navigate('Verification');
+    } else if (item.targetScreen === 'Chat' && item.relatedId) {
+      navigation.navigate('ChatScreen', { conversationId: item.relatedId });
+    } else if (item.targetScreen === 'MyListings') {
+      navigation.navigate('MyListings');
+    } else if (item.targetScreen === 'Profile') {
+      navigation.navigate('Profile');
+    } else {
+      const titleLower = (item.title || '').toLowerCase();
+      if (titleLower.includes('पावती') || titleLower.includes('verification')) {
+        navigation.navigate('Verification');
+      } else if (titleLower.includes('जाहिरात') || titleLower.includes('listing')) {
+        if (item.relatedId) {
+          navigation.navigate('AnimalDetails', { id: item.relatedId });
+        } else {
+          navigation.navigate('MyListings');
+        }
+      }
+    }
+  }, [handleMarkAsRead, navigation]);
+
   const renderNotificationItem = useCallback(({ item }) => (
     <NotificationCard
       item={item}
       onMarkAsRead={handleMarkAsRead}
       onDelete={handleDeleteNotification}
+      onPressCard={handlePressNotification}
     />
-  ), [handleMarkAsRead, handleDeleteNotification]);
+  ), [handleMarkAsRead, handleDeleteNotification, handlePressNotification]);
 
   return (
     <SafeAreaView style={styles.container}>
       {/* Top Header */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={22} color="#0F172A" />
-          </TouchableOpacity>
-          <AppText style={styles.headerTitle}>{t('notifications.title')}</AppText>
-        </View>
+      <CustomHeader
+        title={t('notifications.title')}
+        onBackPress={() => navigation.goBack()}
+        centered={false}
+        rightComponent={
+          <View style={styles.headerRight}>
+            {notifications.length > 0 && (
+              <TouchableOpacity style={styles.headerMarkReadBtn} onPress={handleMarkAllAsRead}>
+                <AppText style={styles.headerMarkReadText}>{t('notifications.markAllRead')}</AppText>
+              </TouchableOpacity>
+            )}
 
-        <View style={styles.headerRight}>
-          {notifications.length > 0 && (
-            <TouchableOpacity style={styles.headerMarkReadBtn} onPress={handleMarkAllAsRead}>
-              <AppText style={styles.headerMarkReadText}>{t('notifications.markAllRead')}</AppText>
+            <TouchableOpacity style={styles.headerMenuBtn} onPress={() => setIsMenuVisible(true)}>
+              <Ionicons name="ellipsis-vertical" size={20} color="#0F172A" />
             </TouchableOpacity>
-          )}
-
-          <TouchableOpacity style={styles.headerMenuBtn} onPress={() => setIsMenuVisible(true)}>
-            <Ionicons name="ellipsis-vertical" size={20} color="#0F172A" />
-          </TouchableOpacity>
-        </View>
-      </View>
+          </View>
+        }
+      />
 
       {/* Categories Tabs Row */}
       <View style={styles.tabsContainer}>
@@ -236,7 +315,7 @@ export default function NotificationsScreen({ navigation }) {
         initialNumToRender={8}
         maxToRenderPerBatch={8}
         windowSize={5}
-        removeClippedSubviews={Platform.OS === 'android'}
+        removeClippedSubviews={false}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         refreshing={isRefreshing}

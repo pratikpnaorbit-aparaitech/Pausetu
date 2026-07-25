@@ -1,5 +1,7 @@
 import React, { useContext, useState, useMemo, useCallback } from 'react';
-import { StyleSheet, View, SafeAreaView, ScrollView, Image, TouchableOpacity, Alert, Modal, TextInput, ActivityIndicator, Platform, Text } from 'react-native';
+import { StyleSheet, View, ScrollView, Image, TouchableOpacity, Alert, Modal, TextInput, ActivityIndicator, Platform, Text } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { AppContext } from '../context/AppContext';
@@ -8,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { resolveMediaUrl } from '../api/api';
 import AppText from '../components/AppText';
 import VerificationCard from '../components/VerificationCard';
+import CustomHeader from '../components/CustomHeader';
 import { formatLocationDisplay } from '../utils/geocoder';
 
 const SELLER_STATS = [
@@ -150,7 +153,7 @@ export default function ProfileScreen({ navigation }) {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: 'images',
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8
@@ -166,14 +169,23 @@ export default function ProfileScreen({ navigation }) {
     setUploading(true);
     setUploadProgress(0);
     try {
-      const filename = uri.split('/').pop() || 'photo.jpg';
-      const match = /\.(\w+)$/.exec(filename);
-      const type = match ? `image/${match[1]}` : `image/jpeg`;
+      let filename = uri.split('/').pop() || 'photo.jpg';
+      let match = /\.(\w+)$/.exec(filename);
+      let type = match ? `image/${match[1]}` : `image/jpeg`;
 
       const formData = new FormData();
       if (Platform.OS === 'web') {
         const resBlob = await fetch(uri);
         const blob = await resBlob.blob();
+        if (blob.type) {
+          type = blob.type;
+          const ext = blob.type.split('/').pop();
+          if (ext && !filename.endsWith(`.${ext}`)) {
+            filename = `${filename}.${ext}`;
+          }
+        } else if (!match) {
+          filename = `${filename}.jpg`;
+        }
         formData.append('photo', blob, filename);
       } else {
         formData.append('photo', {
@@ -242,19 +254,19 @@ export default function ProfileScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header bar */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={22} color="#0F172A" />
-        </TouchableOpacity>
-        <AppText style={styles.headerTitle}>{t('profile.title')}</AppText>
-        <TouchableOpacity style={styles.backButton} onPress={triggerSync} disabled={syncing}>
-          {syncing ? (
-            <ActivityIndicator size="small" color="#16A34A" />
-          ) : (
-            <Ionicons name="refresh-outline" size={22} color="#16A34A" />
-          )}
-        </TouchableOpacity>
-      </View>
+      <CustomHeader
+        title={t('profile.title')}
+        onBackPress={() => navigation.goBack()}
+        rightComponent={
+          <TouchableOpacity style={styles.backButton} onPress={triggerSync} disabled={syncing}>
+            {syncing ? (
+              <ActivityIndicator size="small" color="#16A34A" />
+            ) : (
+              <Ionicons name="refresh-outline" size={22} color="#16A34A" />
+            )}
+          </TouchableOpacity>
+        }
+      />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 

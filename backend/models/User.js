@@ -33,6 +33,9 @@ const userSchema = new mongoose.Schema(
     profilePhoto: {
       type: String
     },
+    profilePhotoPublicId: {
+      type: String
+    },
     village: {
       type: String
     },
@@ -65,6 +68,9 @@ const userSchema = new mongoose.Schema(
         default: 'unverified'
       },
       receiptUrl: String,
+      receiptPublicId: String,
+      receiptImage: String,
+      receiptImagePublicId: String,
       farmerName: String,
       dairyName: String,
       receiptDate: Date,

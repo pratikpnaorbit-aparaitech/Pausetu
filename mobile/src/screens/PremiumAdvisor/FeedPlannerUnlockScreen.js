@@ -2,7 +2,8 @@
 // Lifetime unlock screen for the AI Feed Planner Advisor, utilizing ₹1 Demo payment gateway simulation.
 
 import React from 'react';
-import { StyleSheet, View, SafeAreaView, TouchableOpacity, ScrollView } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import AppText from '../../components/AppText';

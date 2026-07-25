@@ -66,16 +66,20 @@ exports.markAsRead = asyncHandler(async (req, res, next) => {
  * Delete a notification
  */
 exports.deleteNotification = asyncHandler(async (req, res, next) => {
-  const notification = await Notification.findOneAndDelete({
-    _id: req.params.id,
-    recipient: req.user.id
-  });
+  const notification = await Notification.findById(req.params.id);
 
   if (!notification) {
     return next(new AppError('Notification not found', 404));
   }
 
-  res.status(204).json({
+  // Explicit ownership validation
+  if (notification.recipient.toString() !== req.user.id.toString()) {
+    return next(new AppError('You do not have permission to delete this notification', 403));
+  }
+
+  await Notification.findByIdAndDelete(req.params.id);
+
+  res.status(200).json({
     status: 'success',
     data: null
   });

@@ -1,5 +1,7 @@
 import React, { useContext, useState, useMemo, useCallback } from 'react';
-import { StyleSheet, View, SafeAreaView, ScrollView, TouchableOpacity, Image } from 'react-native';
+import { StyleSheet, View, ScrollView, TouchableOpacity, Image } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppContext } from '../context/AppContext';
@@ -36,6 +38,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar style="light" translucent={false} backgroundColor="#0F2027" />
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Welcome Header Card */}
         <LinearGradient colors={isPremium ? ['#7F00FF', '#E100FF'] : ['#11998e', '#38ef7d']} style={styles.headerCard}>

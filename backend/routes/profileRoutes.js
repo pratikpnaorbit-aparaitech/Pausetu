@@ -11,7 +11,8 @@ router.use(protect);
 router
   .route('/')
   .get(profileController.getProfile)
-  .put(profileController.updateProfile);
+  .put(profileController.updateProfile)
+  .delete(profileController.deleteProfile);
 
 router.post('/upload-photo', upload.single('photo'), profileController.uploadPhoto);
 

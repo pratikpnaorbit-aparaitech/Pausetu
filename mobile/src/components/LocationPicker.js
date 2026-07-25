@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -9,19 +9,31 @@ import {
   Modal,
   Platform,
   KeyboardAvoidingView,
-  TouchableWithoutFeedback,
-  Keyboard
+  Pressable,
+  Keyboard,
+  Animated,
+  PanResponder,
+  Dimensions,
+  ScrollView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useTranslation } from 'react-i18next';
 import AppText from './AppText';
 
+const { height: SCREEN_H } = Dimensions.get('window');
+const SHEET_H = Math.round(SCREEN_H * 0.52); // ~50-52% of screen height
+const DISMISS_THRESHOLD = 70;
+
 export default function LocationPicker({ visible, onClose, onSelectLocation }) {
   const { t, i18n } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [gpsSuccess, setGpsSuccess] = useState(false);
   const [pincode, setPincode] = useState('');
+
+  const translateY = useRef(new Animated.Value(SHEET_H)).current;
+  const dragY = useRef(new Animated.Value(0)).current;
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
 
   const getCloseAccessibilityLabel = () => {
     const lang = i18n.language || 'en';
@@ -30,12 +42,73 @@ export default function LocationPicker({ visible, onClose, onSelectLocation }) {
     return 'Close';
   };
 
-  // Reset state when modal opens
+  // PanResponder for swipe-down dismiss
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => gestureState.dy > 5,
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dy > 0) {
+          dragY.setValue(gestureState.dy);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy > DISMISS_THRESHOLD || gestureState.vy > 0.5) {
+          handleDismiss();
+        } else {
+          Animated.spring(dragY, {
+            toValue: 0,
+            useNativeDriver: true,
+            bounciness: 4
+          }).start();
+        }
+      }
+    })
+  ).current;
+
+  const animateIn = () => {
+    dragY.setValue(0);
+    Animated.parallel([
+      Animated.timing(translateY, {
+        toValue: 0,
+        duration: 280,
+        useNativeDriver: true
+      }),
+      Animated.timing(backdropOpacity, {
+        toValue: 1,
+        duration: 280,
+        useNativeDriver: true
+      })
+    ]).start();
+  };
+
+  const handleDismiss = () => {
+    Animated.parallel([
+      Animated.timing(translateY, {
+        toValue: SHEET_H,
+        duration: 220,
+        useNativeDriver: true
+      }),
+      Animated.timing(backdropOpacity, {
+        toValue: 0,
+        duration: 220,
+        useNativeDriver: true
+      })
+    ]).start(() => {
+      dragY.setValue(0);
+      if (typeof onClose === 'function') {
+        onClose();
+      }
+    });
+  };
+
+  // Reset state and animate when modal opens
   useEffect(() => {
     if (visible) {
       setPincode('');
       setLoading(false);
       setGpsSuccess(false);
+      animateIn();
     }
   }, [visible]);
 
@@ -46,11 +119,32 @@ export default function LocationPicker({ visible, onClose, onSelectLocation }) {
       const reverse = await Location.reverseGeocodeAsync({ latitude, longitude });
       if (reverse && reverse.length > 0 && (reverse[0].region || reverse[0].district || reverse[0].city)) {
         const addr = reverse[0];
+        console.log('[LocationPicker] Raw Expo reverseGeocodeAsync:', addr);
+
+        const state = addr.administrativeArea || addr.region || 'Maharashtra';
+        let district = addr.subAdministrativeArea || addr.state_district || addr.subregion;
+        if (!district && addr.district) {
+          const dLower = addr.district.toLowerCase();
+          const cityLower = (addr.city || '').toLowerCase();
+          const locLower = (addr.locality || '').toLowerCase();
+          if (dLower !== cityLower && dLower !== locLower) {
+            district = addr.district;
+          }
+        }
+        if (!district) {
+          district = addr.subregion || addr.district || 'Pune';
+        }
+
+        const taluka = addr.city || addr.locality || addr.district || 'Baramati';
+        const village = addr.subLocality || addr.street || addr.name || '';
+
         return {
-          state: addr.region || addr.country || 'Maharashtra',
-          district: addr.district || addr.subregion || addr.city || 'Pune',
-          taluka: addr.subregion || addr.district || addr.city || 'Baramati',
-          village: addr.city || addr.subregion || addr.street || addr.name || ''
+          state,
+          district: district.replace(/ District$/i, '').replace(/ Division$/i, '').trim(),
+          taluka: taluka.replace(/ Taluka$/i, '').replace(/ Sub-District$/i, '').trim(),
+          village,
+          latitude,
+          longitude
         };
       }
     } catch (err) {
@@ -67,14 +161,14 @@ export default function LocationPicker({ visible, onClose, onSelectLocation }) {
         if (data && data.address) {
           const a = data.address;
           const state = a.state || a.province || 'Maharashtra';
-          const district = a.county || a.state_district || a.city || a.town || 'Pune';
-          const taluka = a.municipality || a.suburb || a.town || a.county || 'Baramati';
-          const village = a.village || a.neighbourhood || a.suburb || a.city_district || a.town || a.city || '';
+          const district = a.state_district || a.county || a.city || 'Pune';
+          const taluka = a.town || a.subdistrict || a.municipality || a.county || 'Baramati';
+          const village = a.suburb || a.village || a.neighbourhood || a.hamlet || '';
 
           return {
             state,
-            district: district.replace(/ District$/i, '').replace(/ Division$/i, ''),
-            taluka: taluka.replace(/ Taluka$/i, '').replace(/ Sub-District$/i, ''),
+            district: district.replace(/ District$/i, '').replace(/ Division$/i, '').trim(),
+            taluka: taluka.replace(/ Taluka$/i, '').replace(/ Sub-District$/i, '').trim(),
             village,
             latitude,
             longitude
@@ -255,122 +349,145 @@ export default function LocationPicker({ visible, onClose, onSelectLocation }) {
   return (
     <Modal
       visible={visible}
-      animationType="slide"
       transparent={true}
-      onRequestClose={onClose}
+      animationType="none"
+      statusBarTranslucent={true}
+      onRequestClose={handleDismiss}
     >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View style={styles.modalOverlay}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.keyboardView}
-          >
-            <View style={styles.modalContent}>
-              {/* Header */}
-              <View style={styles.modalHeader}>
-                <View style={{ flex: 1, marginRight: 12 }}>
-                  <View style={styles.titleRow}>
-                    <Ionicons name="location" size={22} color="#16A34A" style={{ marginRight: 6 }} />
-                    <AppText style={styles.modalTitle}>{t('locationPicker.title')}</AppText>
-                  </View>
-                  <AppText style={styles.modalSubtitle}>{t('locationPicker.subtitle')}</AppText>
-                </View>
-                <TouchableOpacity 
-                  onPress={onClose} 
-                  style={styles.closeButton}
-                  accessibilityRole="button"
-                  accessibilityLabel={getCloseAccessibilityLabel()}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="close" size={20} color="#374151" />
-                </TouchableOpacity>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.modalOverlay}
+      >
+        {/* Dim Backdrop */}
+        <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={handleDismiss} />
+        </Animated.View>
+
+        {/* Bottom Sheet Container */}
+        <Animated.View
+          style={[
+            styles.modalContent,
+            {
+              transform: [
+                {
+                  translateY: Animated.add(translateY, dragY)
+                }
+              ]
+            }
+          ]}
+        >
+          {/* Drag Handle Area (Swipe Down to Dismiss) */}
+          <View {...panResponder.panHandlers} style={styles.dragArea}>
+            <View style={styles.dragHandle} />
+          </View>
+
+          {/* Header */}
+          <View style={styles.modalHeader}>
+            <View style={{ flex: 1, marginRight: 12 }}>
+              <View style={styles.titleRow}>
+                <Ionicons name="location" size={22} color="#16A34A" style={{ marginRight: 6 }} />
+                <AppText style={styles.modalTitle}>{t('locationPicker.title')}</AppText>
               </View>
+              <AppText style={styles.modalSubtitle}>{t('locationPicker.subtitle')}</AppText>
+            </View>
+            <TouchableOpacity 
+              onPress={handleDismiss} 
+              style={styles.closeButton}
+              accessibilityRole="button"
+              accessibilityLabel={getCloseAccessibilityLabel()}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="close" size={20} color="#374151" />
+            </TouchableOpacity>
+          </View>
 
-              {/* Body */}
-              <View style={styles.modalBody}>
-                {loading ? (
-                  <View style={styles.loaderContainer}>
-                    <ActivityIndicator size="large" color="#16A34A" />
-                    <AppText style={styles.loaderText}>{t('locationPicker.detecting')}</AppText>
-                  </View>
-                ) : (
-                <View style={styles.menuContainer}>
-                  {/* Option 1: Single Full-Width Primary GPS Button */}
-                  <TouchableOpacity
-                    style={[
-                      styles.primaryGpsButton,
-                      loading && styles.primaryGpsButtonDisabled
-                    ]}
-                    onPress={handleUseCurrentLocation}
-                    disabled={loading}
-                    activeOpacity={0.85}
-                  >
-                    {loading ? (
-                      <View style={styles.loadingRow}>
-                        <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />
-                        <AppText style={styles.primaryGpsButtonText}>
-                          स्थान शोधत आहे...
-                        </AppText>
-                      </View>
-                    ) : (
-                      <View style={styles.loadingRow}>
-                        <Ionicons name="navigate" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-                        <AppText style={styles.primaryGpsButtonText}>
-                          📍 माझा सध्याचा पत्ता वापरा
-                        </AppText>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-
-                  {gpsSuccess && (
-                    <View style={styles.successContainer}>
-                      <Ionicons name="checkmark-circle" size={16} color="#16A34A" style={{ marginRight: 6 }} />
-                      <AppText style={styles.successText}>
-                        ✅ वर्तमान स्थान सापडले
+          {/* Body Content */}
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.scrollBody}
+          >
+            {loading ? (
+              <View style={styles.loaderContainer}>
+                <ActivityIndicator size="large" color="#16A34A" />
+                <AppText style={styles.loaderText}>{t('locationPicker.detecting')}</AppText>
+              </View>
+            ) : (
+              <View style={styles.menuContainer}>
+                {/* Option 1: GPS Button */}
+                <TouchableOpacity
+                  style={[
+                    styles.primaryGpsButton,
+                    loading && styles.primaryGpsButtonDisabled
+                  ]}
+                  onPress={handleUseCurrentLocation}
+                  disabled={loading}
+                  activeOpacity={0.85}
+                >
+                  {loading ? (
+                    <View style={styles.loadingRow}>
+                      <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />
+                      <AppText style={styles.primaryGpsButtonText}>
+                        स्थान शोधत आहे...
+                      </AppText>
+                    </View>
+                  ) : (
+                    <View style={styles.loadingRow}>
+                      <Ionicons name="navigate" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+                      <AppText style={styles.primaryGpsButtonText}>
+                        📍 माझा सध्याचा पत्ता वापरा
                       </AppText>
                     </View>
                   )}
+                </TouchableOpacity>
 
-                  {/* Divider */}
-                  <View style={styles.dividerContainer}>
-                    <View style={styles.dividerLine} />
-                    <AppText style={styles.dividerText}>
-                      {t('locationPicker.dividerText') ? ` ${t('locationPicker.dividerText')} ` : ' OR '}
+                {gpsSuccess && (
+                  <View style={styles.successContainer}>
+                    <Ionicons name="checkmark-circle" size={16} color="#16A34A" style={{ marginRight: 6 }} />
+                    <AppText style={styles.successText}>
+                      ✅ वर्तमान स्थान सापडले
                     </AppText>
-                    <View style={styles.dividerLine} />
-                  </View>
-
-                    {/* Option 2: PIN Code Card */}
-                    <View style={styles.pinCard}>
-                      <AppText style={styles.pinCardTitle}>{t('locationPicker.searchPinTitle')}</AppText>
-                      <View style={styles.pinInputWrapper}>
-                        <Ionicons name="mail-open" size={20} color="#64748B" style={styles.pinIcon} />
-                        <TextInput
-                          style={styles.pinTextInput}
-                          placeholder={t('locationPicker.pinPlaceholder')}
-                          placeholderTextColor="#94A3B8"
-                          value={pincode}
-                          onChangeText={(val) => setPincode(val.replace(/[^0-9]/g, '').slice(0, 6))}
-                          keyboardType="number-pad"
-                          maxLength={6}
-                        />
-                      </View>
-                      <TouchableOpacity
-                        style={[styles.pinSubmitButton, !isPinValid && styles.pinSubmitButtonDisabled]}
-                        onPress={handlePincodeSearch}
-                        disabled={!isPinValid}
-                      >
-                        <Ionicons name="search" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-                        <AppText style={styles.pinSubmitButtonText}>{t('locationPicker.findLocationBtn')}</AppText>
-                      </TouchableOpacity>
-                    </View>
                   </View>
                 )}
+
+                {/* Divider */}
+                <View style={styles.dividerContainer}>
+                  <View style={styles.dividerLine} />
+                  <AppText style={styles.dividerText}>
+                    {t('locationPicker.dividerText') ? ` ${t('locationPicker.dividerText')} ` : ' OR '}
+                  </AppText>
+                  <View style={styles.dividerLine} />
+                </View>
+
+                {/* Option 2: PIN Code Card */}
+                <View style={styles.pinCard}>
+                  <AppText style={styles.pinCardTitle}>{t('locationPicker.searchPinTitle')}</AppText>
+                  <View style={styles.pinInputWrapper}>
+                    <Ionicons name="mail-open" size={20} color="#64748B" style={styles.pinIcon} />
+                    <TextInput
+                      style={styles.pinTextInput}
+                      placeholder={t('locationPicker.pinPlaceholder')}
+                      placeholderTextColor="#94A3B8"
+                      value={pincode}
+                      onChangeText={(val) => setPincode(val.replace(/[^0-9]/g, '').slice(0, 6))}
+                      keyboardType="number-pad"
+                      maxLength={6}
+                    />
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.pinSubmitButton, !isPinValid && styles.pinSubmitButtonDisabled]}
+                    onPress={handlePincodeSearch}
+                    disabled={!isPinValid}
+                  >
+                    <Ionicons name="search" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                    <AppText style={styles.pinSubmitButtonText}>{t('locationPicker.findLocationBtn')}</AppText>
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
-          </KeyboardAvoidingView>
-        </View>
-      </TouchableWithoutFeedback>
+            )}
+          </ScrollView>
+        </Animated.View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -378,30 +495,52 @@ export default function LocationPicker({ visible, onClose, onSelectLocation }) {
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.45)',
     justifyContent: 'flex-end'
   },
-  keyboardView: {
-    width: '100%'
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15, 23, 42, 0.5)'
   },
   modalContent: {
+    maxHeight: SHEET_H,
+    minHeight: Math.round(SHEET_H * 0.85),
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 10,
-    width: '100%'
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: -6 },
+        shadowOpacity: 0.15,
+        shadowRadius: 16,
+      },
+      android: {
+        elevation: 16,
+      },
+      web: {
+        boxShadow: '0px -6px 20px rgba(0, 0, 0, 0.15)',
+      }
+    }),
+    overflow: 'hidden'
+  },
+  dragArea: {
+    width: '100%',
+    alignItems: 'center',
+    paddingVertical: 10,
+    backgroundColor: '#FFFFFF'
+  },
+  dragHandle: {
+    width: 44,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: '#CBD5E1'
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16,
+    paddingBottom: 14,
     borderBottomWidth: 1,
     borderColor: '#F1F5F9'
   },
@@ -421,28 +560,36 @@ const styles = StyleSheet.create({
     paddingRight: 10
   },
   closeButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#F3F4F6',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
-    elevation: 2
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 3,
+      },
+      android: {
+        elevation: 2,
+      },
+      web: {
+        boxShadow: '0px 2px 3px rgba(0, 0, 0, 0.06)',
+      }
+    }),
   },
-  modalBody: {
+  scrollBody: {
     paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: Platform.OS === 'ios' ? 44 : 28,
-    minHeight: 280
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24
   },
   loaderContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 56
+    paddingVertical: 48
   },
   loaderText: {
     marginTop: 12,
@@ -453,17 +600,26 @@ const styles = StyleSheet.create({
     paddingTop: 4
   },
   primaryGpsButton: {
-    height: 52,
+    height: 50,
     backgroundColor: '#16A34A',
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 16,
-    shadowColor: '#16A34A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 3
+    ...Platform.select({
+      ios: {
+        shadowColor: '#16A34A',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 3,
+      },
+      web: {
+        boxShadow: '0px 4px 6px rgba(22, 163, 74, 0.2)',
+      }
+    }),
   },
   primaryGpsButtonDisabled: {
     backgroundColor: '#86EFAC',
@@ -498,7 +654,7 @@ const styles = StyleSheet.create({
   dividerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 18
+    marginVertical: 14
   },
   dividerLine: {
     flex: 1,
@@ -513,16 +669,16 @@ const styles = StyleSheet.create({
   },
   pinCard: {
     backgroundColor: '#F8FAFC',
-    borderRadius: 20,
-    padding: 16,
+    borderRadius: 18,
+    padding: 14,
     borderWidth: 1.5,
     borderColor: '#E2E8F0'
   },
   pinCardTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: 'bold',
     color: '#334155',
-    marginBottom: 12
+    marginBottom: 10
   },
   pinInputWrapper: {
     flexDirection: 'row',
@@ -532,8 +688,8 @@ const styles = StyleSheet.create({
     borderColor: '#CBD5E1',
     borderRadius: 12,
     paddingHorizontal: 12,
-    height: 48,
-    marginBottom: 14
+    height: 46,
+    marginBottom: 12
   },
   pinIcon: {
     marginRight: 8
@@ -541,22 +697,31 @@ const styles = StyleSheet.create({
   pinTextInput: {
     flex: 1,
     color: '#1E293B',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '500',
     padding: 0
   },
   pinSubmitButton: {
     flexDirection: 'row',
-    height: 48,
+    height: 46,
     backgroundColor: '#16A34A',
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#16A34A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 3
+    ...Platform.select({
+      ios: {
+        shadowColor: '#16A34A',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 3,
+      },
+      web: {
+        boxShadow: '0px 4px 6px rgba(22, 163, 74, 0.15)',
+      }
+    }),
   },
   pinSubmitButtonDisabled: {
     backgroundColor: '#CBD5E1',

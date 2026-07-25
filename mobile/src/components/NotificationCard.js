@@ -7,7 +7,7 @@ import AppText from './AppText';
 const { width } = Dimensions.get('window');
 const SWIPE_THRESHOLD = -80; // Swipe threshold to show delete button
 
-function NotificationCard({ item, onMarkAsRead, onDelete }) {
+function NotificationCard({ item, onMarkAsRead, onDelete, onPressCard }) {
   const { t } = useTranslation();
   const translateX = useRef(new Animated.Value(0)).current;
 
@@ -61,7 +61,11 @@ function NotificationCard({ item, onMarkAsRead, onDelete }) {
       toValue: 0,
       useNativeDriver: true,
     }).start();
-    onMarkAsRead(item.id);
+    if (onPressCard) {
+      onPressCard(item);
+    } else {
+      onMarkAsRead(item.id);
+    }
   };
 
   return (
@@ -137,6 +141,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'flex-end',
     backgroundColor: '#EF4444',
+    zIndex: 1,
   },
   deleteButton: {
     width: 90,
@@ -160,6 +165,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.02,
     shadowRadius: 8,
     elevation: 2,
+    zIndex: 2,
   },
   unreadCardBorder: {
     borderColor: '#DCFCE7',

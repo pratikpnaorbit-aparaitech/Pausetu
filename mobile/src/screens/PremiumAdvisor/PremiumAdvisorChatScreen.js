@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  StyleSheet, View, SafeAreaView, ScrollView, TextInput,
+  StyleSheet, View, ScrollView, TextInput,
   TouchableOpacity, ActivityIndicator, FlatList, KeyboardAvoidingView,
   Platform, Image, Alert
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import AppText from '../../components/AppText';
+import CustomHeader from '../../components/CustomHeader';
 import { usePremium } from '../../hooks/usePremium';
 import { SUGGESTED_QUESTIONS_KEYS } from '../../constants/premiumConstants';
 import TypingAnimation from '../../components/PremiumAdvisor/TypingAnimation';
@@ -133,29 +135,22 @@ export default function PremiumAdvisorChatScreen({ onClose }) {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header bar */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.headerBtn} onPress={onClose}>
-          <Ionicons name="chevron-back" size={24} color="#0F172A" />
-        </TouchableOpacity>
-        
-        <View style={styles.headerTitleContainer}>
-          <AppText style={styles.headerTitle}>
-            {t('premiumAdvisor.chatbot.title')}
-          </AppText>
-          <AppText style={styles.headerStatus}>
-            👑 {t('premiumAdvisor.membership.activeStatus')}
-          </AppText>
-        </View>
-
-        <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.headerIconBtn} onPress={() => setShowSessions(!showSessions)}>
-            <Ionicons name="chatbubbles-outline" size={22} color="#0F172A" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.headerIconBtn} onPress={handleClearHistory} disabled={!activeSessionId}>
-            <Ionicons name="trash-outline" size={22} color={activeSessionId ? "#EF4444" : "#CBD5E1"} />
-          </TouchableOpacity>
-        </View>
-      </View>
+            <CustomHeader
+        title={t('premiumAdvisor.chatbot.title')}
+        subtitle={"👑 " + t('premiumAdvisor.membership.activeStatus')}
+        onBackPress={onClose}
+        centered={false}
+        rightComponent={
+          <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.headerIconBtn} onPress={() => setShowSessions(!showSessions)}>
+              <Ionicons name="chatbubbles-outline" size={22} color="#0F172A" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.headerIconBtn} onPress={handleClearHistory} disabled={!activeSessionId}>
+              <Ionicons name="trash-outline" size={22} color={activeSessionId ? "#EF4444" : "#CBD5E1"} />
+            </TouchableOpacity>
+          </View>
+        }
+      />
 
       {/* Session selector dropdown list overlay */}
       {showSessions && (

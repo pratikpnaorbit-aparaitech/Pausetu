@@ -3,6 +3,7 @@ const Notification = require('../models/Notification');
 const Setting = require('../models/Setting');
 const asyncHandler = require('../utils/asyncHandler');
 const { AppError } = require('../middleware/errorHandler');
+const { getPublicIdFromUrl, deleteFromCloudinary } = require('../config/cloudinary');
 
 console.log("Verification Controller Loaded");
 
@@ -40,10 +41,10 @@ const notifyAdmins = async (title, message, type = 'info') => {
  * Submit Milk Dairy Receipt for verification
  */
 exports.submitVerification = asyncHandler(async (req, res, next) => {
-  const { receiptUrl, farmerName, dairyName, receiptDate } = req.body;
-
-  if (!receiptUrl) {
-    return next(new AppError('Please provide a receipt URL', 400));
+  const { farmerName, dairyName, receiptDate } = req.body;
+  const targetReceiptUrl = req.body.receiptImage || req.body.receiptUrl;
+  if (!targetReceiptUrl) {
+    return next(new AppError('Please provide a receipt image URL', 400));
   }
 
   const user = await User.findById(req.user.id);
@@ -52,18 +53,20 @@ exports.submitVerification = asyncHandler(async (req, res, next) => {
   }
 
   console.log("User:", user._id);
-  console.log("Profile:", {
-    fullName: user.fullName,
-    mobile: user.mobile,
-    isProfileCompleted: user.isProfileCompleted
-  });
 
   const settings = await getSettingsHelper();
   const isAuto = settings.verificationMode === 'auto';
 
+  const oldReceiptUrl = user.verification && (user.verification.receiptImage || user.verification.receiptUrl);
+  const newPublicIdResult = getPublicIdFromUrl(targetReceiptUrl);
+  const receiptPublicId = newPublicIdResult ? newPublicIdResult.publicId : (req.body.receiptImagePublicId || req.body.receiptPublicId);
+
   user.verification = {
     status: isAuto ? 'approved' : 'pending',
-    receiptUrl,
+    receiptImage: targetReceiptUrl,
+    receiptImagePublicId: receiptPublicId,
+    receiptUrl: targetReceiptUrl,
+    receiptPublicId: receiptPublicId,
     farmerName,
     dairyName,
     receiptDate: receiptDate ? new Date(receiptDate) : undefined,
@@ -73,6 +76,12 @@ exports.submitVerification = asyncHandler(async (req, res, next) => {
   };
 
   await user.save();
+  console.log(`[VERIFICATION SUBMIT SUCCESS] Verification receipt updated: ${targetReceiptUrl}, publicId: ${receiptPublicId}`);
+
+  if (oldReceiptUrl && oldReceiptUrl !== targetReceiptUrl) {
+    await deleteFromCloudinary(oldReceiptUrl);
+    console.log(`[VERIFICATION REPLACE SUCCESS] Removed old Cloudinary receipt: ${oldReceiptUrl}`);
+  }
 
   if (isAuto) {
     await Notification.create([
@@ -359,5 +368,32 @@ exports.getPendingVerificationsCount = asyncHandler(async (req, res, next) => {
     data: {
       pendingVerificationCount: count
     }
+  });
+});
+
+/**
+ * Delete verification request & clean up Cloudinary asset (Admin only)
+ */
+exports.deleteVerification = asyncHandler(async (req, res, next) => {
+  const { id } = req.params;
+  const user = await User.findById(id);
+  if (!user) {
+    return next(new AppError('User not found', 404));
+  }
+
+  const receiptUrl = user.verification && (user.verification.receiptImage || user.verification.receiptUrl);
+  if (receiptUrl) {
+    await deleteFromCloudinary(receiptUrl);
+    console.log(`[VERIFICATION DELETE SUCCESS] Removed Cloudinary receipt: ${receiptUrl}`);
+  }
+
+  user.verification = {
+    status: 'unverified'
+  };
+  await user.save();
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Verification request deleted and Cloudinary asset cleaned up successfully'
   });
 });

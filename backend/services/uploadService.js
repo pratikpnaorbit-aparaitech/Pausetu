@@ -1,40 +1,21 @@
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
 const { AppError } = require('../middleware/errorHandler');
+const { storage } = require('../config/cloudinary');
 
-// Ensure local uploads directory exists
-const uploadDir = path.join(__dirname, '..', 'uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-// Multer Storage Configuration
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    // Generate unique name: user-id + timestamp + original-extension
-    const userId = req.user ? req.user.id : 'anonymous';
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, `profile-${userId}-${uniqueSuffix}${path.extname(file.originalname)}`);
-  }
-});
-
-// Multer File Filter - Image validation (jpg, jpeg, png, webp, pdf)
+// Multer File Filter - Image & Video validation (jpg, jpeg, png, webp, pdf, mp4, mov, webm)
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png|webp|pdf|mp4|mov|avi|mkv/;
+  const allowedTypes = /jpeg|jpg|png|webp|pdf|mp4|mov|webm/;
   const mimetype = allowedTypes.test(file.mimetype);
   const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
 
   if (mimetype || extname) {
     return cb(null, true);
   }
-  cb(new AppError('Only images (JPEG, JPG, PNG, WEBP), PDFs, and videos (MP4, MOV, AVI, MKV) are allowed!', 400), false);
+  cb(new AppError('Only JPEG, JPG, PNG, WEBP, PDF, MP4, MOV, and WEBM formats are allowed!', 400), false);
 };
 
-// Configurable upload middleware (Max 5MB file size)
+// Configurable upload middleware (Max 100MB file size)
 const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
@@ -45,23 +26,16 @@ const upload = multer({
 
 /**
  * Service to process the upload output and return the appropriate URL.
- * Designed to support swappable storage providers.
  * @param {Object} file - The file object from Multer
  * @returns {String} Resolved storage URL
  */
 const getUploadedFileUrl = async (file) => {
-  const provider = process.env.STORAGE_PROVIDER || 'local';
-
-  if (provider === 'cloudinary') {
-    // Future Cloudinary integration placeholder
-    // const result = await cloudinary.uploader.upload(file.path);
-    // return result.secure_url;
-    console.log('[UPLOAD SERVICE] Cloudinary provider is configured but mocked for now.');
-    return `https://res.cloudinary.com/demo/image/upload/mocked-${file.filename}`;
+  if (file.path && (file.path.startsWith('http://') || file.path.startsWith('https://'))) {
+    return file.path;
   }
-
-  // Local Storage URL Path
-  // In production, configure app.use('/uploads', express.static('uploads'))
+  if (file.secure_url) {
+    return file.secure_url;
+  }
   return `/uploads/${file.filename}`;
 };
 

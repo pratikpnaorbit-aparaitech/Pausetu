@@ -1,7 +1,9 @@
 const Animal = require('../models/Animal');
+const Notification = require('../models/Notification');
 const asyncHandler = require('../utils/asyncHandler');
 const { AppError } = require('../middleware/errorHandler');
 const { verifyToken } = require('../utils/jwt');
+const { getPublicIdFromUrl, deleteFromCloudinary } = require('../config/cloudinary');
 
 /**
  * Get all animal listings - GET /api/animals
@@ -98,16 +100,39 @@ exports.getAllAnimals = asyncHandler(async (req, res, next) => {
     .skip(skip)
     .limit(limit);
 
+  // Filter out animals whose main photo doesn't exist on disk to prevent 404 rendering errors
+  const fs = require('fs');
+  const path = require('path');
+  const isRemoteUrl = (url) => typeof url === 'string' && (url.startsWith('http://') || url.startsWith('https://'));
+  const photoExists = (p) => {
+    if (!p) return false;
+    if (isRemoteUrl(p)) return true;
+    const pPath = path.join(__dirname, '..', p.startsWith('/') ? p.substring(1) : p);
+    return fs.existsSync(pPath);
+  };
+  const validAnimals = [];
+  for (const animal of animals) {
+    if (animal.photos && animal.photos[0]) {
+      if (photoExists(animal.photos[0])) {
+        // Also clean up any other missing photos from the array
+        animal.photos = animal.photos.filter(photoExists);
+        validAnimals.push(animal);
+      }
+    } else {
+      validAnimals.push(animal);
+    }
+  }
+
   res.status(200).json({
     status: 'success',
     pagination: {
-      totalCount,
+      totalCount: validAnimals.length, // Sync totalCount with filtered count
       totalPages,
       currentPage: page,
       limit
     },
     data: {
-      animals
+      animals: validAnimals
     }
   });
 });
@@ -129,6 +154,26 @@ exports.getAnimal = asyncHandler(async (req, res, next) => {
 
   if (!animal) {
     return next(new AppError('Animal listing not found', 404));
+  }
+
+  // Filter out any missing photos from disk
+  const fs = require('fs');
+  const path = require('path');
+  if (animal.photos) {
+    animal.photos = animal.photos.filter(p => {
+      if (!p) return false;
+      if (typeof p === 'string' && (p.startsWith('http://') || p.startsWith('https://'))) return true;
+      const pPath = path.join(__dirname, '..', p.startsWith('/') ? p.substring(1) : p);
+      return fs.existsSync(pPath);
+    });
+  }
+
+  // Clear local profilePhoto reference if missing (preserve Cloudinary remote URLs)
+  if (animal.sellerId && animal.sellerId.profilePhoto && typeof animal.sellerId.profilePhoto === 'string' && !animal.sellerId.profilePhoto.startsWith('http://') && !animal.sellerId.profilePhoto.startsWith('https://')) {
+    const spPath = path.join(__dirname, '..', animal.sellerId.profilePhoto.startsWith('/') ? animal.sellerId.profilePhoto.substring(1) : animal.sellerId.profilePhoto);
+    if (!fs.existsSync(spPath)) {
+      animal.sellerId.profilePhoto = null;
+    }
   }
 
   res.status(200).json({
@@ -187,6 +232,15 @@ exports.createAnimal = asyncHandler(async (req, res, next) => {
     return next(new AppError('A live video recording is mandatory to list an animal.', 400));
   }
 
+  // Extract public IDs from Cloudinary URLs
+  const photoPublicIds = (photos || []).map(p => {
+    const result = getPublicIdFromUrl(p);
+    return result ? result.publicId : null;
+  }).filter(id => !!id);
+
+  const videoResult = getPublicIdFromUrl(video);
+  const videoPublicId = videoResult ? videoResult.publicId : null;
+
   // 2. Build and save the animal listing (sets status default to 'pending')
   const animal = await Animal.create({
     sellerId: req.user.id,
@@ -197,7 +251,9 @@ exports.createAnimal = asyncHandler(async (req, res, next) => {
     price: Number(price),
     negotiable: negotiable === true || negotiable === 'true',
     photos,
+    photoPublicIds,
     video,
+    videoPublicId,
     gender: gender || 'Female',
     age,
     weight,
@@ -214,6 +270,19 @@ exports.createAnimal = asyncHandler(async (req, res, next) => {
     status: 'pending', // Default listing status
     mediaMetadata: mediaMetadata || {}
   });
+
+  try {
+    await Notification.create({
+      recipient: req.user.id,
+      title: 'जाहिरात सबमिट केली / Listing Submitted',
+      message: `तुमची जाहिरात "${animal.title}" यशस्वीरित्या सबमिट केली आहे आणि तपासणीसाठी प्रलंबित आहे. / Your listing "${animal.title}" has been submitted and is pending approval.`,
+      type: 'info',
+      relatedId: animal._id.toString(),
+      targetScreen: 'MyListings'
+    });
+  } catch (notifErr) {
+    console.error('[NOTIFICATION ERROR] Failed to create submission notification:', notifErr.message);
+  }
 
   res.status(201).json({
     status: 'success',
@@ -259,6 +328,37 @@ exports.updateAnimal = asyncHandler(async (req, res, next) => {
     }
   }
 
+  // Cloudinary media cleanup for replaced assets
+  try {
+    if (updateData.photos && Array.isArray(updateData.photos)) {
+      const oldPhotos = animal.photos || [];
+      const newPhotos = updateData.photos;
+      
+      const removedPhotos = oldPhotos.filter(p => !newPhotos.includes(p));
+      for (const photoUrl of removedPhotos) {
+        await deleteFromCloudinary(photoUrl);
+        console.log(`[MEDIA REPLACE SUCCESS] Deleted photo: ${photoUrl}`);
+      }
+
+      updateData.photoPublicIds = newPhotos.map(p => {
+        const result = getPublicIdFromUrl(p);
+        return result ? result.publicId : null;
+      }).filter(id => !!id);
+    }
+
+    if (updateData.video && updateData.video !== animal.video) {
+      if (animal.video) {
+        await deleteFromCloudinary(animal.video);
+        console.log(`[MEDIA REPLACE SUCCESS] Deleted video: ${animal.video}`);
+      }
+      const result = getPublicIdFromUrl(updateData.video);
+      updateData.videoPublicId = result ? result.publicId : null;
+    }
+  } catch (mediaErr) {
+    console.error('[MEDIA CLEANUP ERROR] Replaced assets delete failed:', mediaErr.message);
+    return next(new AppError('Failed to process media replacement updates', 500));
+  }
+
   animal = await Animal.findByIdAndUpdate(req.params.id, updateData, {
     new: true,
     runValidators: true
@@ -288,8 +388,24 @@ exports.deleteAnimal = asyncHandler(async (req, res, next) => {
     return next(new AppError('You are not authorized to delete this listing', 403));
   }
 
-  animal.isDeleted = true;
-  await animal.save();
+  // Delete all Cloudinary assets
+  try {
+    if (animal.photos && Array.isArray(animal.photos)) {
+      for (const photoUrl of animal.photos) {
+        await deleteFromCloudinary(photoUrl);
+      }
+    }
+    if (animal.video) {
+      await deleteFromCloudinary(animal.video);
+    }
+    console.log(`[DELETE SUCCESS] Cloudinary assets deleted for animal: ${req.params.id}`);
+  } catch (err) {
+    console.error('[MEDIA DELETE ERROR] Failed to destroy Cloudinary assets:', err.message);
+  }
+
+  // Hard delete animal from database
+  await Animal.deleteOne({ _id: req.params.id });
+  console.log(`[DELETE SUCCESS] Animal listing removed from DB: ${req.params.id}`);
 
   res.status(200).json({
     status: 'success',
@@ -317,6 +433,19 @@ exports.approveListing = asyncHandler(async (req, res, next) => {
   animal.approvedAt = new Date();
   animal.rejectionReason = undefined;
   await animal.save();
+
+  try {
+    await Notification.create({
+      recipient: animal.sellerId,
+      title: 'जाहिरात मंजूर झाली / Listing Approved',
+      message: `अभिनंदन! तुमची जाहिरात "${animal.title}" प्रशासकाद्वारे मंजूर झाली आहे. / Congratulations! Your listing "${animal.title}" has been approved.`,
+      type: 'success',
+      relatedId: animal._id.toString(),
+      targetScreen: 'AnimalDetails'
+    });
+  } catch (notifErr) {
+    console.error('[NOTIFICATION ERROR] Failed to create approval notification:', notifErr.message);
+  }
 
   const populated = await Animal.findById(animal._id)
     .populate('sellerId', 'name email mobile')
@@ -352,6 +481,19 @@ exports.rejectListing = asyncHandler(async (req, res, next) => {
   animal.approvedBy = undefined;
   animal.approvedAt = undefined;
   await animal.save();
+
+  try {
+    await Notification.create({
+      recipient: animal.sellerId,
+      title: 'जाहिरात नाकारली / Listing Rejected',
+      message: `तुमची जाहिरात "${animal.title}" नाकारण्यात आली आहे. कारण: ${reason.trim()}. / Your listing "${animal.title}" was rejected. Reason: ${reason.trim()}.`,
+      type: 'alert',
+      relatedId: animal._id.toString(),
+      targetScreen: 'MyListings'
+    });
+  } catch (notifErr) {
+    console.error('[NOTIFICATION ERROR] Failed to create rejection notification:', notifErr.message);
+  }
 
   const populated = await Animal.findById(animal._id)
     .populate('sellerId', 'name email mobile')

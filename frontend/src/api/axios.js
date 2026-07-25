@@ -37,4 +37,7 @@ instance.interceptors.response.use(
   }
 );
 
+export const axiosInstance = instance;
+export const api = instance;
+
 export default instance;

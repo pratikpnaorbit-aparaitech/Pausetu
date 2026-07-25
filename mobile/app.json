@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
+    "name": "PashuSetu",
+    "slug": "pashusetu",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -12,8 +12,16 @@
     },
     "android": {
       "package": "com.pashusetu.mobile",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO"
+      ],
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -24,11 +32,26 @@
     },
     "plugins": [
       "expo-font",
-      "expo-video"
+      "expo-video",
+      "expo-secure-store",
+      "expo-status-bar",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow PashuSetu to access your camera to take animal photos and videos.",
+          "microphonePermission": "Allow PashuSetu to access your microphone to record audio for animal videos."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow PashuSetu to access your photos to select animal images."
+        }
+      ]
     ],
     "extra": {
       "eas": {
-        "projectId": "286ad861-f9f3-49d4-a03a-5a39d0c5cfc8"
+        "projectId": "d06fe552-09e5-4e77-a222-af1c5d7c1727"
       }
     }
   }
