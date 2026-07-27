@@ -72,15 +72,25 @@ export const AppProvider = ({ children }) => {
       setIsProfileLoading(true);
 
       try {
-        // Preload essential logo assets for immediate crisp rendering
-        await Asset.loadAsync([
-          require('../../assets/logo-full.png'),
-          require('../../assets/logo-icon.png')
-        ]);
+        console.log('[AppBoot Debug] Starting bootstrapAsync');
+        // Preload essential logo assets with safety catch to prevent startup hang
+        try {
+          console.log('[AppBoot Debug] Preloading assets...');
+          await Asset.loadAsync([
+            require('../../assets/logo-full.png'),
+            require('../../assets/logo-icon.png')
+          ]);
+          console.log('[AppBoot Debug] Assets loaded.');
+        } catch (assetErr) {
+          console.warn('[AppBoot Warning] Preloading assets failed, continuing:', assetErr.message);
+        }
 
+        console.log('[AppBoot Debug] Reading AsyncStorage keys...');
         const onboarded = await AsyncStorage.getItem('isOnboarded');
         const lang = await AsyncStorage.getItem('language') || 'mr';
+        console.log('[AppBoot Debug] Reading secure storage for userToken...');
         const token = await secureStorage.getItem('userToken');
+        console.log('[AppBoot Debug] userToken loaded:', token);
         const locationGranted = await AsyncStorage.getItem('hasLocationPermission');
         const cachedProfile = await AsyncStorage.getItem('userProfile');
         const isGuestStr = await AsyncStorage.getItem('isGuest');
