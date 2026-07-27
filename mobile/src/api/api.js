@@ -203,6 +203,10 @@ export const api = {
     return instance.delete(`/notifications/${id}`);
   },
 
+  clearAllNotifications: async () => {
+    return instance.delete('/notifications/clear-all');
+  },
+
   // Favorites
   getFavorites: async () => {
     return instance.get('/buyers/favorites');

@@ -48,7 +48,34 @@ const restrictTo = (...roles) => {
   };
 };
 
+/**
+ * Optional middleware: populates req.user from a Bearer JWT if one is provided
+ * and valid, but NEVER blocks the request if the token is absent or invalid.
+ * Use this on public endpoints (e.g. GET /api/animals) so that admin/seller
+ * identity can be detected without breaking unauthenticated access.
+ */
+const optionalProtect = (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      if (token) {
+        try {
+          req.user = verifyToken(token);
+        } catch (_) {
+          // Token is invalid/expired — treat as unauthenticated, do not block
+          req.user = undefined;
+        }
+      }
+    }
+  } catch (_) {
+    req.user = undefined;
+  }
+  next();
+};
+
 module.exports = {
   protect,
-  restrictTo
+  restrictTo,
+  optionalProtect
 };

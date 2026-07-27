@@ -120,18 +120,6 @@ exports.updateProfile = asyncHandler(async (req, res, next) => {
 
   await user.save();
 
-  try {
-    await Notification.create({
-      recipient: user._id,
-      title: 'प्रोफाइल अद्ययावत केली / Profile Updated',
-      message: 'तुमची प्रोफाईल माहिती यशस्वीरित्या अद्ययावत केली गेली आहे. / Your profile information has been updated successfully.',
-      type: 'info',
-      targetScreen: 'Profile'
-    });
-  } catch (notifErr) {
-    console.error('[NOTIFICATION ERROR] Profile update notification failed:', notifErr.message);
-  }
-
   res.status(200).json({
     status: 'success',
     message: 'Profile updated successfully',

@@ -206,6 +206,8 @@ export const AdminProvider = ({ children }) => {
     rejectionReason: a.rejectionReason || '',
     approvedBy: a.approvedBy || null,
     approvedAt: a.approvedAt || null,
+    rejectedBy: a.rejectedBy || null,
+    rejectedAt: a.rejectedAt || null,
     views: a.views || 0,
     isDeleted: a.isDeleted || false,
     createdAt: a.createdAt || null,

@@ -271,18 +271,7 @@ exports.createAnimal = asyncHandler(async (req, res, next) => {
     mediaMetadata: mediaMetadata || {}
   });
 
-  try {
-    await Notification.create({
-      recipient: req.user.id,
-      title: 'जाहिरात सबमिट केली / Listing Submitted',
-      message: `तुमची जाहिरात "${animal.title}" यशस्वीरित्या सबमिट केली आहे आणि तपासणीसाठी प्रलंबित आहे. / Your listing "${animal.title}" has been submitted and is pending approval.`,
-      type: 'info',
-      relatedId: animal._id.toString(),
-      targetScreen: 'MyListings'
-    });
-  } catch (notifErr) {
-    console.error('[NOTIFICATION ERROR] Failed to create submission notification:', notifErr.message);
-  }
+
 
   res.status(201).json({
     status: 'success',
@@ -432,17 +421,25 @@ exports.approveListing = asyncHandler(async (req, res, next) => {
   animal.approvedBy = req.user.id;
   animal.approvedAt = new Date();
   animal.rejectionReason = undefined;
+  animal.rejectedBy = undefined;
+  animal.rejectedAt = undefined;
   await animal.save();
 
   try {
-    await Notification.create({
+    const existingNotif = await Notification.findOne({
       recipient: animal.sellerId,
-      title: 'जाहिरात मंजूर झाली / Listing Approved',
-      message: `अभिनंदन! तुमची जाहिरात "${animal.title}" प्रशासकाद्वारे मंजूर झाली आहे. / Congratulations! Your listing "${animal.title}" has been approved.`,
-      type: 'success',
-      relatedId: animal._id.toString(),
-      targetScreen: 'AnimalDetails'
+      relatedAnimal: animal._id,
+      notificationType: Notification.NOTIFICATION_TYPES.LISTING_APPROVED
     });
+    if (!existingNotif) {
+      await Notification.create({
+        recipient: animal.sellerId,
+        title: 'जाहिरात मंजूर झाली / Listing Approved',
+        message: `तुमची जनावराची जाहिरात मंजूर झाली आहे. / Your animal listing "${animal.title}" has been approved.`,
+        notificationType: Notification.NOTIFICATION_TYPES.LISTING_APPROVED,
+        relatedAnimal: animal._id
+      });
+    }
   } catch (notifErr) {
     console.error('[NOTIFICATION ERROR] Failed to create approval notification:', notifErr.message);
   }
@@ -478,19 +475,27 @@ exports.rejectListing = asyncHandler(async (req, res, next) => {
 
   animal.status = 'rejected';
   animal.rejectionReason = reason.trim();
+  animal.rejectedBy = req.user.id;
+  animal.rejectedAt = new Date();
   animal.approvedBy = undefined;
   animal.approvedAt = undefined;
   await animal.save();
 
   try {
-    await Notification.create({
+    const existingNotif = await Notification.findOne({
       recipient: animal.sellerId,
-      title: 'जाहिरात नाकारली / Listing Rejected',
-      message: `तुमची जाहिरात "${animal.title}" नाकारण्यात आली आहे. कारण: ${reason.trim()}. / Your listing "${animal.title}" was rejected. Reason: ${reason.trim()}.`,
-      type: 'alert',
-      relatedId: animal._id.toString(),
-      targetScreen: 'MyListings'
+      relatedAnimal: animal._id,
+      notificationType: Notification.NOTIFICATION_TYPES.LISTING_REJECTED
     });
+    if (!existingNotif) {
+      await Notification.create({
+        recipient: animal.sellerId,
+        title: 'जाहिरात नाकारली / Listing Rejected',
+        message: `तुमची जनावराची जाहिरात नाकारण्यात आली आहे. कारण: ${reason.trim()}`,
+        notificationType: Notification.NOTIFICATION_TYPES.LISTING_REJECTED,
+        relatedAnimal: animal._id
+      });
+    }
   } catch (notifErr) {
     console.error('[NOTIFICATION ERROR] Failed to create rejection notification:', notifErr.message);
   }

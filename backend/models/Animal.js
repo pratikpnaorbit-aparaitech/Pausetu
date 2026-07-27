@@ -147,6 +147,13 @@ const animalSchema = new mongoose.Schema(
     rejectionReason: {
       type: String
     },
+    rejectedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    rejectedAt: {
+      type: Date
+    },
     mediaMetadata: {
       captureTime: {
         type: Date

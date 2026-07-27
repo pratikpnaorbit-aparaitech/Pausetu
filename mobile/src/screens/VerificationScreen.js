@@ -20,6 +20,8 @@ import { animalApi } from '../api/animalApi';
 import { verificationApi } from '../api/verificationApi';
 import AppText from '../components/AppText';
 import CustomHeader from '../components/CustomHeader';
+import { useAutoRefresh } from '../hooks/useAutoRefresh';
+import { REFRESH_EVENTS } from '../services/refreshManager';
 
 // ─── Date Picker Helper ───────────────────────────────────────────────────────
 
@@ -165,6 +167,18 @@ function DatePickerModal({ visible, onClose, onConfirm, initialDate }) {
 export default function VerificationScreen({ navigation }) {
   const { t } = useTranslation();
   const { refreshProfileData } = useContext(AppContext);
+
+  useAutoRefresh(
+    () => {
+      if (refreshProfileData) {
+        return refreshProfileData();
+      }
+    },
+    {
+      events: [REFRESH_EVENTS.VERIFICATION_UPDATED, REFRESH_EVENTS.PROFILE_UPDATED],
+      screenKey: 'VerificationScreen'
+    }
+  );
 
   const [loading,             setLoading]             = useState(false);
   const [statusText,          setStatusText]          = useState('');

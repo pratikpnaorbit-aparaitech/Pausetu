@@ -12,6 +12,8 @@ import AppText from '../components/AppText';
 import VerificationCard from '../components/VerificationCard';
 import CustomHeader from '../components/CustomHeader';
 import { formatLocationDisplay } from '../utils/geocoder';
+import { useAutoRefresh } from '../hooks/useAutoRefresh';
+import { REFRESH_EVENTS } from '../services/refreshManager';
 
 const SELLER_STATS = [
   { id: '1', labelKey: 'profile.activeListings', value: '3', icon: 'list-box-outline', color: '#16A34A' },
@@ -28,6 +30,19 @@ const MENU_ITEMS = [
 export default function ProfileScreen({ navigation }) {
   const { userProfile, isProfileLoading, completeProfile, logout, exitGuestSession, isGuest, userToken, refreshProfileData } = useContext(AppContext);
   const { t } = useTranslation();
+
+  useAutoRefresh(
+    () => {
+      if (!isGuest && userToken !== 'guest' && refreshProfileData) {
+        return refreshProfileData();
+      }
+    },
+    {
+      events: [REFRESH_EVENTS.VERIFICATION_UPDATED, REFRESH_EVENTS.PROFILE_UPDATED],
+      screenKey: 'ProfileScreen',
+      enabled: !isGuest
+    }
+  );
 
   // Edit profile states
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);

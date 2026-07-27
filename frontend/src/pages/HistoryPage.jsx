@@ -1,11 +1,12 @@
 import React, { useContext, useState } from 'react';
 import { AdminContext } from '../context/AdminContext';
-import { CheckCircle, ShoppingBag, Search, Download, Printer, ChevronLeft, ChevronRight, X, ArrowLeft } from 'lucide-react';
+import { CheckCircle, ShoppingBag, Search, Download, Printer, ChevronLeft, ChevronRight, X, ArrowLeft, XCircle } from 'lucide-react';
 
 function StatusBadge({ status }) {
   const map = {
     approved: 'badge-approved',
     sold: 'badge-sold',
+    rejected: 'badge-rejected',
   };
   return (
     <span className={`badge ${map[status] || 'badge-pending'}`}>
@@ -17,7 +18,7 @@ function StatusBadge({ status }) {
 export default function HistoryPage() {
   const { animals, showToast } = useContext(AdminContext);
 
-  const [activeTab, setActiveTab] = useState('cards'); // 'cards', 'approved', 'sold'
+  const [activeTab, setActiveTab] = useState('cards'); // 'cards', 'approved', 'sold', 'rejected'
   const [searchQuery, setSearchQuery] = useState('');
   const [districtFilter, setDistrictFilter] = useState('');
   const [breedFilter, setBreedFilter] = useState('');
@@ -28,8 +29,12 @@ export default function HistoryPage() {
   // Slices
   const approvedAnimals = animals.filter(a => a.status === 'approved' && !a.isDeleted);
   const soldAnimals = animals.filter(a => a.status === 'sold' && !a.isDeleted);
+  const rejectedAnimals = animals.filter(a => a.status === 'rejected' && !a.isDeleted);
 
-  const currentDataset = activeTab === 'approved' ? approvedAnimals : activeTab === 'sold' ? soldAnimals : [];
+  const currentDataset = 
+    activeTab === 'approved' ? approvedAnimals : 
+    activeTab === 'sold' ? soldAnimals : 
+    activeTab === 'rejected' ? rejectedAnimals : [];
 
   // Filter
   const filteredData = currentDataset.filter(a => {
@@ -77,6 +82,8 @@ export default function HistoryPage() {
     let headers = [];
     if (activeTab === 'approved') {
       headers = ['Animal ID', 'Title', 'Breed', 'Seller', 'District', 'Price', 'Approved Date', 'Status'];
+    } else if (activeTab === 'rejected') {
+      headers = ['Animal ID', 'Title', 'Breed', 'Seller', 'District', 'Price', 'Rejection Reason', 'Status'];
     } else {
       headers = ['Animal ID', 'Title', 'Buyer', 'Seller', 'Sold Price', 'Sold Date', 'District', 'Status'];
     }
@@ -86,6 +93,10 @@ export default function HistoryPage() {
       if (activeTab === 'approved') {
         return [
           a.id, `"${a.title}"`, `"${a.breedName}"`, `"${a.sellerName}"`, `"${a.district}"`, a.price, a.approvedAt ? a.approvedAt.split('T')[0] : '', a.status
+        ];
+      } else if (activeTab === 'rejected') {
+        return [
+          a.id, `"${a.title}"`, `"${a.breedName}"`, `"${a.sellerName}"`, `"${a.district}"`, a.price, `"${a.rejectionReason || ''}"`, a.status
         ];
       } else {
         return [
@@ -120,7 +131,7 @@ export default function HistoryPage() {
           <div className="page-header">
             <div>
               <h2 className="page-title">Historical Records</h2>
-              <p className="page-subtitle">View and export approved and sold listings history.</p>
+              <p className="page-subtitle">View and export approved, sold, and rejected listings history.</p>
             </div>
           </div>
           
@@ -170,6 +181,29 @@ export default function HistoryPage() {
                 View All Sold
               </button>
             </div>
+
+            {/* Rejected Card */}
+            <div className="card" style={{ padding: 24, borderTop: '4px solid #ef4444' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                <div>
+                  <h3 style={{ margin: 0, color: 'var(--text-muted)', fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: '700' }}>
+                    Rejected Animals
+                  </h3>
+                  <div style={{ fontSize: 36, fontWeight: '800', color: 'var(--text-heading)', marginTop: 8 }}>
+                    {rejectedAnimals.length}
+                  </div>
+                </div>
+                <div style={{ width: 48, height: 48, borderRadius: '50%', backgroundColor: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <XCircle size={24} color="#ef4444" />
+                </div>
+              </div>
+              <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 24, lineHeight: 1.5 }}>
+                Animals that did not pass verification along with their rejection reasons.
+              </p>
+              <button className="btn" style={{ width: '100%', backgroundColor: '#f1f5f9', color: 'var(--text-heading)', border: '1px solid #e2e8f0', justifyContent: 'center' }} onClick={() => switchTab('rejected')}>
+                View All Rejected
+              </button>
+            </div>
           </div>
         </>
       )}
@@ -189,7 +223,7 @@ export default function HistoryPage() {
                   <ArrowLeft size={16} />
                 </button>
                 <h2 className="page-title" style={{ margin: 0 }}>
-                  {activeTab === 'approved' ? 'Approved History' : 'Sold History'}
+                  {activeTab === 'approved' ? 'Approved History' : activeTab === 'rejected' ? 'Rejected History' : 'Sold History'}
                 </h2>
               </div>
               <p className="page-subtitle">{filteredData.length} total records found</p>
@@ -276,6 +310,13 @@ export default function HistoryPage() {
                         <th>Price</th>
                         <th>Approved Date</th>
                       </>
+                    ) : activeTab === 'rejected' ? (
+                      <>
+                        <th>Breed</th>
+                        <th>Seller</th>
+                        <th>Price</th>
+                        <th>Rejection Reason</th>
+                      </>
                     ) : (
                       <>
                         <th>Buyer</th>
@@ -309,6 +350,13 @@ export default function HistoryPage() {
                           <td>{a.sellerName}</td>
                           <td style={{ fontWeight: '600', color: 'var(--color-primary)' }}>₹{a.price?.toLocaleString()}</td>
                           <td style={{ fontSize: 13, color: 'var(--text-muted)' }}>{a.approvedAt ? new Date(a.approvedAt).toLocaleDateString() : '-'}</td>
+                        </>
+                      ) : activeTab === 'rejected' ? (
+                        <>
+                          <td>{a.breedName}</td>
+                          <td>{a.sellerName}</td>
+                          <td style={{ fontWeight: '600', color: 'var(--color-primary)' }}>₹{a.price?.toLocaleString()}</td>
+                          <td style={{ fontSize: 13, color: 'var(--color-danger)', fontWeight: '600' }}>{a.rejectionReason || 'No reason specified'}</td>
                         </>
                       ) : (
                         <>

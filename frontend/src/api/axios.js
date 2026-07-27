@@ -1,14 +1,15 @@
 import axios from "axios";
 
-// Export API_BASE_URL so other files can import it
+// Use VITE_API_URL from .env (the single source of truth).
+// Fallback: if running locally without the env var set, default to localhost:5000.
 export const API_BASE_URL =
-  window.location.hostname === "localhost"
-    ? "http://localhost:5000/api"
-    : "https://pausetu.onrender.com/api";
+  import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 const instance = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 8000,
+  // 30 seconds — covers Render free-tier cold start (10–30 s) and slow connections.
+  // The old 8000 ms caused every cold-start request to fail with "Network Error".
+  timeout: 30000,
   headers: {
     "Content-Type": "application/json",
   },

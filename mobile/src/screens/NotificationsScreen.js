@@ -49,7 +49,7 @@ const formatRelativeTime = (dateStr, lang = 'en') => {
 };
 
 const mapBackendNotification = (n, lang = 'en') => {
-  let category = 'System';
+  let category = 'Listings';
   let icon = 'cog-outline';
   let iconColor = '#64748B';
   let badgeText = 'Update';
@@ -57,38 +57,40 @@ const mapBackendNotification = (n, lang = 'en') => {
   let badgeTextColor = '#64748B';
   let priority = 'Medium';
 
-  if (n.type === 'success') {
+  const type = n.notificationType || n.type;
+
+  if (type === 'LISTING_APPROVED' || type === 'success') {
     category = 'Listings';
     icon = 'check-decagram';
     iconColor = '#16A34A';
-    badgeText = 'Approved';
+    badgeText = lang.startsWith('mr') ? 'मंजूर' : 'Approved';
     badgeColor = '#DCFCE7';
     badgeTextColor = '#16A34A';
-    priority = 'Low';
-  } else if (n.type === 'alert' || n.type === 'error') {
+    priority = 'High';
+  } else if (type === 'LISTING_REJECTED' || type === 'alert' || type === 'error') {
     category = 'Listings';
     icon = 'alert-circle-outline';
     iconColor = '#EF4444';
-    badgeText = 'Alert';
+    badgeText = lang.startsWith('mr') ? 'नाकारले' : 'Rejected';
     badgeColor = '#FEE2E2';
     badgeTextColor = '#EF4444';
     priority = 'High';
-  } else if (n.type === 'chat') {
-    category = 'Messages';
+  } else if (type === 'BUYER_INQUIRY' || type === 'chat') {
+    category = 'Listings';
     icon = 'account-question-outline';
     iconColor = '#3B82F6';
-    badgeText = 'Message';
+    badgeText = lang.startsWith('mr') ? 'चौकशी' : 'Inquiry';
     badgeColor = '#DBEAFE';
     badgeTextColor = '#2563EB';
     priority = 'High';
-  } else if (n.type === 'warning') {
-    category = 'System';
-    icon = 'warning-outline';
+  } else if (type === 'SUBSCRIPTION_EXPIRY' || type === 'warning') {
+    category = 'Listings';
+    icon = 'calendar-clock';
     iconColor = '#D97706';
-    badgeText = 'Warning';
+    badgeText = lang.startsWith('mr') ? 'मुदत संपणार' : 'Expiry';
     badgeColor = '#FEF3C7';
     badgeTextColor = '#D97706';
-    priority = 'Medium';
+    priority = 'High';
   }
 
   return {
@@ -98,6 +100,7 @@ const mapBackendNotification = (n, lang = 'en') => {
     description: parseLocalizedText(n.message, lang),
     time: formatRelativeTime(n.createdAt, lang),
     isRead: n.isRead,
+    createdAt: n.createdAt,
     icon,
     iconColor,
     badgeText,
@@ -109,7 +112,7 @@ const mapBackendNotification = (n, lang = 'en') => {
   };
 };
 
-const TABS = ['All', 'Listings', 'Messages', 'Orders', 'System'];
+const TABS = ['All', 'Listings'];
 
 export default function NotificationsScreen({ navigation }) {
   const [selectedTab, setSelectedTab] = useState('All');
@@ -150,8 +153,14 @@ export default function NotificationsScreen({ navigation }) {
   );
 
   const filteredNotifications = useMemo(() => {
-    return notifications.filter((item) => {
+    const filtered = notifications.filter((item) => {
       return selectedTab === 'All' || item.category === selectedTab;
+    });
+    return filtered.sort((a, b) => {
+      if (a.isRead !== b.isRead) {
+        return a.isRead ? 1 : -1;
+      }
+      return new Date(b.createdAt) - new Date(a.createdAt);
     });
   }, [notifications, selectedTab]);
 
@@ -200,9 +209,9 @@ export default function NotificationsScreen({ navigation }) {
           text: t('notifications.clearAll'),
           style: 'destructive',
           onPress: async () => {
-            try {
-              await Promise.all(notifications.map(n => api.deleteNotification(n.id)));
-              setNotifications([]);
+              try {
+                await api.clearAllNotifications();
+                setNotifications([]);
             } catch (err) {
               Alert.alert(t('common.error'), t('notifications.clearFailed'));
             }

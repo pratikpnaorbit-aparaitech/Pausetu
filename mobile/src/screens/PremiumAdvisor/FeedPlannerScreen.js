@@ -223,7 +223,7 @@ function FeedPlannerChatAssistant({ onRestart, onClose }) {
   const options = (currentQuestionIndex < QUESTIONS.length && !analyzing && !isComplete) ? activeQ.getOptions(answers) : [];
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
+    <SafeAreaView style={styles.container}>
       {/* Header with Enterprise Status Badge using CustomHeader */}
       <CustomHeader
         title={t('feedPlanner.title')}
@@ -267,7 +267,7 @@ function FeedPlannerChatAssistant({ onRestart, onClose }) {
         textColor="#FFFFFF"
         iconColor="#FFFFFF"
         showBorder={false}
-        safeArea={true}
+        safeArea={false}
         style={{
           height: 64, // Chat-specific taller header height
         }}
