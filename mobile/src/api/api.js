@@ -10,7 +10,7 @@ export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ||
 
 const instance = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: 45000,
   headers: {
     'Content-Type': 'application/json'
   }
@@ -154,11 +154,11 @@ export const api = {
   },
 
   // Animals listing CRUD
-  getAnimals: async (filters = {}) => {
+  getAnimals: async (filters = {}, config = {}) => {
     const query = Object.keys(filters)
       .map(k => `${encodeURIComponent(k)}=${encodeURIComponent(filters[k])}`)
       .join('&');
-    return instance.get(`/animals?${query}`);
+    return instance.get(`/animals?${query}`, config);
   },
 
   getRecommendedAnimals: async () => {

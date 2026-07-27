@@ -32,6 +32,8 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600', // SemiBold
     color: '#111827', // Primary Text
+    flexShrink: 1,
+    marginRight: 8,
   },
   actionText: {
     fontSize: 14,

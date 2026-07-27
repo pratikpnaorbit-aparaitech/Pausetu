@@ -3,6 +3,7 @@ import { StyleSheet, View, Platform, Animated } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Import Screens
 import BuyScreen from '../screens/BuyScreen';
@@ -79,6 +80,7 @@ function AnimatedTabLabel({ focused, labelText }) {
 
 export default function BottomTabNavigator() {
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
 
   return (
     <Tab.Navigator
@@ -95,7 +97,7 @@ export default function BottomTabNavigator() {
         },
 
         tabBarStyle: {
-          height: Platform.OS === 'ios' ? 96 : 84,
+          height: Platform.OS === 'ios' ? (60 + Math.max(insets.bottom, 16)) : (60 + Math.max(insets.bottom, 12)),
           backgroundColor: '#FFFFFF',
           borderTopWidth: 1,
           borderTopColor: '#E2E8F0',
@@ -106,7 +108,7 @@ export default function BottomTabNavigator() {
           shadowOpacity: 0.06,
           shadowRadius: 12,
           elevation: 12,
-          paddingBottom: Platform.OS === 'ios' ? 24 : 12,
+          paddingBottom: Platform.OS === 'ios' ? Math.max(insets.bottom, 16) : Math.max(insets.bottom, 8),
           paddingTop: 8,
           paddingHorizontal: 16,
         },

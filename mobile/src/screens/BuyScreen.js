@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { AppContext } from '../context/AppContext';
-import { api, resolveMediaUrl } from '../api/api';
+import { api, resolveMediaUrl, API_BASE_URL } from '../api/api';
 import { useTranslation } from 'react-i18next';
 import { LinearGradient } from 'expo-linear-gradient';
 import AppText from '../components/AppText';
@@ -300,7 +300,25 @@ const ListFooter = React.memo(({ onViewDetails, recommendedAnimals, selectedCate
   );
 });
 
-export default function BuyScreen({ navigation }) {
+const formatPriceSafe = (price) => {
+  if (price === null || price === undefined) return '0';
+  try {
+    const num = Number(price);
+    if (isNaN(num)) return String(price);
+    if (typeof num.toLocaleString === 'function') {
+      try {
+        return num.toLocaleString('en-IN');
+      } catch (e) {
+        return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+      }
+    }
+    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  } catch (err) {
+    return String(price);
+  }
+};
+
+function BuyScreenComponent({ navigation }) {
   const { userProfile, userToken, updateLocation } = useContext(AppContext);
   const [isLocationPickerVisible, setIsLocationPickerVisible] = useState(false);
   const { t } = useTranslation();
@@ -320,6 +338,18 @@ export default function BuyScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [isFilterVisible, setIsFilterVisible] = useState(false);
   const [activeFilters, setActiveFilters] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [debugInfo, setDebugInfo] = useState({
+    apiBaseUrl: API_BASE_URL || 'Unknown',
+    status: 'Initial',
+    payload: 'None',
+    token: 'None',
+    error: 'None',
+    animalsCount: 0,
+    flatListRenderCount: 0,
+    lastUpdated: 'Never'
+  });
+  const [showDebug, setShowDebug] = useState(false);
   const mainListRef = useRef(null);
 
   const handleLocationTap = () => {
@@ -513,20 +543,54 @@ export default function BuyScreen({ navigation }) {
   renderCountRef.current += 1;
   console.log("loading =", loading);
   console.log("animals.length =", animalsList.length);
+  console.log("userProfile?.district =", userProfile?.district);
+
+
 
   const fetchLiveListings = async (showSpinner = true) => {
     if (showSpinner) setLoading(true);
+
+    console.log("[BuyScreen Debug] ======= API REQUEST EXECUTION =======");
+    console.log("[BuyScreen Debug] API Base URL:", API_BASE_URL);
+    console.log("[BuyScreen Debug] Target Endpoint: /animals");
+    console.log("[BuyScreen Debug] Request Method: GET");
+    console.log("[BuyScreen Debug] Request Params/Payload:", JSON.stringify({ status: 'approved', limit: 50 }));
+    console.log("[BuyScreen Debug] Token Attached:", userToken ? "Token present" : "Guest/None");
+    console.log("[BuyScreen Debug] =====================================");
+
+    setDebugInfo(prev => ({
+      ...prev,
+      status: 'Fetching...',
+      payload: JSON.stringify({ status: 'approved', limit: 50 }),
+      token: userToken || 'Guest/None',
+      error: 'None'
+    }));
+
     try {
       const res = await api.getAnimals({ status: 'approved' });
-      if (res.status === 'success') {
-        const mappedList = res.data.animals.map((a) => ({
+      console.log("[BuyScreen Debug] API Response Status:", res?.status || 'No status');
+      console.log("[BuyScreen Debug] API Response raw keys:", Object.keys(res || {}));
+
+      if (res && res.status === 'success') {
+        const animals = res.data?.animals || [];
+        console.log("[BuyScreen Debug] API Response Animals Count:", animals.length);
+
+        setDebugInfo(prev => ({
+          ...prev,
+          status: 'Success',
+          animalsCount: animals.length,
+          lastUpdated: new Date().toLocaleTimeString(),
+          rawResponse: JSON.stringify(res).substring(0, 300) + '...'
+        }));
+
+        const mappedList = animals.map((a) => ({
           ...a,
           id: a._id,
           name: a.title,
           breed: a.breedId?.name || 'Unknown Breed',
           age: a.age,
           rawPrice: a.price,
-          price: `₹${a.price.toLocaleString()}`,
+          price: `₹${formatPriceSafe(a.price)}`,
           sellerName: a.sellerId?.name || 'Seller',
           location: `${a.village}, ${a.district}`,
           isVerified: a.status === 'approved',
@@ -537,14 +601,45 @@ export default function BuyScreen({ navigation }) {
           categorySlug: a.categoryId?.slug?.toLowerCase()
         }));
         setAnimalsList(mappedList);
+      } else {
+        const errMsg = res ? `Invalid status: ${res.status}` : 'Empty response';
+        console.warn('[BuyScreen Debug] API Response unsuccessful:', errMsg);
+        setDebugInfo(prev => ({
+          ...prev,
+          status: 'Failed',
+          error: errMsg,
+          lastUpdated: new Date().toLocaleTimeString()
+        }));
+        setAnimalsList([]);
       }
     } catch (e) {
-      console.warn('[BuyScreen API Warning] Offline or failed backend:', e.message);
+      let errStr = e.message || 'Unknown Error';
+      console.error("[BuyScreen Debug] API Request failed with error:", errStr);
+      if (e.response) {
+        console.error("[BuyScreen Debug] Error response status:", e.response.status);
+        console.error("[BuyScreen Debug] Error response data:", JSON.stringify(e.response.data));
+        errStr = `HTTP ${e.response.status}: ${JSON.stringify(e.response.data)}`;
+      } else if (e.request) {
+        console.error("[BuyScreen Debug] No response received. Connection timed out or DNS failed.");
+        errStr = "No response from server. Check internet or API URL.";
+      }
+      setDebugInfo(prev => ({
+        ...prev,
+        status: 'Error',
+        error: errStr,
+        lastUpdated: new Date().toLocaleTimeString()
+      }));
       setAnimalsList([]);
     } finally {
       if (showSpinner) setLoading(false);
     }
   };
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchLiveListings(false);
+    setRefreshing(false);
+  }, []);
 
   useEffect(() => {
     console.log("BuyScreen mounted");
@@ -590,6 +685,7 @@ export default function BuyScreen({ navigation }) {
     >
       <SafeAreaView 
         style={styles.safeArea}
+        edges={['top', 'left', 'right']}
         onLayout={(e) => {
           console.log('[BuyScreen Layout] Root Container:', e.nativeEvent.layout);
           console.log('[BuyScreen Layout] SafeArea:', e.nativeEvent.layout);
@@ -597,7 +693,7 @@ export default function BuyScreen({ navigation }) {
       >
         <Image
           source={require('../../assets/farmer-bg.webp')}
-          style={[StyleSheet.absoluteFillObject, { opacity: 0.025 }]}
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.025 }}
           resizeMode="cover"
         />
         <View 
@@ -651,6 +747,8 @@ export default function BuyScreen({ navigation }) {
             data={filteredAnimals}
             keyExtractor={(item) => item.id}
             style={styles.mainFlatList}
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
             initialNumToRender={8}
             maxToRenderPerBatch={8}
             windowSize={11}
@@ -693,6 +791,48 @@ export default function BuyScreen({ navigation }) {
                 >
                   <AppText style={styles.emptyStateButtonText}>{t('buy.noAnimalsCategoryButton')}</AppText>
                 </TouchableOpacity>
+
+                {/* Technical Debug Info (Android APK Troubleshooting) */}
+                <View style={{ marginTop: 24, width: '100%', borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingTop: 16 }}>
+                  <TouchableOpacity
+                    onPress={() => setShowDebug(!showDebug)}
+                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1F5F9', paddingVertical: 8, borderRadius: 10 }}
+                  >
+                    <Ionicons name={showDebug ? "chevron-up" : "chevron-down"} size={16} color="#475569" style={{ marginRight: 6 }} />
+                    <AppText style={{ fontSize: 12, fontWeight: '700', color: '#475569' }}>
+                      {showDebug ? "Hide Technical Debug Info" : "Show Technical Debug Info"}
+                    </AppText>
+                  </TouchableOpacity>
+
+                  {showDebug && (
+                    <View style={{ marginTop: 12, backgroundColor: '#0F172A', padding: 12, borderRadius: 10, width: '100%' }}>
+                      <AppText style={{ fontSize: 11, color: '#10B981', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', marginBottom: 4 }}>
+                        [API URL]: {debugInfo.apiBaseUrl}
+                      </AppText>
+                      <AppText style={{ fontSize: 11, color: '#38BDF8', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', marginBottom: 4 }}>
+                        [Status]: {debugInfo.status}
+                      </AppText>
+                      <AppText style={{ fontSize: 11, color: '#E2E8F0', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', marginBottom: 4 }}>
+                        [Payload]: {debugInfo.payload}
+                      </AppText>
+                      <AppText style={{ fontSize: 11, color: '#FCD34D', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', marginBottom: 4 }}>
+                        [Token]: {debugInfo.token ? (debugInfo.token.substring(0, 15) + '...') : 'None'}
+                      </AppText>
+                      <AppText style={{ fontSize: 11, color: '#FCA5A5', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', marginBottom: 4 }}>
+                        [Error]: {debugInfo.error || 'None'}
+                      </AppText>
+                      <AppText style={{ fontSize: 11, color: '#E2E8F0', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', marginBottom: 4 }}>
+                        [Count]: {debugInfo.animalsCount}
+                      </AppText>
+                      <AppText style={{ fontSize: 11, color: '#E2E8F0', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', marginBottom: 4 }}>
+                        [Renders]: {renderCountRef.current}
+                      </AppText>
+                      <AppText style={{ fontSize: 11, color: '#94A3B8', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>
+                        [Updated]: {debugInfo.lastUpdated}
+                      </AppText>
+                    </View>
+                  )}
+                </View>
               </View>
             }
             contentContainerStyle={styles.scrollContent}
@@ -702,11 +842,7 @@ export default function BuyScreen({ navigation }) {
         )}
       </View>
 
-      {/* Floating Action Button (FAB) */}
-      <TouchableOpacity style={styles.fab} activeOpacity={0.85} onPress={handleNavigateToSell}>
-        <MaterialCommunityIcons name="plus" size={22} color="#FFFFFF" />
-        <AppText style={styles.fabLabel}>{t('buy.sellAnimal')}</AppText>
-      </TouchableOpacity>
+
 
       <LocationPicker
         visible={isLocationPickerVisible}
@@ -721,6 +857,52 @@ export default function BuyScreen({ navigation }) {
       />
       </SafeAreaView>
     </LinearGradient>
+  );
+}
+
+class BuyerErrorBoundary extends React.Component {
+  state = { hasError: false, error: null };
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error("[BuyerErrorBoundary caught error]", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, backgroundColor: '#F8FCF7' }}>
+          <Ionicons name="alert-circle" size={64} color="#EF4444" style={{ marginBottom: 16 }} />
+          <AppText style={{ fontSize: 18, fontWeight: 'bold', color: '#0F172A', textAlign: 'center' }}>
+            काहीतरी चुकीचे घडले (Something Went Wrong)
+          </AppText>
+          <AppText style={{ fontSize: 13, color: '#64748B', marginTop: 8, textAlign: 'center', paddingHorizontal: 12 }}>
+            {this.state.error?.toString() || "Unknown Error"}
+          </AppText>
+          <TouchableOpacity
+            style={{ marginTop: 24, backgroundColor: '#16A34A', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12 }}
+            onPress={() => this.setState({ hasError: false, error: null })}
+          >
+            <AppText style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 }}>
+              पुन्हा प्रयत्न करा (Retry)
+            </AppText>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+export default function BuyScreen(props) {
+  return (
+    <BuyerErrorBoundary>
+      <BuyScreenComponent {...props} />
+    </BuyerErrorBoundary>
   );
 }
 
@@ -854,7 +1036,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#EF4444',
   },
   scrollContent: {
-    paddingBottom: 120, // Increased bottom padding to prevent FAB overlay overlap
+    paddingBottom: 24,
   },
   locationCard: {
     flexDirection: 'row',
@@ -1266,9 +1448,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     marginLeft: 6,
   },
-  scrollContent: {
-    paddingBottom: 160,
-  },
+
   emptyStateContainer: {
     alignItems: 'center',
     justifyContent: 'center',
