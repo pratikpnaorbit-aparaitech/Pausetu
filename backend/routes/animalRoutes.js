@@ -1,12 +1,12 @@
 const express = require('express');
 const animalController = require('../controllers/animalController');
-const { protect, restrictTo } = require('../middleware/authMiddleware');
+const { protect, restrictTo, optionalProtect } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
 router
   .route('/')
-  .get(animalController.getAllAnimals)
+  .get(optionalProtect, animalController.getAllAnimals)
   .post(protect, animalController.createAnimal);
 
 // Admin-only dedicated approve / reject endpoints (hardened — no generic status patch)

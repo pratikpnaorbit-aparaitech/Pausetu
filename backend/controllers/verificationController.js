@@ -1,5 +1,5 @@
 const User = require('../models/User');
-const Notification = require('../models/Notification');
+
 const Setting = require('../models/Setting');
 const asyncHandler = require('../utils/asyncHandler');
 const { AppError } = require('../middleware/errorHandler');
@@ -21,21 +21,7 @@ const getSettingsHelper = async () => {
   return settings;
 };
 
-const notifyAdmins = async (title, message, type = 'info') => {
-  try {
-    const admins = await User.find({ role: 'admin' });
-    for (const admin of admins) {
-      await Notification.create({
-        recipient: admin._id,
-        title,
-        message,
-        type
-      });
-    }
-  } catch (err) {
-    console.warn('Failed to notify admins:', err.message);
-  }
-};
+
 
 /**
  * Submit Milk Dairy Receipt for verification
@@ -83,42 +69,7 @@ exports.submitVerification = asyncHandler(async (req, res, next) => {
     console.log(`[VERIFICATION REPLACE SUCCESS] Removed old Cloudinary receipt: ${oldReceiptUrl}`);
   }
 
-  if (isAuto) {
-    await Notification.create([
-      {
-        recipient: user._id,
-        title: 'डेअरी पावती पडताळणी यशस्वी / Verification Approved',
-        message: 'अभिनंदन! तुमची दुग्धशाळा पावती यशस्वीरित्या मंजूर झाली आहे. आता तुम्ही सर्व वैशिष्ट्ये वापरू शकता. / Congratulations! Your dairy receipt has been approved. You can now use all features.',
-        type: 'success'
-      },
-      {
-        recipient: user._id,
-        title: 'सदस्यत्व सक्रिय झाले / Membership Activated',
-        message: 'तुमचे सत्यापित सदस्यत्व यशस्वीरित्या सक्रिय झाले आहे. / Your verified membership has been successfully activated.',
-        type: 'success'
-      }
-    ]);
 
-    await notifyAdmins(
-      'पडताळणी पूर्ण झाली / Verification Completed',
-      `वापरकर्ता ${user.fullName || user.name} ची पावती स्वयंचलितपणे मंजूर झाली. / User ${user.fullName || user.name}'s receipt was approved automatically.`,
-      'success'
-    );
-  } else {
-    await Notification.create({
-      recipient: user._id,
-      title: 'पडताळणी सबमिट केली / Verification Submitted',
-      message: 'तुमची दुग्धशाळा पावती यशस्वीरित्या सबमिट केली आहे. पडताळणी प्रलंबित आहे. / Your dairy receipt has been submitted. Review is pending.',
-      type: 'info'
-    });
-
-    await notifyAdmins(
-      'नवीन पडताळणी विनंती / New Verification Request',
-      `वापरकर्ता ${user.fullName || user.name} ने नवीन पावती सबमिट केली आहे. / User ${user.fullName || user.name} has submitted a new receipt.`,
-      'info'
-    );
-
-  }
 
   res.status(200).json({
     status: 'success',
@@ -234,54 +185,15 @@ exports.updateVerificationStatus = asyncHandler(async (req, res, next) => {
   user.verification.status = status;
   user.verification.verifiedBy = req.user.id;
 
-  let notificationTitle = '';
-  let notificationMessage = '';
-  let notificationType = 'info';
-
   if (status === 'approved') {
     user.verification.approvedAt = new Date();
     user.verification.rejectedReason = undefined;
-    
-    notificationTitle = 'डेअरी पावती पडताळणी यशस्वी / Verification Approved';
-    notificationMessage = 'अभिनंदन! तुमची दुग्धशाळा पावती यशस्वीरित्या मंजूर झाली आहे. आता तुम्ही सर्व वैशिष्ट्ये वापरू शकता. / Congratulations! Your dairy receipt has been approved. You can now use all features.';
-    notificationType = 'success';
-
-    await Notification.create({
-      recipient: user._id,
-      title: 'सदस्यत्व सक्रिय झाले / Membership Activated',
-      message: 'तुमचे सत्यापित सदस्यत्व यशस्वीरित्या सक्रिय झाले आहे. / Your verified membership has been successfully activated.',
-      type: 'success'
-    });
   } else if (status === 'rejected') {
     user.verification.rejectedReason = rejectedReason;
     user.verification.approvedAt = undefined;
-    
-    notificationTitle = 'डेअरी पावती पडताळणी नाकारली / Verification Rejected';
-    notificationMessage = `दिलगीर आहोत, तुमची दुग्धशाळा पावती नाकारण्यात आली आहे. कारण: ${rejectedReason}. कृपया पुन्हा प्रयत्न करा. / Sorry, your dairy receipt was rejected. Reason: ${rejectedReason}. Please try again.`;
-    notificationType = 'alert';
-
-    await Notification.create({
-      recipient: user._id,
-      title: 'पुन्हा अपलोड करणे आवश्यक आहे / Re-upload Required',
-      message: 'कृपया वैध पावती दस्तऐवज पुन्हा अपलोड करा. / Please re-upload a valid receipt document.',
-      type: 'alert'
-    });
   }
 
   await user.save();
-
-  await Notification.create({
-    recipient: user._id,
-    title: notificationTitle,
-    message: notificationMessage,
-    type: notificationType
-  });
-
-  await notifyAdmins(
-    'पडताळणी पूर्ण झाली / Verification Completed',
-    `वापरकर्ता ${user.fullName || user.name} ची पडताळणी स्थिती ${status === 'approved' ? 'मंजूर' : 'नाकारली'} केली आहे. / User ${user.fullName || user.name}'s status was updated to ${status}.`,
-    status === 'approved' ? 'success' : 'alert'
-  );
 
   res.status(200).json({
     status: 'success',

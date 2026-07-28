@@ -62,6 +62,8 @@ export const registerLogoutHandler = (callback) => {
 // Interceptor to inject bearer token
 instance.interceptors.request.use(
   async (config) => {
+    const finalUrl = (config.baseURL || '') + (config.url || '');
+    console.log(`[API Request] ${(config.method || 'GET').toUpperCase()} ${finalUrl}`);
     const token = await secureStorage.getItem('userToken');
     if (token && token !== 'guest' && token !== 'null' && token !== 'undefined') {
       config.headers.Authorization = `Bearer ${token}`;
@@ -201,6 +203,10 @@ export const api = {
 
   deleteNotification: async (id) => {
     return instance.delete(`/notifications/${id}`);
+  },
+
+  clearAllNotifications: async () => {
+    return instance.delete('/notifications/clear-all');
   },
 
   // Favorites

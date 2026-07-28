@@ -2,13 +2,14 @@ import React, { useState, useContext, useMemo, useCallback } from 'react';
 import {
   StyleSheet, View, ScrollView,
   TouchableOpacity, Switch, Alert, Platform, Modal,
-  Linking, ActivityIndicator, Text} from 'react-native';
+  Linking, ActivityIndicator, Text, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import CustomHeader from '../components/CustomHeader';
 import { AppContext } from '../context/AppContext';
 import { api } from '../api/api';
+import { reviewApi } from '../api/reviewApi';
 import { useTranslation } from 'react-i18next';
 import AppText from '../components/AppText';
 import { usePremium } from '../hooks/usePremium';
@@ -269,45 +270,96 @@ export default function SettingsScreen({ navigation }) {
     );
   }, [handleContactEmail, handleContactPhone, handleContactWeb, t]);
 
-  const handleRateApp = useCallback(async () => {
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [ratingVal, setRatingVal] = useState(0);
+  const [feedbackText, setFeedbackText] = useState('');
+  const [existingReview, setExistingReview] = useState(null);
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewSubmitted, setReviewSubmitted] = useState(false);
+  const [fetchingReview, setFetchingReview] = useState(false);
+
+  const handleOpenRateApp = useCallback(async () => {
+    setShowRatingModal(true);
+    setReviewSubmitted(false);
+    setFetchingReview(true);
+    try {
+      if (!isGuest && userToken !== 'guest') {
+        const res = await reviewApi.getUserReview();
+        if (res && res.status === 'success' && res.data && res.data.review) {
+          const rev = res.data.review;
+          setExistingReview(rev);
+          setRatingVal(rev.rating);
+          setFeedbackText(rev.feedback || '');
+        } else {
+          setExistingReview(null);
+          setRatingVal(0);
+          setFeedbackText('');
+        }
+      }
+    } catch (e) {
+      // Friendly fallback — do not block user or crash
+      setExistingReview(null);
+      setRatingVal(0);
+      setFeedbackText('');
+    } finally {
+      setFetchingReview(false);
+    }
+  }, [isGuest, userToken]);
+
+  const handleGooglePlayRedirect = useCallback(async () => {
+    setShowRatingModal(false);
+
     if (Platform.OS === 'web') {
-      try { await Linking.openURL(PLAY_STORE_WEB_URL); } catch (e) { }
+      try {
+        await Linking.openURL(PLAY_STORE_WEB_URL);
+      } catch (e) {
+        Alert.alert(t('settings.ratePashuSetu'), 'Google Play version coming soon.', [
+          { text: t('common.close'), style: 'cancel' }
+        ]);
+      }
       return;
     }
 
     const url = Platform.OS === 'ios' ? APP_STORE_URL : PLAY_STORE_URL;
 
-    if (!url) {
-      Alert.alert(
-        t('settings.ratePashuSetu'),
-        `${t('settings.rateNotPublished')} ${SUPPORT_EMAIL}`,
-        [
-          { text: t('settings.emailFeedback'), onPress: handleContactEmail },
-          { text: t('common.close'), style: 'cancel' },
-        ]
-      );
+    try {
+      if (url && (await Linking.canOpenURL(url))) {
+        await Linking.openURL(url);
+      } else if (PLAY_STORE_WEB_URL && (await Linking.canOpenURL(PLAY_STORE_WEB_URL))) {
+        await Linking.openURL(PLAY_STORE_WEB_URL);
+      } else {
+        Alert.alert(t('settings.ratePashuSetu'), 'Google Play version coming soon.', [
+          { text: t('common.close'), style: 'cancel' }
+        ]);
+      }
+    } catch (e) {
+      Alert.alert(t('settings.ratePashuSetu'), 'Google Play version coming soon.', [
+        { text: t('common.close'), style: 'cancel' }
+      ]);
+    }
+  }, [t]);
+
+  const handleSubmitFeedback = useCallback(async () => {
+    if (ratingVal <= 3 && !feedbackText.trim()) {
+      Alert.alert(t('common.error'), t('settings.feedbackRequiredError'));
       return;
     }
 
+    setSubmittingReview(true);
     try {
-      const ok = await Linking.canOpenURL(url);
-      if (ok) {
-        await Linking.openURL(url);
-      } else if (Platform.OS === 'android') {
-        await Linking.openURL(PLAY_STORE_WEB_URL);
-      } else {
-        Alert.alert(t('settings.storeUnavailable'), t('settings.storeUnavailableMsg'));
-      }
-    } catch (e) {
-      if (Platform.OS === 'android') {
-        try { await Linking.openURL(PLAY_STORE_WEB_URL); } catch (e) {
-          Alert.alert(t('settings.storeUnavailable'), t('settings.storeUnavailableMsg'));
-        }
-      } else {
-        Alert.alert(t('settings.storeUnavailable'), t('settings.storeUnavailableMsg'));
-      }
+      await reviewApi.submitReview({
+        rating: ratingVal,
+        feedback: feedbackText.trim(),
+        appVersion: APP_VERSION,
+        platform: Platform.OS,
+      });
+      setReviewSubmitted(true);
+    } catch (err) {
+      Alert.alert(t('common.error'), err.message || t('settings.saveThemeError'));
+    } finally {
+      setSubmittingReview(false);
     }
-  }, [handleContactEmail, t]);
+  }, [ratingVal, feedbackText, t]);
 
   const closeLangModal = useCallback(() => setShowLangModal(false), []);
   const closeFontModal = useCallback(() => setShowFontModal(false), []);
@@ -458,7 +510,7 @@ export default function SettingsScreen({ navigation }) {
           {renderMenuRow({
             iconName: 'star-outline', iconBg: '#FEF3C7', iconColor: '#D97706',
             title: t('settings.rateApp'),
-            onPress: handleRateApp,
+            onPress: handleOpenRateApp,
           })}
         </View>
 
@@ -726,7 +778,7 @@ export default function SettingsScreen({ navigation }) {
                 { icon: 'add-circle-outline', label: t('settings.howToPost'), onPress: () => { closeHelpModal(); setShowFaqModal(true); } },
                 { icon: 'camera-outline', label: t('settings.photoVideoReq'), onPress: () => { closeHelpModal(); setShowFaqModal(true); } },
                 { icon: 'shield-outline', label: t('settings.accountSecurity'), onPress: () => { closeHelpModal(); setShowPrivacySettingsModal(true); } },
-                { icon: 'star-outline', label: t('settings.rateAppTopic'), onPress: handleRateApp },
+                { icon: 'star-outline', label: t('settings.rateAppTopic'), onPress: () => { closeHelpModal(); handleOpenRateApp(); } },
               ].map((item, i) => (
                 <TouchableOpacity
                   key={i}
@@ -915,6 +967,136 @@ export default function SettingsScreen({ navigation }) {
             >
               <AppText style={styles.primaryBtnText}>{t('common.confirm')}</AppText>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Rate App & Review Modal ────────────────────────────────────── */}
+      <Modal
+        visible={showRatingModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowRatingModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalSheet, { backgroundColor: T.card }]}>
+            <View style={styles.modalHandle} />
+            <View style={styles.modalHeaderRow}>
+              <AppText style={[styles.modalTitle, { color: T.text }]}>
+                {existingReview ? t('settings.editRateTitle') : t('settings.rateTitle')}
+              </AppText>
+              <TouchableOpacity onPress={() => setShowRatingModal(false)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                <Ionicons name="close" size={22} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            {fetchingReview ? (
+              <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                <ActivityIndicator size="large" color="#16A34A" />
+              </View>
+            ) : reviewSubmitted ? (
+              <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+                <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#DCFCE7', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                  <Ionicons name="checkmark-circle" size={36} color="#16A34A" />
+                </View>
+                <AppText style={{ fontSize: 18, fontWeight: '800', color: T.text, marginBottom: 8, textAlign: 'center' }}>
+                  {t('settings.feedbackSuccessTitle')}
+                </AppText>
+                <AppText style={{ fontSize: 13, color: '#64748B', textAlign: 'center', paddingHorizontal: 16, marginBottom: 20 }}>
+                  {t('settings.feedbackSuccessSub')}
+                </AppText>
+                <TouchableOpacity style={styles.primaryBtn} onPress={() => setShowRatingModal(false)}>
+                  <AppText style={styles.primaryBtnText}>{t('common.close')}</AppText>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 10 }}>
+                <AppText style={{ fontSize: 13, color: '#64748B', textAlign: 'center', marginBottom: 16 }}>
+                  {t('settings.rateSubtitle')}
+                </AppText>
+
+                {/* 5-Star Rating Buttons */}
+                <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 10, marginBottom: 20 }}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <TouchableOpacity
+                      key={star}
+                      onPress={() => setRatingVal(star)}
+                      activeOpacity={0.7}
+                      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                    >
+                      <Ionicons
+                        name={star <= ratingVal ? "star" : "star-outline"}
+                        size={36}
+                        color={star <= ratingVal ? "#F59E0B" : "#CBD5E1"}
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* High Rating Flow (4-5 Stars) */}
+                {ratingVal >= 4 && (
+                  <View style={{ alignItems: 'center', backgroundColor: '#F0FDF4', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#DCFCE7', marginBottom: 16 }}>
+                    <AppText style={{ fontSize: 16, fontWeight: '700', color: '#15803D', textAlign: 'center', marginBottom: 4 }}>
+                      {t('settings.highRatingTitle')}
+                    </AppText>
+                    <AppText style={{ fontSize: 13, color: '#166534', textAlign: 'center', marginBottom: 16 }}>
+                      {t('settings.highRatingSub')}
+                    </AppText>
+
+                    <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: '#16A34A', width: '100%', marginBottom: 10 }]} onPress={handleGooglePlayRedirect}>
+                      <AppText style={styles.primaryBtnText}>{t('settings.rateOnGooglePlay')}</AppText>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={{ paddingVertical: 8 }} onPress={() => setShowRatingModal(false)}>
+                      <AppText style={{ fontSize: 13, fontWeight: '600', color: '#64748B' }}>{t('settings.maybeLater')}</AppText>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* Feedback Form Flow (1-3 Stars) */}
+                {ratingVal > 0 && ratingVal <= 3 && (
+                  <View style={{ marginTop: 4 }}>
+                    <AppText style={{ fontSize: 13, fontWeight: '700', color: T.text, marginBottom: 8 }}>
+                      {t('settings.feedbackTitle')}
+                    </AppText>
+                    <TextInput
+                      style={{
+                        borderWidth: 1,
+                        borderColor: T.border,
+                        backgroundColor: isDarkMode ? '#0F172A' : '#F8FAFC',
+                        borderRadius: 12,
+                        padding: 14,
+                        fontSize: 13,
+                        color: T.text,
+                        minHeight: 90,
+                        textAlignVertical: 'top',
+                        marginBottom: 16,
+                      }}
+                      multiline
+                      numberOfLines={4}
+                      placeholder={t('settings.feedbackPlaceholder')}
+                      placeholderTextColor="#94A3B8"
+                      value={feedbackText}
+                      onChangeText={setFeedbackText}
+                    />
+
+                    <TouchableOpacity
+                      style={[styles.primaryBtn, submittingReview && { opacity: 0.6 }]}
+                      onPress={handleSubmitFeedback}
+                      disabled={submittingReview}
+                    >
+                      {submittingReview ? (
+                        <ActivityIndicator color="#FFFFFF" />
+                      ) : (
+                        <AppText style={styles.primaryBtnText}>
+                          {existingReview ? t('settings.updateFeedback') : t('settings.submitFeedback')}
+                        </AppText>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </ScrollView>
+            )}
           </View>
         </View>
       </Modal>

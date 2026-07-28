@@ -105,12 +105,10 @@ export const AppProvider = ({ children }) => {
         if (storedDarkMode === 'true') setIsDarkMode(true);
         if (storedFontSize) setFontSize(storedFontSize);
 
-        if (isGuestStr === 'true') {
-          setIsGuest(true);
-          setIsProfileComplete(true);
-          setUserProfile(null);
-          setUserToken('guest');
-        } else if (token && token !== 'null' && token !== 'undefined') {
+        if (token && token !== 'null' && token !== 'undefined' && token !== 'guest') {
+          console.log('[AppBoot Debug] Valid userToken found in secureStorage:', token);
+          setIsGuest(false);
+          await AsyncStorage.removeItem('isGuest');
           try {
             const resObj = await profileApi.getProfile();
             if (resObj?.status === 'success' && resObj.data?.user) {
@@ -123,32 +121,25 @@ export const AppProvider = ({ children }) => {
               setIsProfileComplete(isComplete);
               setUserToken(token);
             } else {
-              await AsyncStorage.removeItem('userProfile');
-              setUserProfile(null);
-              setIsProfileComplete(false);
+              if (cachedProfile) {
+                try { setUserProfile(JSON.parse(cachedProfile)); } catch (_) {}
+              }
               setUserToken(token);
             }
           } catch (syncErr) {
             console.warn('[Sync Warning] Backend profile synchronization failed:', syncErr.message);
-            const isNetworkError = syncErr.message && (
-              syncErr.message.includes('Network') ||
-              syncErr.message.includes('network') ||
-              syncErr.message.includes('timeout') ||
-              syncErr.message.includes('connect')
-            );
-            if (isNetworkError) {
-              const profileComplete = await AsyncStorage.getItem('isProfileComplete');
-              if (profileComplete === 'true') setIsProfileComplete(true);
-              if (cachedProfile) {
-                setUserProfile(JSON.parse(cachedProfile));
-              } else {
-                setUserProfile(null);
-              }
-              setUserToken(token);
-            } else {
-              await logout();
+            const profileComplete = await AsyncStorage.getItem('isProfileComplete');
+            if (profileComplete === 'true') setIsProfileComplete(true);
+            if (cachedProfile) {
+              try { setUserProfile(JSON.parse(cachedProfile)); } catch (_) {}
             }
+            setUserToken(token);
           }
+        } else if (isGuestStr === 'true' || token === 'guest') {
+          setIsGuest(true);
+          setIsProfileComplete(true);
+          setUserProfile(null);
+          setUserToken('guest');
         } else {
           setUserProfile(null);
           setIsProfileComplete(false);
@@ -246,10 +237,14 @@ export const AppProvider = ({ children }) => {
     setUserProfile(null);
 
     try {
+      console.log('[Auth Persistence] Token received from backend:', accessToken);
       await secureStorage.setItem('userToken', accessToken);
+      console.log('[Auth Persistence] Token saved successfully to storage key "userToken"');
       if (refreshToken) {
         await secureStorage.setItem('refreshToken', refreshToken);
       }
+      await AsyncStorage.removeItem('isGuest');
+      setIsGuest(false);
 
       let currentUser = user;
       let profileData = normalizeProfileData(currentUser);

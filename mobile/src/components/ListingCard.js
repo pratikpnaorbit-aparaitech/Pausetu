@@ -258,7 +258,12 @@ function ListingCard({ item, onViewDetailsPress, style }) {
               <View style={styles.specTextContainer}>
                 <AppText style={styles.specLabel}>{t('buy.milkLabel', { defaultValue: 'Milk' })}</AppText>
                 <AppText style={styles.specValue} numberOfLines={1}>
-                  {item.milkYield ? `${item.milkYield} L` : getUnavailableMilkText()}
+                  {(() => {
+                    const raw = item.health?.milkCapacity || item.milkYield;
+                    if (!raw) return getUnavailableMilkText();
+                    const cleaned = String(raw).replace(/liters\/day|liters|liter|l\/day|l/gi, '').trim();
+                    return cleaned ? `${cleaned} L` : getUnavailableMilkText();
+                  })()}
                 </AppText>
               </View>
             </View>

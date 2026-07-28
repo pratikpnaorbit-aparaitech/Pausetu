@@ -257,3 +257,20 @@ exports.getVillages = asyncHandler(async (req, res, next) => {
     }
   });
 });
+
+/**
+ * Get Locations - GET /api/locations
+ */
+exports.getLocations = asyncHandler(async (req, res, next) => {
+  const districts = await District.find({ isActive: true }).sort({ name: 1 });
+  const states = await State.find({ isActive: true }).sort({ name: 1 });
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      districts,
+      states,
+      locations: districts
+    }
+  });
+});

@@ -552,7 +552,7 @@ export default function AnimalDetailsScreen({ route, navigation }) {
             village: villageVal,
             pincode: pincodeVal,
             formattedAddress: formattedAddr,
-            milkYield: a.milkYield || null,
+            milkYield: a.health?.milkCapacity || a.milkYield || null,
             pregnant: a.pregnant || false,
             lactation: a.lactation || null,
           });

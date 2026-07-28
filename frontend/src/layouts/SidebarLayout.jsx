@@ -3,7 +3,7 @@ import { AdminContext } from '../context/AdminContext';
 import {
   LayoutDashboard, Clock, Layers, Users, UserCheck,
   FolderTree, Tag, MapPin, Shield, BarChart3, Settings,
-  AlertCircle, HelpCircle, LogOut, Search, User, X, Menu, Archive
+  AlertCircle, HelpCircle, LogOut, Search, User, X, Menu, Archive, Star
 } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -18,6 +18,7 @@ const NAV_ITEMS = [
   { name: 'Breeds',           icon: Tag,             section: 'catalog' },
   { name: 'Locations',        icon: MapPin,          section: 'catalog' },
   { name: 'Complaints',       icon: AlertCircle,     section: 'system' },
+  { name: 'App Reviews',      icon: Star,            section: 'system' },
   { name: 'Audit Logs',       icon: Shield,          section: 'system' },
   { name: 'Reports',          icon: BarChart3,       section: 'system' },
   { name: 'Settings',         icon: Settings,        section: 'system' },

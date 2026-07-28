@@ -1,11 +1,19 @@
 const mongoose = require('mongoose');
 
+const NOTIFICATION_TYPES = {
+  LISTING_APPROVED: 'LISTING_APPROVED',
+  LISTING_REJECTED: 'LISTING_REJECTED',
+  BUYER_INQUIRY: 'BUYER_INQUIRY',
+  SUBSCRIPTION_EXPIRY: 'SUBSCRIPTION_EXPIRY'
+};
+
 const notificationSchema = new mongoose.Schema(
   {
     recipient: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: [true, 'Notification must belong to a recipient']
+      required: [true, 'Notification must belong to a recipient'],
+      index: true
     },
     title: {
       type: String,
@@ -15,21 +23,24 @@ const notificationSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Notification must have a message']
     },
-    type: {
+    notificationType: {
       type: String,
-      enum: ['info', 'alert', 'success', 'chat', 'warning', 'error'],
-      default: 'info'
+      enum: Object.values(NOTIFICATION_TYPES),
+      required: [true, 'Notification must have a type']
     },
     isRead: {
       type: Boolean,
-      default: false
+      default: false,
+      index: true
     },
-    relatedId: {
-      type: String,
+    relatedAnimal: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Animal',
       default: null
     },
-    targetScreen: {
-      type: String,
+    relatedUser: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
       default: null
     },
     metadata: {
@@ -43,5 +54,6 @@ const notificationSchema = new mongoose.Schema(
 );
 
 const Notification = mongoose.model('Notification', notificationSchema);
+Notification.NOTIFICATION_TYPES = NOTIFICATION_TYPES;
 
 module.exports = Notification;

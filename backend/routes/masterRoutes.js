@@ -11,6 +11,7 @@ router.get('/categories/:id', masterController.getCategoryById);
 router.get('/breeds', masterController.getBreeds);
 
 // Public routes for Location dropdowns
+router.get('/locations', masterController.getLocations);
 router.get('/states', masterController.getStates);
 router.get('/districts', masterController.getDistricts);
 router.get('/talukas', masterController.getTalukas);

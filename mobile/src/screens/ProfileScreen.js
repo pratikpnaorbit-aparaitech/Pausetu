@@ -1,4 +1,4 @@
-import React, { useContext, useState, useMemo, useCallback } from 'react';
+import React, { useContext, useState, useMemo, useCallback, useEffect } from 'react';
 import { StyleSheet, View, ScrollView, Image, TouchableOpacity, Alert, Modal, TextInput, ActivityIndicator, Platform, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -6,17 +6,20 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { AppContext } from '../context/AppContext';
 import { profileApi } from '../api/profileApi';
+import { animalApi } from '../api/animalApi';
 import { useTranslation } from 'react-i18next';
 import { resolveMediaUrl } from '../api/api';
 import AppText from '../components/AppText';
 import VerificationCard from '../components/VerificationCard';
 import CustomHeader from '../components/CustomHeader';
 import { formatLocationDisplay } from '../utils/geocoder';
+import { useAutoRefresh } from '../hooks/useAutoRefresh';
+import { REFRESH_EVENTS } from '../services/refreshManager';
 
-const SELLER_STATS = [
-  { id: '1', labelKey: 'profile.activeListings', value: '3', icon: 'list-box-outline', color: '#16A34A' },
-  { id: '2', labelKey: 'profile.soldAnimals', value: '4', icon: 'checkbox-marked-circle-outline', color: '#3B82F6' },
-  { id: '3', labelKey: 'profile.totalViews', value: '240', icon: 'eye-outline', color: '#8B5CF6' },
+const SELLER_STATS_CONFIG = [
+  { id: 'active', labelKey: 'profile.activeListings', icon: 'list-box-outline', color: '#16A34A' },
+  { id: 'sold', labelKey: 'profile.soldAnimals', icon: 'checkbox-marked-circle-outline', color: '#3B82F6' },
+  { id: 'views', labelKey: 'profile.totalViews', icon: 'eye-outline', color: '#8B5CF6' },
 ];
 
 const MENU_ITEMS = [
@@ -28,6 +31,82 @@ const MENU_ITEMS = [
 export default function ProfileScreen({ navigation }) {
   const { userProfile, isProfileLoading, completeProfile, logout, exitGuestSession, isGuest, userToken, refreshProfileData } = useContext(AppContext);
   const { t } = useTranslation();
+
+  // Dynamic Stats States
+  const [myListings, setMyListings] = useState([]);
+  const [isStatsLoading, setIsStatsLoading] = useState(true);
+
+  const fetchUserStatsData = useCallback(async () => {
+    if (!userProfile || !userProfile.id || isGuest || userToken === 'guest') {
+      setMyListings([]);
+      setIsStatsLoading(false);
+      return;
+    }
+
+    try {
+      const res = await animalApi.getMyListings(userProfile.id);
+      if (res && res.status === 'success' && res.data && res.data.animals) {
+        setMyListings(res.data.animals);
+      } else if (res && res.data && Array.isArray(res.data)) {
+        setMyListings(res.data);
+      }
+    } catch (err) {
+      console.warn('[ProfileScreen] Failed to fetch stats listings:', err);
+    } finally {
+      setIsStatsLoading(false);
+    }
+  }, [userProfile?.id, isGuest, userToken]);
+
+  useEffect(() => {
+    fetchUserStatsData();
+  }, [fetchUserStatsData]);
+
+  useAutoRefresh(
+    () => {
+      if (!isGuest && userToken !== 'guest') {
+        fetchUserStatsData();
+        if (refreshProfileData) {
+          return refreshProfileData();
+        }
+      }
+    },
+    {
+      events: [
+        REFRESH_EVENTS.VERIFICATION_UPDATED,
+        REFRESH_EVENTS.PROFILE_UPDATED,
+        REFRESH_EVENTS.LISTING_CREATED,
+        REFRESH_EVENTS.LISTING_UPDATED,
+        REFRESH_EVENTS.LISTING_DELETED
+      ],
+      screenKey: 'ProfileScreen',
+      enabled: !isGuest
+    }
+  );
+
+  const statsData = useMemo(() => {
+    const activeCount = myListings.filter(item => {
+      const s = item.status?.toLowerCase();
+      return s === 'available' || s === 'approved';
+    }).length;
+
+    const soldCount = myListings.filter(item => {
+      const s = item.status?.toLowerCase();
+      return s === 'sold';
+    }).length;
+
+    let totalViews = 0;
+    if (userProfile && typeof userProfile.totalViews === 'number') {
+      totalViews = userProfile.totalViews;
+    } else {
+      totalViews = myListings.reduce((sum, item) => sum + Number(item.views || 0), 0);
+    }
+
+    return {
+      activeListings: activeCount,
+      soldAnimals: soldCount,
+      totalViews: totalViews
+    };
+  }, [myListings, userProfile]);
 
   // Edit profile states
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
@@ -214,7 +293,10 @@ export default function ProfileScreen({ navigation }) {
   const triggerSync = async () => {
     setSyncing(true);
     try {
-      await refreshProfileData();
+      await Promise.all([
+        refreshProfileData ? refreshProfileData() : Promise.resolve(),
+        fetchUserStatsData()
+      ]);
       Alert.alert(t('common.success'), t('profile.refreshed'));
     } catch (err) {
       Alert.alert(t('profile.validationError'), t('profile.syncError'));
@@ -330,17 +412,28 @@ export default function ProfileScreen({ navigation }) {
             {/* Statistics Grid */}
             <AppText style={styles.sectionTitle}>{t('profile.dashboardStats')}</AppText>
             <View style={styles.statsGrid}>
-              {SELLER_STATS.map((stat) => (
-                <View key={stat.id} style={styles.statCard}>
-                  <View style={[styles.statIconCircle, { backgroundColor: stat.color + '12' }]}>
-                    <MaterialCommunityIcons name={stat.icon} size={18} color={stat.color} />
+              {SELLER_STATS_CONFIG.map((stat) => {
+                let displayVal = 0;
+                if (stat.id === 'active') displayVal = statsData.activeListings;
+                else if (stat.id === 'sold') displayVal = statsData.soldAnimals;
+                else if (stat.id === 'views') displayVal = statsData.totalViews;
+
+                return (
+                  <View key={stat.id} style={styles.statCard}>
+                    <View style={[styles.statIconCircle, { backgroundColor: stat.color + '12' }]}>
+                      <MaterialCommunityIcons name={stat.icon} size={18} color={stat.color} />
+                    </View>
+                    <View style={styles.statInfo}>
+                      {isStatsLoading ? (
+                        <View style={styles.statSkeleton} />
+                      ) : (
+                        <AppText style={styles.statValue}>{displayVal.toLocaleString()}</AppText>
+                      )}
+                      <AppText style={styles.statLabel}>{t(stat.labelKey)}</AppText>
+                    </View>
                   </View>
-                  <View style={styles.statInfo}>
-                    <AppText style={styles.statValue}>{stat.value}</AppText>
-                    <AppText style={styles.statLabel}>{t(stat.labelKey)}</AppText>
-                  </View>
-                </View>
-              ))}
+                );
+              })}
             </View>
 
             {/* Profile Information */}
@@ -624,6 +717,13 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#0F172A',
   },
+  statSkeleton: {
+    width: 32,
+    height: 16,
+    borderRadius: 4,
+    backgroundColor: '#E2E8F0',
+    marginVertical: 2,
+  },
   statLabel: {
     fontSize: 10,
     color: '#64748B',
@@ -784,46 +884,42 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#F1F5F9',
     padding: 24,
-    marginHorizontal: 16,
-    marginTop: 16,
     alignItems: 'center',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.02,
-    shadowRadius: 8,
-    elevation: 1,
+    marginHorizontal: 16,
+    marginTop: 20,
   },
   emptyStateIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: '#DCFCE7',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
   },
   emptyStateTitle: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 18,
+    fontWeight: '800',
     color: '#0F172A',
     marginBottom: 8,
+    textAlign: 'center',
   },
   emptyStateText: {
     fontSize: 13,
     color: '#64748B',
     textAlign: 'center',
-    lineHeight: 18,
+    lineHeight: 20,
     marginBottom: 20,
   },
   emptyStateButton: {
     backgroundColor: '#16A34A',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 24,
   },
   emptyStateButtonText: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
   },
 });
