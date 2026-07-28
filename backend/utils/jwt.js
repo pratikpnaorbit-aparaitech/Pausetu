@@ -7,7 +7,7 @@ const jwt = require('jsonwebtoken');
  */
 const generateToken = (payload) => {
   const secret = process.env.JWT_SECRET || 'pashusetu_super_secret_key_123456';
-  const expiresIn = process.env.JWT_EXPIRES_IN || '15m'; // Access tokens are short-lived
+  const expiresIn = process.env.JWT_EXPIRES_IN || '24h';
   return jwt.sign(payload, secret, { expiresIn });
 };
 

@@ -24,6 +24,7 @@ const SettingsPage         = lazy(() => import('./pages/SettingsPage'));
 const HelpCenterPage       = lazy(() => import('./pages/HelpCenterPage'));
 const ErrorPagesDemo       = lazy(() => import('./pages/ErrorPagesDemo'));
 const VerificationRequestsPage = lazy(() => import('./pages/VerificationRequestsPage'));
+const ReviewsPage           = lazy(() => import('./pages/ReviewsPage'));
 
 // Page skeleton while lazy chunk loads
 function PageSkeleton() {
@@ -166,6 +167,7 @@ export default function AppRoutes() {
       case 'Breeds':            return <BreedsPage />;
       case 'Locations':         return <LocationsPage />;
       case 'Complaints':        return <Suspense fallback={<PageSkeleton />}><ComplaintsPage /></Suspense>;
+      case 'App Reviews':       return <Suspense fallback={<PageSkeleton />}><ReviewsPage /></Suspense>;
       case 'Audit Logs':        return <AuditLogsPage />;
       case 'Reports':           return <ReportsPage />;
       case 'Settings':          return <SettingsPage />;

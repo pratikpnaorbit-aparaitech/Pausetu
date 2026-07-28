@@ -2983,14 +2983,19 @@ export default function AddAnimalScreen({ navigation }) {
       <Modal
         visible={showCameraModal}
         animationType="slide"
+        transparent={true}
+        hardwareAccelerated={true}
         statusBarTranslucent
         onRequestClose={() => setShowCameraModal(false)}
       >
-        <View style={{ flex: 1, backgroundColor: '#000000' }}>
+        <View style={{ flex: 1, backgroundColor: 'transparent' }}>
           <CameraView
             ref={cameraRef}
-            style={StyleSheet.absoluteFillObject}
+            style={[{ flex: 1, width: '100%', height: '100%' }, StyleSheet.absoluteFillObject]}
             facing="back"
+            active={showCameraModal}
+            onCameraReady={() => console.log('[Camera] Photo preview ready')}
+            onMountError={(error) => console.warn('[Camera] Photo mount error:', error?.nativeEvent?.message || error)}
           />
           {/* Instruction bar */}
           <View style={{ position: 'absolute', top: 0, left: 0, right: 0, paddingTop: 48, paddingHorizontal: 16, paddingBottom: 16, backgroundColor: 'rgba(0,0,0,0.45)' }}>
@@ -3037,15 +3042,20 @@ export default function AddAnimalScreen({ navigation }) {
       <Modal
         visible={showVideoCameraModal}
         animationType="slide"
+        transparent={true}
+        hardwareAccelerated={true}
         statusBarTranslucent
         onRequestClose={() => { handleStopRecording(); setShowVideoCameraModal(false); }}
       >
-        <View style={{ flex: 1, backgroundColor: '#000000' }}>
+        <View style={{ flex: 1, backgroundColor: 'transparent' }}>
           <CameraView
             ref={cameraRef}
-            style={StyleSheet.absoluteFillObject}
+            style={[{ flex: 1, width: '100%', height: '100%' }, StyleSheet.absoluteFillObject]}
             mode="video"
             facing={videoCameraFacing}
+            active={showVideoCameraModal}
+            onCameraReady={() => console.log('[Camera] Video preview ready')}
+            onMountError={(error) => console.warn('[Camera] Video mount error:', error?.nativeEvent?.message || error)}
           />
           {/* Recording indicator */}
           {isVideoRecording && (

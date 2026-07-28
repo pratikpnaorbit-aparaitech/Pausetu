@@ -113,9 +113,8 @@ export const AdminProvider = ({ children }) => {
           + '=='.slice(0, (4 - payloadBase64.length % 4) % 4);
         const payload = JSON.parse(atob(padded));
         const nowSeconds = Math.floor(Date.now() / 1000);
-        const safetyMarginSeconds = 60; // 60s safety window
 
-        if (payload.exp && payload.exp > nowSeconds + safetyMarginSeconds) {
+        if (payload.exp && payload.exp > nowSeconds) {
           setIsAdminLoggedIn(true);
           return true;
         }
@@ -137,7 +136,7 @@ export const AdminProvider = ({ children }) => {
       throw new Error(err.response?.data?.message || err.message || 'Invalid email or password.');
     }
 
-    const token = authRes?.accessToken || authRes?.data?.accessToken;
+    const token = authRes?.accessToken || authRes?.data?.accessToken || authRes?.token || authRes?.data?.token;
     if (!token) {
       throw new Error('Authentication failed: no access token returned by server.');
     }

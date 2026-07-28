@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { StyleSheet, View, FlatList, TouchableOpacity, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import AppText from '../../components/AppText';
@@ -111,7 +112,7 @@ export default function GuidedChatScreen({ onClose, isPremium, onShowPayment }) 
   return (
     <SafeAreaView style={styles.container}>
       <ChatHeader 
-        title={t(flows[selectedFlowId].titleKey, { defaultValue: selectedFlowId })} 
+        title={t(flows[selectedFlowId]?.titleKey || '', { defaultValue: selectedFlowId })} 
         onClose={handleRestart} 
       />
       
