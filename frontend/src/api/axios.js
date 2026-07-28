@@ -3,7 +3,7 @@ import axios from "axios";
 // Use VITE_API_URL from .env (the single source of truth).
 // Fallback: if running locally without the env var set, default to localhost:5000.
 export const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+  import.meta.env.VITE_API_URL || "https://pausetu.onrender.com/api";
 
 const instance = axios.create({
   baseURL: API_BASE_URL,

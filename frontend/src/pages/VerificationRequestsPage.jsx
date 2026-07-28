@@ -7,6 +7,8 @@ import {
   Check, X, Eye, Search, AlertCircle, RefreshCw, Loader2, ShieldAlert
 } from 'lucide-react';
 
+import { API_BASE_URL } from '../api/axios';
+
 export default function VerificationRequestsPage() {
   const { loadDashboardData } = useContext(AdminContext);
   const resolveMediaUrl = (path) => {
@@ -14,8 +16,8 @@ export default function VerificationRequestsPage() {
     if (path.startsWith('http://') || path.startsWith('https://')) {
       return path;
     }
-    const host = window.location.hostname === 'localhost' ? 'http://localhost:5000' : '';
-    return `${host}${path.startsWith('/') ? '' : '/'}${path}`;
+    const serverBase = API_BASE_URL.replace(/\/api$/, '');
+    return `${serverBase}${path.startsWith('/') ? '' : '/'}${path}`;
   };
 
   const [activeTab, setActiveTab] = useState('pending');
