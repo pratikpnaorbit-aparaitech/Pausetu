@@ -57,7 +57,7 @@ export default function LanguageSelector({ style }) {
         animationType="fade"
         onRequestClose={() => setIsOpen(false)}
       >
-        <Pressable onPress={() => setIsOpen(false)}>
+        <Pressable onPress={() => setIsOpen(false)} style={{ flex: 1 }}>
           <View style={styles.modalOverlay}>
             <Pressable>
               <Animated.View style={[
@@ -147,17 +147,19 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.1,
         shadowRadius: 12,
+        overflow: 'hidden',
       },
       android: {
         elevation: 8,
+        overflow: 'visible',
       },
       web: {
         boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)',
+        overflow: 'hidden',
       }
     }),
     borderWidth: 1,
     borderColor: '#F1F5F9',
-    overflow: 'hidden',
   },
   dropdownItem: {
     flexDirection: 'row',

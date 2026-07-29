@@ -50,11 +50,12 @@
         {
           "photosPermission": "Allow PashuSetu to access your photos to select animal images."
         }
-      ]
+      ],
+      "./plugins/withAndroidQueries"
     ],
     "extra": {
       "eas": {
-        "projectId": "d06fe552-09e5-4e77-a222-af1c5d7c1727"
+        "projectId": "ddfdd79d-6fcd-4769-bb29-54292636d827"
       }
     }
   }

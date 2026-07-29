@@ -114,6 +114,11 @@ export default function LocationPicker({ visible, onClose, onSelectLocation }) {
 
   // Multi-provider reverse geocoding helper (Expo -> OpenStreetMap Nominatim -> BigDataCloud)
   const reverseGeocodeCoords = async (latitude, longitude) => {
+    const isPlusCode = (text) => {
+      if (!text) return false;
+      return /[A-Z0-9]{4,8}\+[A-Z0-9]{2,}/i.test(text.trim());
+    };
+
     // Strategy 1: Expo Location API (Native iOS / Android)
     try {
       const reverse = await Location.reverseGeocodeAsync({ latitude, longitude });
@@ -136,7 +141,16 @@ export default function LocationPicker({ visible, onClose, onSelectLocation }) {
         }
 
         const taluka = addr.city || addr.locality || addr.district || 'Baramati';
-        const village = addr.subLocality || addr.street || addr.name || '';
+        
+        const cleanName = (addr.name && !isPlusCode(addr.name)) ? addr.name : '';
+        let village = '';
+        if (addr.subLocality && !isPlusCode(addr.subLocality)) {
+          village = addr.subLocality;
+        } else if (cleanName) {
+          village = cleanName;
+        } else if (addr.street && !isPlusCode(addr.street)) {
+          village = addr.street;
+        }
 
         return {
           state,
@@ -465,13 +479,15 @@ export default function LocationPicker({ visible, onClose, onSelectLocation }) {
                   <View style={styles.pinInputWrapper}>
                     <Ionicons name="mail-open" size={20} color="#64748B" style={styles.pinIcon} />
                     <TextInput
-                      style={styles.pinTextInput}
+                      style={[styles.pinTextInput, { color: '#0F172A', backgroundColor: '#FFFFFF' }]}
                       placeholder={t('locationPicker.pinPlaceholder')}
                       placeholderTextColor="#94A3B8"
                       value={pincode}
                       onChangeText={(val) => setPincode(val.replace(/[^0-9]/g, '').slice(0, 6))}
                       keyboardType="number-pad"
                       maxLength={6}
+                      selectionColor="#16A34A"
+                      cursorColor="#16A34A"
                     />
                   </View>
                   <TouchableOpacity
@@ -696,10 +712,12 @@ const styles = StyleSheet.create({
   },
   pinTextInput: {
     flex: 1,
-    color: '#1E293B',
+    color: '#0F172A',
+    backgroundColor: '#FFFFFF',
     fontSize: 15,
     fontWeight: '500',
-    padding: 0
+    paddingVertical: Platform.OS === 'android' ? 0 : 8,
+    height: '100%',
   },
   pinSubmitButton: {
     flexDirection: 'row',

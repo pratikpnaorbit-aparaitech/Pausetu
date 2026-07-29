@@ -218,6 +218,13 @@
     "noAnimalsCategorySubtitle": "कृपया दूसरी श्रेणी चुनें।",
     "noAnimalsCategoryButton": "सभी पशु",
     "repliesWithin": "आम तौर पर {{time}} के भीतर उत्तर देते हैं",
+    "repliesQuickly": "आम तौर पर जल्दी उत्तर देते हैं",
+    "responseTimeUnavailable": "प्रतिक्रिया समय उपलब्ध नहीं है",
+    "time_5_minutes": "५ मिनट में",
+    "time_30_minutes": "३० मिनट में",
+    "time_1_hour": "१ घंटे में",
+    "time_2_hours": "२ घंटे में",
+    "time_1_day": "१ दिन में",
     "locationNotSet": "स्थान निर्धारित नहीं है",
     "tapToDetect": "वर्तमान स्थान का पता लगाने के लिए टैप करें"
   },
