@@ -236,7 +236,14 @@ export default function NotificationsScreen({ navigation }) {
     } else if (item.targetScreen === 'Verification') {
       navigation.navigate('Verification');
     } else if (item.targetScreen === 'Chat' && item.relatedId) {
-      navigation.navigate('ChatScreen', { conversationId: item.relatedId });
+      const routeNames = navigation.getState()?.routeNames || [];
+      if (routeNames.includes('ChatScreen')) {
+        navigation.navigate('ChatScreen', { conversationId: item.relatedId });
+      } else if (routeNames.includes('Chat')) {
+        navigation.navigate('Chat', { conversationId: item.relatedId });
+      } else {
+        navigation.navigate('MainApp', { screen: 'Post' });
+      }
     } else if (item.targetScreen === 'MyListings') {
       navigation.navigate('MyListings');
     } else if (item.targetScreen === 'Profile') {

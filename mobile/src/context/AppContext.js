@@ -3,7 +3,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { secureStorage, registerLogoutHandler } from '../api/api';
 import { profileApi } from '../api/profileApi';
 import i18n from '../i18n/i18n';
-import { Asset } from 'expo-asset';
 import { refreshManager, REFRESH_EVENTS } from '../services/refreshManager';
 
 export const AppContext = createContext();
@@ -72,18 +71,7 @@ export const AppProvider = ({ children }) => {
       setIsProfileLoading(true);
 
       try {
-        console.log('[AppBoot Debug] Starting bootstrapAsync');
-        // Preload essential logo assets with safety catch to prevent startup hang
-        try {
-          console.log('[AppBoot Debug] Preloading assets...');
-          await Asset.loadAsync([
-            require('../../assets/logo-full.png'),
-            require('../../assets/logo-icon.png')
-          ]);
-          console.log('[AppBoot Debug] Assets loaded.');
-        } catch (assetErr) {
-          console.warn('[AppBoot Warning] Preloading assets failed, continuing:', assetErr.message);
-        }
+        console.log('[AppBoot Debug] App ready.');
 
         console.log('[AppBoot Debug] Reading AsyncStorage keys...');
         const onboarded = await AsyncStorage.getItem('isOnboarded');

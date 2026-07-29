@@ -3,7 +3,7 @@
  * Handles Screen Focus, App Background-to-Foreground (AppState), and RefreshManager events.
  */
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useMemo } from 'react';
 import { AppState } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { refreshManager } from '../services/refreshManager';

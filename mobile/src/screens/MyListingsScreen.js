@@ -301,7 +301,7 @@ export default function MyListingsScreen({ navigation }) {
   };
 
   const renderMyListingItem = useCallback(({ item }) => {
-    const mainImage = resolveMediaUrl(item.photos && item.photos.length > 0 ? item.photos[0] : null);
+    const mainImage = resolveMediaUrl(item?.photos && item.photos.length > 0 ? item.photos[0] : null);
 
     return (
       <View style={styles.listingCard}>
