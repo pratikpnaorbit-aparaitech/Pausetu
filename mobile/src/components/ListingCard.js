@@ -64,25 +64,44 @@ function ListingCard({ item, onViewDetailsPress, style }) {
 
   const handleCall = async () => {
     const phone = item.sellerId?.mobile || item.sellerId?.phoneNumber || '9876543210';
-    const url = `tel:${phone}`;
+    let cleaned = String(phone).replace(/[^0-9]/g, '');
+    if (cleaned.startsWith('00')) {
+      cleaned = cleaned.substring(2);
+    } else if (cleaned.startsWith('0')) {
+      cleaned = cleaned.substring(1);
+    }
+    const withCountry = cleaned.startsWith('91') && cleaned.length > 10 ? `+${cleaned}` : `+91${cleaned}`;
+    const url = `tel:${withCountry}`;
+    
+    console.log(`[CONSOLE LOG] [ListingCard Call] Initiated. Raw: ${phone}, Formatted: ${withCountry}, URL: ${url}`);
+
     try {
+      console.log('[CONSOLE LOG] [ListingCard Call] Checking canOpenURL...');
       const supported = await Linking.canOpenURL(url);
+      console.log(`[CONSOLE LOG] [ListingCard Call] canOpenURL result: ${supported}`);
       if (supported) {
         await Linking.openURL(url);
       } else {
-        Alert.alert(t('common.error', { defaultValue: 'Error' }), 'Calling is not supported on this device.');
+        console.log('[CONSOLE LOG] [ListingCard Call] canOpenURL returned false. Trying direct openURL fallback...');
+        await Linking.openURL(url);
       }
     } catch (e) {
-      console.warn(e);
+      console.warn('[CONSOLE LOG] [ListingCard Call] Calling failed with error:', e.message);
+      Alert.alert(t('common.error', { defaultValue: 'Error' }), 'Calling is not supported on this device.');
     }
   };
 
   const handleWhatsApp = async () => {
     const phone = item.sellerId?.mobile || item.sellerId?.phoneNumber || '9876543210';
-    const cleaned = phone.replace(/[^0-9]/g, '');
-    const withCountry = cleaned.startsWith('91') ? cleaned : `91${cleaned}`;
+    let cleaned = String(phone).replace(/[^0-9]/g, '');
+    if (cleaned.startsWith('00')) {
+      cleaned = cleaned.substring(2);
+    } else if (cleaned.startsWith('0')) {
+      cleaned = cleaned.substring(1);
+    }
+    const withCountry = cleaned.startsWith('91') && cleaned.length > 10 ? cleaned : `91${cleaned}`;
     
-    const cleanPrice = item.price ? item.price.replace(/[^0-9,]/g, '') : '';
+    const cleanPrice = item.price ? String(item.price).replace(/[^0-9,]/g, '') : '';
     let messageText = t('animalDetails.whatsappShareMessage', {
       animalName: item.name,
       breed: item.breed,
@@ -92,16 +111,32 @@ function ListingCard({ item, onViewDetailsPress, style }) {
       messageText = `Hi, I am interested in your animal listing: ${item.name} (${item.breed}) priced at ${item.price} on PashuSetu.`;
     }
 
-    const url = `https://wa.me/${withCountry}?text=${encodeURIComponent(messageText)}`;
+    const whatsappAppUrl = `whatsapp://send?phone=${withCountry}&text=${encodeURIComponent(messageText)}`;
+    const whatsappWebUrl = `https://wa.me/${withCountry}?text=${encodeURIComponent(messageText)}`;
+    
+    console.log(`[CONSOLE LOG] [ListingCard WhatsApp] Initiated. Raw: ${phone}, Formatted: ${withCountry}, Msg: ${messageText}`);
+    console.log(`[CONSOLE LOG] [ListingCard WhatsApp] App URL: ${whatsappAppUrl}`);
+    console.log(`[CONSOLE LOG] [ListingCard WhatsApp] Web URL: ${whatsappWebUrl}`);
+
     try {
-      const supported = await Linking.canOpenURL(url);
-      if (supported) {
-        await Linking.openURL(url);
+      console.log('[CONSOLE LOG] [ListingCard WhatsApp] Checking canOpenURL for whatsapp://...');
+      const isWhatsappInstalled = await Linking.canOpenURL('whatsapp://');
+      console.log(`[CONSOLE LOG] [ListingCard WhatsApp] canOpenURL result: ${isWhatsappInstalled}`);
+      if (isWhatsappInstalled) {
+        await Linking.openURL(whatsappAppUrl);
       } else {
-        Alert.alert(t('common.error', { defaultValue: 'Error' }), 'WhatsApp is not installed on this device.');
+        console.log('[CONSOLE LOG] [ListingCard WhatsApp] canOpenURL false. Trying direct App URL open fallback...');
+        try {
+          await Linking.openURL(whatsappAppUrl);
+        } catch (directErr) {
+          console.warn('[CONSOLE LOG] [ListingCard WhatsApp] Direct App URL open failed:', directErr.message);
+          console.log('[CONSOLE LOG] [ListingCard WhatsApp] Trying Web URL fallback...');
+          await Linking.openURL(whatsappWebUrl);
+        }
       }
     } catch (e) {
-      console.warn(e);
+      console.warn('[CONSOLE LOG] [ListingCard WhatsApp] WhatsApp failed with error:', e.message);
+      Alert.alert(t('common.error', { defaultValue: 'Error' }), 'WhatsApp is not installed on this device.');
     }
   };
 

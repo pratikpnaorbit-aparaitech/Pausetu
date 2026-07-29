@@ -176,8 +176,7 @@ const ZoomableImage = ({ uri, isActive }) => {
       onTouchEnd={handleTouchEnd}
       {...panResponder.panHandlers}
     >
-      <Animated.Image
-        source={{ uri }}
+      <Animated.View
         style={{
           width: screenW,
           height: screenH,
@@ -187,8 +186,13 @@ const ZoomableImage = ({ uri, isActive }) => {
             { translateY: pan.y }
           ]
         }}
-        resizeMode="contain"
-      />
+      >
+        <Image
+          source={{ uri }}
+          style={{ width: '100%', height: '100%' }}
+          resizeMode="contain"
+        />
+      </Animated.View>
     </View>
   );
 };
@@ -633,14 +637,33 @@ export default function AnimalDetailsScreen({ route, navigation }) {
     if (!checkVerification()) return;
     const phone = animal.sellerId?.mobile || animal.sellerId?.phoneNumber;
     if (!phone) {
+      console.log('[CONSOLE LOG] [Call] Phone number not available');
       Alert.alert(t('animalDetails.phoneNotAvailable'), t('animalDetails.phoneNotAvailableMsg'));
       return;
     }
-    const url = `tel:${phone}`;
-    const supported = await Linking.canOpenURL(url);
-    if (supported) {
-      Linking.openURL(url);
-    } else {
+    let cleaned = String(phone).replace(/[^0-9]/g, '');
+    if (cleaned.startsWith('00')) {
+      cleaned = cleaned.substring(2);
+    } else if (cleaned.startsWith('0')) {
+      cleaned = cleaned.substring(1);
+    }
+    const withCountry = cleaned.startsWith('91') && cleaned.length > 10 ? `+${cleaned}` : `+91${cleaned}`;
+    const url = `tel:${withCountry}`;
+
+    console.log(`[CONSOLE LOG] [Call] Initiated calling. Raw: ${phone}, Formatted: ${withCountry}, URL: ${url}`);
+
+    try {
+      console.log('[CONSOLE LOG] [Call] Checking canOpenURL...');
+      const supported = await Linking.canOpenURL(url);
+      console.log(`[CONSOLE LOG] [Call] canOpenURL result: ${supported}`);
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        console.log('[CONSOLE LOG] [Call] canOpenURL returned false. Trying direct openURL fallback...');
+        await Linking.openURL(url);
+      }
+    } catch (e) {
+      console.warn('[CONSOLE LOG] [Call] Calling failed with error:', e.message);
       Alert.alert(t('animalDetails.cannotOpenDialer'), t('animalDetails.cannotOpenDialerMsg'));
     }
   };
@@ -649,22 +672,50 @@ export default function AnimalDetailsScreen({ route, navigation }) {
     if (!checkVerification()) return;
     const phone = animal.sellerId?.mobile || animal.sellerId?.phoneNumber;
     if (!phone) {
+      console.log('[CONSOLE LOG] [WhatsApp] Phone number not available');
       Alert.alert(t('animalDetails.phoneNotAvailable'), t('animalDetails.phoneNotAvailableMsg'));
       return;
     }
-    const cleaned = String(phone).replace(/[^0-9]/g, '');
-    const withCountry = cleaned.startsWith('91') ? cleaned : `91${cleaned}`;
+    let cleaned = String(phone).replace(/[^0-9]/g, '');
+    if (cleaned.startsWith('00')) {
+      cleaned = cleaned.substring(2);
+    } else if (cleaned.startsWith('0')) {
+      cleaned = cleaned.substring(1);
+    }
+    const withCountry = cleaned.startsWith('91') && cleaned.length > 10 ? cleaned : `91${cleaned}`;
+    
     const cleanPrice = animal.price ? String(animal.price).replace(/[^0-9,]/g, '') : '';
     const messageText = t('animalDetails.whatsappShareMessage', {
       animalName: animal.name,
       breed: animal.breed,
       price: cleanPrice
     });
-    const url = `https://wa.me/${withCountry}?text=${encodeURIComponent(messageText)}`;
-    const supported = await Linking.canOpenURL(url);
-    if (supported) {
-      Linking.openURL(url);
-    } else {
+
+    const whatsappAppUrl = `whatsapp://send?phone=${withCountry}&text=${encodeURIComponent(messageText)}`;
+    const whatsappWebUrl = `https://wa.me/${withCountry}?text=${encodeURIComponent(messageText)}`;
+
+    console.log(`[CONSOLE LOG] [WhatsApp] Initiated. Raw: ${phone}, Formatted: ${withCountry}, Msg: ${messageText}`);
+    console.log(`[CONSOLE LOG] [WhatsApp] App URL: ${whatsappAppUrl}`);
+    console.log(`[CONSOLE LOG] [WhatsApp] Web URL: ${whatsappWebUrl}`);
+
+    try {
+      console.log('[CONSOLE LOG] [WhatsApp] Checking canOpenURL for whatsapp://...');
+      const isWhatsappInstalled = await Linking.canOpenURL('whatsapp://');
+      console.log(`[CONSOLE LOG] [WhatsApp] canOpenURL result: ${isWhatsappInstalled}`);
+      if (isWhatsappInstalled) {
+        await Linking.openURL(whatsappAppUrl);
+      } else {
+        console.log('[CONSOLE LOG] [WhatsApp] canOpenURL false. Trying direct App URL open fallback...');
+        try {
+          await Linking.openURL(whatsappAppUrl);
+        } catch (directErr) {
+          console.warn('[CONSOLE LOG] [WhatsApp] Direct App URL open failed:', directErr.message);
+          console.log('[CONSOLE LOG] [WhatsApp] Trying Web URL fallback...');
+          await Linking.openURL(whatsappWebUrl);
+        }
+      }
+    } catch (e) {
+      console.warn('[CONSOLE LOG] [WhatsApp] WhatsApp failed with error:', e.message);
       Alert.alert(t('animalDetails.whatsappNotFound'), t('animalDetails.whatsappNotFoundMsg'));
     }
   };
@@ -1185,9 +1236,14 @@ export default function AnimalDetailsScreen({ route, navigation }) {
 
               <View style={styles.sellerMeta}>
                 <AppText style={styles.sellerName}>{animal.sellerId?.name || animal.sellerName || 'Seller'}</AppText>
-                <AppText style={styles.sellerRepliesText}>
-                  {t('buy.repliesWithin', { defaultValue: 'Usually replies within 15 minutes' })}
-                </AppText>
+                {(animal?.sellerId?.responseTime || animal?.responseTime) ? (
+                  <AppText style={styles.sellerRepliesText}>
+                    {t('buy.repliesWithin', {
+                      time: animal.sellerId?.responseTime || animal.responseTime,
+                      defaultValue: `Usually replies within ${animal.sellerId?.responseTime || animal.responseTime}`
+                    })}
+                  </AppText>
+                ) : null}
                 <View style={styles.ratingStarsRow}>
                   <Ionicons name="star" size={13} color="#F59E0B" />
                   <AppText style={styles.ratingLabel}>4.8 • {t('animalDetails.verifiedSeller')}</AppText>

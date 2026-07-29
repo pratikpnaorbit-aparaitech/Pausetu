@@ -218,6 +218,13 @@
     "noAnimalsCategorySubtitle": "कृपया वेगळा फिल्टर वापरून पहा.",
     "noAnimalsCategoryButton": "सर्व जनावरे पहा",
     "repliesWithin": "सामान्यतः {{time}} मध्ये उत्तर देतात",
+    "repliesQuickly": "सामान्यतः लवकर उत्तर देतात",
+    "responseTimeUnavailable": "प्रतिसाद वेळ उपलब्ध नाही",
+    "time_5_minutes": "५ मिनिटांत",
+    "time_30_minutes": "३० मिनिटांत",
+    "time_1_hour": "१ तासात",
+    "time_2_hours": "२ तासांत",
+    "time_1_day": "१ दिवसात",
     "locationNotSet": "स्थान सेट नाही",
     "tapToDetect": "सध्याचे स्थान शोधण्यासाठी टॅप करा"
   },

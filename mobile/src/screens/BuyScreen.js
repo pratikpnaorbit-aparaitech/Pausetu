@@ -793,46 +793,48 @@ function BuyScreenComponent({ navigation }) {
                 </TouchableOpacity>
 
                 {/* Technical Debug Info (Android APK Troubleshooting) */}
-                <View style={{ marginTop: 24, width: '100%', borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingTop: 16 }}>
-                  <TouchableOpacity
-                    onPress={() => setShowDebug(!showDebug)}
-                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1F5F9', paddingVertical: 8, borderRadius: 10 }}
-                  >
-                    <Ionicons name={showDebug ? "chevron-up" : "chevron-down"} size={16} color="#475569" style={{ marginRight: 6 }} />
-                    <AppText style={{ fontSize: 12, fontWeight: '700', color: '#475569' }}>
-                      {showDebug ? "Hide Technical Debug Info" : "Show Technical Debug Info"}
-                    </AppText>
-                  </TouchableOpacity>
+                {__DEV__ && (
+                  <View style={{ marginTop: 24, width: '100%', borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingTop: 16 }}>
+                    <TouchableOpacity
+                      onPress={() => setShowDebug(!showDebug)}
+                      style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1F5F9', paddingVertical: 8, borderRadius: 10 }}
+                    >
+                      <Ionicons name={showDebug ? "chevron-up" : "chevron-down"} size={16} color="#475569" style={{ marginRight: 6 }} />
+                      <AppText style={{ fontSize: 12, fontWeight: '700', color: '#475569' }}>
+                        {showDebug ? "Hide Technical Debug Info" : "Show Technical Debug Info"}
+                      </AppText>
+                    </TouchableOpacity>
 
-                  {showDebug && (
-                    <View style={{ marginTop: 12, backgroundColor: '#0F172A', padding: 12, borderRadius: 10, width: '100%' }}>
-                      <AppText style={{ fontSize: 11, color: '#10B981', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', marginBottom: 4 }}>
-                        [API URL]: {debugInfo.apiBaseUrl}
-                      </AppText>
-                      <AppText style={{ fontSize: 11, color: '#38BDF8', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', marginBottom: 4 }}>
-                        [Status]: {debugInfo.status}
-                      </AppText>
-                      <AppText style={{ fontSize: 11, color: '#E2E8F0', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', marginBottom: 4 }}>
-                        [Payload]: {debugInfo.payload}
-                      </AppText>
-                      <AppText style={{ fontSize: 11, color: '#FCD34D', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', marginBottom: 4 }}>
-                        [Token]: {debugInfo.token ? (debugInfo.token.substring(0, 15) + '...') : 'None'}
-                      </AppText>
-                      <AppText style={{ fontSize: 11, color: '#FCA5A5', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', marginBottom: 4 }}>
-                        [Error]: {debugInfo.error || 'None'}
-                      </AppText>
-                      <AppText style={{ fontSize: 11, color: '#E2E8F0', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', marginBottom: 4 }}>
-                        [Count]: {debugInfo.animalsCount}
-                      </AppText>
-                      <AppText style={{ fontSize: 11, color: '#E2E8F0', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', marginBottom: 4 }}>
-                        [Renders]: {renderCountRef.current}
-                      </AppText>
-                      <AppText style={{ fontSize: 11, color: '#94A3B8', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>
-                        [Updated]: {debugInfo.lastUpdated}
-                      </AppText>
-                    </View>
-                  )}
-                </View>
+                    {showDebug && (
+                      <View style={{ marginTop: 12, backgroundColor: '#0F172A', padding: 12, borderRadius: 10, width: '100%' }}>
+                        <AppText style={{ fontSize: 11, color: '#10B981', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', marginBottom: 4 }}>
+                          [API URL]: {debugInfo.apiBaseUrl}
+                        </AppText>
+                        <AppText style={{ fontSize: 11, color: '#38BDF8', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', marginBottom: 4 }}>
+                          [Status]: {debugInfo.status}
+                        </AppText>
+                        <AppText style={{ fontSize: 11, color: '#E2E8F0', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', marginBottom: 4 }}>
+                          [Payload]: {debugInfo.payload}
+                        </AppText>
+                        <AppText style={{ fontSize: 11, color: '#FCD34D', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', marginBottom: 4 }}>
+                          [Token]: {debugInfo.token ? (debugInfo.token.substring(0, 15) + '...') : 'None'}
+                        </AppText>
+                        <AppText style={{ fontSize: 11, color: '#FCA5A5', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', marginBottom: 4 }}>
+                          [Error]: {debugInfo.error || 'None'}
+                        </AppText>
+                        <AppText style={{ fontSize: 11, color: '#E2E8F0', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', marginBottom: 4 }}>
+                          [Count]: {debugInfo.animalsCount}
+                        </AppText>
+                        <AppText style={{ fontSize: 11, color: '#E2E8F0', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', marginBottom: 4 }}>
+                          [Renders]: {renderCountRef.current}
+                        </AppText>
+                        <AppText style={{ fontSize: 11, color: '#94A3B8', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>
+                          [Updated]: {debugInfo.lastUpdated}
+                        </AppText>
+                      </View>
+                    )}
+                  </View>
+                )}
               </View>
             }
             contentContainerStyle={styles.scrollContent}

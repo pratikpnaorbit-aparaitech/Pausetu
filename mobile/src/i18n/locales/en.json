@@ -218,6 +218,13 @@
     "noAnimalsCategorySubtitle": "Please select another category.",
     "noAnimalsCategoryButton": "View All Animals",
     "repliesWithin": "Usually replies within {{time}}",
+    "repliesQuickly": "Usually replies quickly",
+    "responseTimeUnavailable": "Response time unavailable",
+    "time_5_minutes": "5 minutes",
+    "time_30_minutes": "30 minutes",
+    "time_1_hour": "1 hour",
+    "time_2_hours": "2 hours",
+    "time_1_day": "1 day",
     "locationNotSet": "Location Not Set",
     "tapToDetect": "Tap to detect your current location"
   },

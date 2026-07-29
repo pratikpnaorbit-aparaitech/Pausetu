@@ -27,8 +27,18 @@ export function useAutoRefresh(refreshCallback, options = {}) {
     callbackRef.current = refreshCallback;
   }, [refreshCallback]);
 
+  // Stabilize events array dependency across parent component re-renders
+  const eventsSerialized = JSON.stringify(events);
+  const memoizedEvents = useMemo(() => {
+    try {
+      return JSON.parse(eventsSerialized);
+    } catch (_) {
+      return events;
+    }
+  }, [eventsSerialized]);
+
   // Execute refetch safely with deduplication
-  const safeRefetch = useCallback(() => {
+  const safeRefetch = useCallback((force = false) => {
     if (!enabled || !callbackRef.current) return;
     refreshManager.executeDeduplicated(screenKey, async () => {
       try {
@@ -36,14 +46,14 @@ export function useAutoRefresh(refreshCallback, options = {}) {
       } catch (err) {
         console.warn(`[useAutoRefresh] Refetch failed for ${screenKey}:`, err.message);
       }
-    });
+    }, force);
   }, [enabled, screenKey]);
 
   // 1. Navigation Focus Effect (Triggered when screen becomes active or user returns)
   useFocusEffect(
     useCallback(() => {
       isFocusedRef.current = true;
-      safeRefetch();
+      safeRefetch(false); // Do not force, respect focus throttle cooldown
 
       return () => {
         isFocusedRef.current = false;
@@ -57,7 +67,7 @@ export function useAutoRefresh(refreshCallback, options = {}) {
 
     const handleAppStateChange = (nextState) => {
       if (nextState === 'active' && isFocusedRef.current) {
-        safeRefetch();
+        safeRefetch(false); // Do not force, respect AppState throttle cooldown
       }
     };
 
@@ -70,12 +80,12 @@ export function useAutoRefresh(refreshCallback, options = {}) {
 
   // 3. Subscriptions to Centralized Refresh Events
   useEffect(() => {
-    if (!enabled || !events || events.length === 0) return;
+    if (!enabled || !memoizedEvents || memoizedEvents.length === 0) return;
 
-    const unsubscribes = events.map(event => {
+    const unsubscribes = memoizedEvents.map(event => {
       return refreshManager.subscribe(event, () => {
         if (isFocusedRef.current) {
-          safeRefetch();
+          safeRefetch(true); // Force refetch because explicit centralized data event was received
         }
       });
     });
@@ -83,5 +93,5 @@ export function useAutoRefresh(refreshCallback, options = {}) {
     return () => {
       unsubscribes.forEach(unsub => unsub());
     };
-  }, [enabled, events, safeRefetch]);
+  }, [enabled, memoizedEvents, safeRefetch]);
 }

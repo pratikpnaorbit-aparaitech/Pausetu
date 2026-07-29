@@ -50,7 +50,8 @@
         {
           "photosPermission": "Allow PashuSetu to access your photos to select animal images."
         }
-      ]
+      ],
+      "./plugins/withAndroidQueries"
     ],
     "extra": {
       "eas": {

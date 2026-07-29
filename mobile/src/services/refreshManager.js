@@ -20,6 +20,7 @@ class RefreshEventManager {
     this.listeners = new Map();
     this.debounceTimers = new Map();
     this.inFlightRequests = new Set();
+    this.lastRunTimestamps = new Map();
   }
 
   /**
@@ -83,17 +84,31 @@ class RefreshEventManager {
   }
 
   /**
-   * Execute an async fetch with deduplication (prevents duplicate simultaneous calls).
+   * Execute an async fetch with deduplication and optional cooldown throttling.
    * @param {string} key 
    * @param {function} asyncTask 
+   * @param {boolean} force Bypass cooldown throttling (default false)
+   * @param {number} cooldownMs Cooldown time in milliseconds (default 15000)
    */
-  async executeDeduplicated(key, asyncTask) {
+  async executeDeduplicated(key, asyncTask, force = false, cooldownMs = 15000) {
     if (this.inFlightRequests.has(key)) {
       return null;
     }
+
+    if (!force) {
+      const lastRun = this.lastRunTimestamps.get(key) || 0;
+      const now = Date.now();
+      if (now - lastRun < cooldownMs) {
+        console.log(`[RefreshManager] Throttled duplicate request for '${key}' (${now - lastRun}ms < ${cooldownMs}ms)`);
+        return null;
+      }
+    }
+
     this.inFlightRequests.add(key);
     try {
-      return await asyncTask();
+      const res = await asyncTask();
+      this.lastRunTimestamps.set(key, Date.now());
+      return res;
     } finally {
       this.inFlightRequests.delete(key);
     }

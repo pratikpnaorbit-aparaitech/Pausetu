@@ -57,10 +57,6 @@ export default function ProfileScreen({ navigation }) {
     }
   }, [userProfile?.id, isGuest, userToken]);
 
-  useEffect(() => {
-    fetchUserStatsData();
-  }, [fetchUserStatsData]);
-
   useAutoRefresh(
     () => {
       if (!isGuest && userToken !== 'guest') {

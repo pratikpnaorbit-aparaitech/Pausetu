@@ -2,6 +2,11 @@ import * as Location from 'expo-location';
 
 const geocodeCache = {};
 
+const isPlusCode = (text) => {
+  if (!text) return false;
+  return /[A-Z0-9]{4,8}\+[A-Z0-9]{2,}/i.test(text.trim());
+};
+
 /**
  * Normalizes reverse geocoded data into standard PashuSetu structure.
  */
@@ -14,7 +19,7 @@ const createResultObject = (village, taluka, district, state, pincode) => {
 
   // If village is identical to taluka or district, make it empty/optional
   let finalVillage = v;
-  if (v.toLowerCase() === t.toLowerCase() || v.toLowerCase() === d.toLowerCase()) {
+  if (v.toLowerCase() === t.toLowerCase() || v.toLowerCase() === d.toLowerCase() || isPlusCode(v)) {
     finalVillage = '';
   }
 
@@ -45,8 +50,16 @@ const geocodeWithExpo = async (lat, lng) => {
         return poiKeywords.some(keyword => lower.includes(keyword));
       };
 
-      const cleanName = (!isBusinessOrPoi(addr.name) ? addr.name : null);
-      const village = addr.subLocality || cleanName || addr.street || '';
+      const cleanName = (!isBusinessOrPoi(addr.name) && !isPlusCode(addr.name) ? addr.name : null);
+      
+      let village = '';
+      if (addr.subLocality && !isPlusCode(addr.subLocality)) {
+        village = addr.subLocality;
+      } else if (cleanName) {
+        village = cleanName;
+      } else if (addr.street && !isPlusCode(addr.street)) {
+        village = addr.street;
+      }
 
       // Priority mapping:
       // State: administrativeArea OR region
@@ -205,7 +218,7 @@ export const formatLocationDisplay = (locationObj) => {
   for (const seg of rawSegments) {
     if (!seg || typeof seg !== 'string') continue;
     const trimmed = seg.trim();
-    if (!trimmed) continue;
+    if (!trimmed || isPlusCode(trimmed)) continue;
     const lower = trimmed.toLowerCase();
 
     if (!seenLower.has(lower)) {

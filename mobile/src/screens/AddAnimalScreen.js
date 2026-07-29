@@ -23,6 +23,7 @@ import { Camera, CameraView } from 'expo-camera';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
+import * as VideoThumbnails from 'expo-video-thumbnails';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppContext } from '../context/AppContext';
 import { useTranslation } from 'react-i18next';
@@ -32,6 +33,20 @@ import { animalApi } from '../api/animalApi';
 import { reverseGeocodeWithCache } from '../utils/geocoder';
 import { refreshManager, REFRESH_EVENTS } from '../services/refreshManager';
 import { getBreedsForCategory } from '../utils/breedDatabase';
+
+const generateVideoThumbnail = async (videoUri) => {
+  console.log('[THUMBNAIL LOG] Thumbnail generation start. Video URI:', videoUri);
+  try {
+    const { uri } = await VideoThumbnails.getThumbnailAsync(videoUri, {
+      time: 1000, // 1000ms = 1 second
+    });
+    console.log('[THUMBNAIL LOG] Thumbnail generation success. Thumbnail URI:', uri);
+    return uri;
+  } catch (e) {
+    console.error('[THUMBNAIL LOG] Thumbnail generation failed with exception:', e.message || e);
+    return null;
+  }
+};
 
 const toMarathiDigits = (val) => {
   if (!val) return '';
@@ -226,6 +241,7 @@ export default function AddAnimalScreen({ navigation }) {
   const [isVideoRecording, setIsVideoRecording] = useState(false);
   const [videoTimer, setVideoTimer] = useState(0);
   const [videoPreview, setVideoPreview] = useState(null);
+  const [playVideoPreview, setPlayVideoPreview] = useState(false);
   const videoIntervalRef = useRef(null);
 
   const videoPlayer = useVideoPlayer(videoPreview?.uri || null, (player) => {
@@ -237,6 +253,16 @@ export default function AddAnimalScreen({ navigation }) {
       videoPlayer.replace(videoPreview.uri);
     }
   }, [videoPreview?.uri, videoPlayer]);
+
+  useEffect(() => {
+    if (playVideoPreview && videoPlayer) {
+      console.log('[THUMBNAIL LOG] playVideoPreview is true. Calling videoPlayer.play()');
+      videoPlayer.play();
+    } else if (!playVideoPreview && videoPlayer) {
+      console.log('[THUMBNAIL LOG] playVideoPreview is false. Calling videoPlayer.pause()');
+      videoPlayer.pause();
+    }
+  }, [playVideoPreview, videoPlayer]);
 
   // Step 5: Health
   const [isVaccinated, setIsVaccinated] = useState(false);
@@ -560,11 +586,20 @@ export default function AddAnimalScreen({ navigation }) {
         });
 
         if (recorded && recorded.uri) {
+          console.log('[THUMBNAIL LOG] Recorded video successfully. URI:', recorded.uri);
+          let thumbnailUri = null;
+          try {
+            thumbnailUri = await generateVideoThumbnail(recorded.uri);
+          } catch (thErr) {
+            console.error('[THUMBNAIL LOG] Failed to run generateVideoThumbnail wrapper:', thErr.message);
+          }
           setVideoPreview({
             uri: recorded.uri,
             duration: durationSec || 30,
-            fileSize: Math.round(6.2 * 1024 * 1024)
+            fileSize: Math.round(6.2 * 1024 * 1024),
+            thumbnailUri: thumbnailUri
           });
+          setPlayVideoPreview(false);
           setShowVideoCameraModal(false); // Close fullscreen video camera modal → show preview
         }
       } catch (err) {
@@ -612,6 +647,7 @@ export default function AddAnimalScreen({ navigation }) {
     setVideo(null);
     setVideoPreview(null);
     setVideoTimer(0);
+    setPlayVideoPreview(false);
   };
 
   const handlePickVideo = async () => {
@@ -630,11 +666,20 @@ export default function AddAnimalScreen({ navigation }) {
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const pickedAsset = result.assets[0];
+        console.log('[THUMBNAIL LOG] Picked video successfully. URI:', pickedAsset.uri);
+        let thumbnailUri = null;
+        try {
+          thumbnailUri = await generateVideoThumbnail(pickedAsset.uri);
+        } catch (thErr) {
+          console.error('[THUMBNAIL LOG] Failed to run generateVideoThumbnail for picked video:', thErr.message);
+        }
         setVideoPreview({
           uri: pickedAsset.uri,
           duration: Math.round((pickedAsset.duration || 20000) / 1000) || 20,
-          fileSize: pickedAsset.fileSize || 5 * 1024 * 1024
+          fileSize: pickedAsset.fileSize || 5 * 1024 * 1024,
+          thumbnailUri: thumbnailUri
         });
+        setPlayVideoPreview(false);
       }
     } catch (err) {
       console.warn('Video picker failed:', err.message);
@@ -1701,15 +1746,41 @@ export default function AddAnimalScreen({ navigation }) {
                 {videoPreview ? (
                   <View key="video-preview-container" style={{ width: '100%', padding: 16, borderRadius: 14, backgroundColor: '#F8FAFC', justifyContent: 'center', alignItems: 'center' }}>
                     {videoPreview.uri && Platform.OS !== 'web' ? (
-                        <View style={{ width: '100%', height: 200, borderRadius: 10, overflow: 'hidden', marginBottom: 8 }}>
-                          <VideoView
-                            key={videoPreview.uri}
-                            style={StyleSheet.absoluteFillObject}
-                            player={videoPlayer}
-                            allowsFullscreen
-                            allowsPictureInPicture
-                            nativeControls={true}
-                          />
+                        <View style={{ width: '100%', height: 200, borderRadius: 10, overflow: 'hidden', marginBottom: 8, position: 'relative' }}>
+                          {playVideoPreview ? (
+                            <VideoView
+                              key={videoPreview.uri}
+                              style={StyleSheet.absoluteFillObject}
+                              player={videoPlayer}
+                              allowsFullscreen
+                              allowsPictureInPicture
+                              nativeControls={true}
+                            />
+                          ) : (
+                            <TouchableOpacity
+                              activeOpacity={0.85}
+                              style={{ width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center', backgroundColor: '#475569' }}
+                              onPress={() => setPlayVideoPreview(true)}
+                            >
+                              {videoPreview.thumbnailUri ? (
+                                <Image
+                                  source={{ uri: videoPreview.thumbnailUri }}
+                                  style={StyleSheet.absoluteFillObject}
+                                  resizeMode="cover"
+                                  onLoad={() => console.log('[THUMBNAIL LOG] Thumbnail load success. URI:', videoPreview.thumbnailUri)}
+                                  onError={(err) => console.error('[THUMBNAIL LOG] Thumbnail load failure. Error:', err.nativeEvent.error)}
+                                />
+                              ) : (
+                                <Ionicons name="videocam" size={48} color="#FFFFFF" style={{ opacity: 0.3 }} />
+                              )}
+                              {/* Dark overlay and play icon */}
+                              <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' }}>
+                                <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}>
+                                  <Ionicons name="play" size={32} color="#FFFFFF" style={{ marginLeft: 4 }} />
+                                </View>
+                              </View>
+                            </TouchableOpacity>
+                          )}
                         </View>
                       ) : (
                         <Ionicons name="videocam" size={64} color={videoPreview.duration < 20 ? '#EF4444' : '#16A34A'} />
