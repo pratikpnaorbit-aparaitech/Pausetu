@@ -1,3 +1,4 @@
+const User = require('../models/User');
 const { verifyToken } = require('../utils/jwt');
 const { AppError } = require('./errorHandler');
 const asyncHandler = require('../utils/asyncHandler');
@@ -25,8 +26,24 @@ const protect = asyncHandler(async (req, res, next) => {
   // 2. Verify token
   try {
     const decoded = verifyToken(token);
-    // Attach decoded user info (e.g. id, role) to the request object
-    req.user = decoded;
+    
+    // 3. Find user in database
+    const currentUser = await User.findById(decoded.id);
+    if (!currentUser) {
+      return next(new AppError('The user belonging to this token no longer exists.', 401));
+    }
+
+    if (currentUser.isBlocked) {
+      return next(new AppError('Your account has been blocked by an administrator.', 403));
+    }
+
+    // Attach user info to request
+    req.user = {
+      id: currentUser._id.toString(),
+      role: currentUser.role,
+      isPremium: currentUser.isPremium,
+      email: currentUser.email
+    };
     next();
   } catch (error) {
     return next(new AppError('Invalid or expired token. Please log in again.', 401));

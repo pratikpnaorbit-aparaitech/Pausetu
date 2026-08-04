@@ -1139,6 +1139,17 @@ export default function AddAnimalScreen({ navigation }) {
       } else if (status === 401) {
         userFriendlyMsg = 'कृपया पुन्हा लॉगिन करा. / Please login again to continue.';
       } else if (status === 403) {
+        if (err.response?.data?.code === 'LISTING_LIMIT_EXCEEDED' || err.response?.data?.data?.requiresUpgrade) {
+          showAlert(
+            'Free Listing Limit Reached 👑',
+            err.response?.data?.message || 'You have reached your limit of active listings. Upgrade to Premium for Unlimited Listings.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Upgrade to Premium', onPress: () => navigation.navigate('Subscription') }
+            ]
+          );
+          return;
+        }
         userFriendlyMsg = 'तुम्हाला ही कृती करण्याची परवानगी नाही. / You do not have permission to perform this action.';
       } else if (status === 404) {
         userFriendlyMsg = 'मागणी केलेले संसाधन सापडले नाही. / Requested resource was not found.';

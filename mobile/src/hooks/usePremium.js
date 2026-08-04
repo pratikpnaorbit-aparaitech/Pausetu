@@ -14,78 +14,32 @@ export const usePremium = () => {
   const [chatMessages, setChatMessages] = useState([]);
   const [chatLoading, setChatLoading] = useState(false);
 
-  // Sync premium status from local state or backend
+  // Sync premium status from user profile context or storage
+  useEffect(() => {
+    if (userProfile?.isPremium !== undefined) {
+      setIsPremium(!!userProfile.isPremium);
+      setLoading(false);
+    }
+  }, [userProfile?.isPremium]);
+
   const checkPremiumStatus = useCallback(async (forceFetch = false) => {
     setLoading(true);
     try {
-      // Fast path: check local storage cache first
-      const cachedStatus = await AsyncStorage.getItem('premium_status');
-      const cachedExpiry = await AsyncStorage.getItem('premium_expires_at');
-      
-      if (cachedStatus && !forceFetch) {
-        setIsPremium(cachedStatus === 'true');
-        setPremiumExpiresAt(cachedExpiry || null);
-        setLoading(false);
-        return;
+      if (refreshProfileData && forceFetch) {
+        await refreshProfileData();
       }
-
-      // Slow path: fetch from API
-      const res = await premiumApi.getPremiumStatus();
-      if (res?.status === 'success' && res.data) {
-        const premiumActive = res.data.isPremium;
-        const expiry = res.data.premiumExpiresAt;
-        
-        setIsPremium(premiumActive);
-        setPremiumExpiresAt(expiry);
-        
-        await AsyncStorage.setItem('premium_status', premiumActive ? 'true' : 'false');
-        if (expiry) {
-          await AsyncStorage.setItem('premium_expires_at', String(expiry));
-        } else {
-          await AsyncStorage.removeItem('premium_expires_at');
-        }
-      }
+      setIsPremium(!!userProfile?.isPremium);
     } catch (err) {
-      console.warn('[usePremium] Failed to fetch premium status:', err.message);
-      // Fallback to userProfile value if backend fails
-      if (userProfile?.verification?.status === 'approved') {
-        // Handled differently or check custom profile fields if any
-      }
+      console.warn('[usePremium] Failed to check status:', err.message);
     } finally {
       setLoading(false);
     }
-  }, [userProfile]);
+  }, [refreshProfileData, userProfile?.isPremium]);
 
   // Boot status verification
   useEffect(() => {
     checkPremiumStatus();
   }, [checkPremiumStatus]);
-
-  // Subscribe to premium plan
-  const subscribe = useCallback(async (planType, price, provider = 'UPI') => {
-    setLoading(true);
-    try {
-      const res = await premiumApi.subscribePremium(planType, price, provider);
-      if (res?.status === 'success' && res.data) {
-        setIsPremium(true);
-        setPremiumExpiresAt(res.data.premiumExpiresAt);
-        await AsyncStorage.setItem('premium_status', 'true');
-        if (res.data.premiumExpiresAt) {
-          await AsyncStorage.setItem('premium_expires_at', String(res.data.premiumExpiresAt));
-        }
-        // Force refresh core user profile context
-        if (refreshProfileData) {
-          await refreshProfileData();
-        }
-        return { success: true, transactionId: res.data.transactionId };
-      }
-      return { success: false, error: 'Activation failed' };
-    } catch (err) {
-      return { success: false, error: err.message || 'Payment failed' };
-    } finally {
-      setLoading(false);
-    }
-  }, [refreshProfileData]);
 
   // Fetch all chat history / sessions list
   const loadChatSessions = useCallback(async () => {
@@ -195,42 +149,6 @@ export const usePremium = () => {
     setActiveSessionTitle('');
   };
 
-  const unlockLifetimeMarketPrice = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await premiumApi.unlockMarketPrice(1);
-      if (res?.status === 'success' && res.data) {
-        if (refreshProfileData) {
-          await refreshProfileData();
-        }
-        return { success: true, marketPriceAccess: res.data.marketPriceAccess };
-      }
-      return { success: false, error: 'Unlock failed' };
-    } catch (err) {
-      return { success: false, error: err.message || 'Payment failed' };
-    } finally {
-      setLoading(false);
-    }
-  }, [refreshProfileData]);
-
-  const unlockLifetimeFeedPlanner = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await premiumApi.unlockFeedPlanner(1);
-      if (res?.status === 'success' && res.data) {
-        if (refreshProfileData) {
-          await refreshProfileData();
-        }
-        return { success: true, feedPlannerAccess: res.data.feedPlannerAccess };
-      }
-      return { success: false, error: 'Unlock failed' };
-    } catch (err) {
-      return { success: false, error: err.message || 'Payment failed' };
-    } finally {
-      setLoading(false);
-    }
-  }, [refreshProfileData]);
-
   return {
     isPremium,
     premiumExpiresAt,
@@ -241,9 +159,6 @@ export const usePremium = () => {
     chatMessages,
     chatLoading,
     checkPremiumStatus,
-    subscribe,
-    unlockLifetimeMarketPrice,
-    unlockLifetimeFeedPlanner,
     loadChatSessions,
     loadSessionMessages,
     sendMessage,

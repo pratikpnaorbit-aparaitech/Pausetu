@@ -29,6 +29,8 @@ const premiumRoutes = require('./routes/premiumRoutes');
 const complaintRoutes = require('./routes/complaintRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
 const masterRoutes = require('./routes/masterRoutes');
+const subscriptionRoutes = require('./routes/subscriptionRoutes');
+const subscriptionAdminRoutes = require('./routes/subscriptionAdminRoutes');
 const autoSeed = require('./config/seed');
 
 // Connect to Database and Seed Master Data
@@ -120,11 +122,14 @@ app.use('/api/sellers', sellerRoutes);
 app.use('/api/buyers', buyerRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/uploads', uploadRoutes);
+app.use('/api/upload', uploadRoutes);
+app.use('/api/admin/subscriptions', subscriptionAdminRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/verification', verificationRoutes);
 app.use('/api/premium', premiumRoutes);
 app.use('/api/complaints', complaintRoutes);
 app.use('/api/reviews', reviewRoutes);
+app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api', masterRoutes);
 
 app.get('/', (req, res) => {

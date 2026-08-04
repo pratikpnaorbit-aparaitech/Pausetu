@@ -95,6 +95,7 @@ const mapBackendNotification = (n, lang = 'en') => {
 
   return {
     id: n._id || n.id,
+    imageUrl: n.imageUrl || null,
     category,
     title: parseLocalizedText(n.title, lang),
     description: parseLocalizedText(n.message, lang),
@@ -107,8 +108,8 @@ const mapBackendNotification = (n, lang = 'en') => {
     badgeColor,
     badgeTextColor,
     priority,
-    targetScreen: n.targetScreen,
-    relatedId: n.relatedId
+    targetScreen: n.targetScreen || n.deepLink?.screen,
+    relatedId: n.relatedId || n.deepLink?.params?.id
   };
 };
 

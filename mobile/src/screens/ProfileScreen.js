@@ -405,6 +405,38 @@ export default function ProfileScreen({ navigation }) {
 
             <VerificationCard navigation={navigation} />
 
+            {/* Premium Membership Banner */}
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#1E1B4B',
+                borderRadius: 16,
+                padding: 16,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 16,
+                borderWidth: 1.5,
+                borderColor: '#7C3AED'
+              }}
+              onPress={() => navigation.navigate('Subscription')}
+              activeOpacity={0.85}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(124, 58, 237, 0.25)', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
+                  <Ionicons name="ribbon-sharp" size={24} color="#F59E0B" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <AppText style={{ fontSize: 15, fontWeight: '800', color: '#F8FAFC' }}>
+                    PashuSetu Premium 👑
+                  </AppText>
+                  <AppText style={{ fontSize: 12, color: '#C7D2FE', marginTop: 2 }}>
+                    Unlimited listings, AI Feed & Cow Estimator
+                  </AppText>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#A78BFA" />
+            </TouchableOpacity>
+
             {/* Statistics Grid */}
             <AppText style={styles.sectionTitle}>{t('profile.dashboardStats')}</AppText>
             <View style={styles.statsGrid}>

@@ -66,9 +66,17 @@ instance.interceptors.request.use(
     console.log(`[API Request] ${(config.method || 'GET').toUpperCase()} ${finalUrl}`);
     const token = await secureStorage.getItem('userToken');
     if (token && token !== 'guest' && token !== 'null' && token !== 'undefined') {
-      config.headers.Authorization = `Bearer ${token}`;
+      if (config.headers && typeof config.headers.set === 'function') {
+        config.headers.set('Authorization', `Bearer ${token}`);
+      } else if (config.headers) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
     } else {
-      delete config.headers.Authorization;
+      if (config.headers && typeof config.headers.delete === 'function') {
+        config.headers.delete('Authorization');
+      } else if (config.headers) {
+        delete config.headers.Authorization;
+      }
     }
     return config;
   },

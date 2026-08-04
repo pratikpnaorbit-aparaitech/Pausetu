@@ -25,6 +25,10 @@ const HelpCenterPage       = lazy(() => import('./pages/HelpCenterPage'));
 const ErrorPagesDemo       = lazy(() => import('./pages/ErrorPagesDemo'));
 const VerificationRequestsPage = lazy(() => import('./pages/VerificationRequestsPage'));
 const ReviewsPage           = lazy(() => import('./pages/ReviewsPage'));
+const SubscriptionDashboardPage = lazy(() => import('./pages/SubscriptionDashboardPage'));
+const SubscriptionPlansPage = lazy(() => import('./pages/SubscriptionPlansPage'));
+const SubscribersPage      = lazy(() => import('./pages/SubscribersPage'));
+const NotificationsPage    = lazy(() => import('./pages/NotificationsPage'));
 
 // Page skeleton while lazy chunk loads
 function PageSkeleton() {
@@ -159,6 +163,9 @@ export default function AppRoutes() {
       case 'Dashboard':         return <DashboardPage />;
       case 'Pending Approvals': return <PendingApprovalsPage />;
       case 'Verification Requests': return <Suspense fallback={<PageSkeleton />}><VerificationRequestsPage /></Suspense>;
+      case 'Subscription Dashboard': return <Suspense fallback={<PageSkeleton />}><SubscriptionDashboardPage /></Suspense>;
+      case 'Subscription Plans': return <Suspense fallback={<PageSkeleton />}><SubscriptionPlansPage /></Suspense>;
+      case 'Subscribers':       return <Suspense fallback={<PageSkeleton />}><SubscribersPage /></Suspense>;
       case 'Animals':           return <AnimalsPage />;
       case 'History':           return <Suspense fallback={<PageSkeleton />}><HistoryPage /></Suspense>;
       case 'Sellers':           return <SellersPage />;
@@ -168,6 +175,8 @@ export default function AppRoutes() {
       case 'Locations':         return <LocationsPage />;
       case 'Complaints':        return <Suspense fallback={<PageSkeleton />}><ComplaintsPage /></Suspense>;
       case 'App Reviews':       return <Suspense fallback={<PageSkeleton />}><ReviewsPage /></Suspense>;
+      case 'Push Notification Manager':
+      case 'Push Notifications': return <Suspense fallback={<PageSkeleton />}><NotificationsPage /></Suspense>;
       case 'Audit Logs':        return <AuditLogsPage />;
       case 'Reports':           return <ReportsPage />;
       case 'Settings':          return <SettingsPage />;

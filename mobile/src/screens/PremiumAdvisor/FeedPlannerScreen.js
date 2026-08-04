@@ -13,7 +13,8 @@ import { AppContext } from '../../context/AppContext';
 import { verificationApi } from '../../api/verificationApi';
 import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 import { REFRESH_EVENTS } from '../../services/refreshManager';
-import FeedPlannerUnlockScreen from './FeedPlannerUnlockScreen';
+import { useNavigation } from '@react-navigation/native';
+import { hasFeatureAccess } from '../../utils/featureAccess';
 import { feedPlannerService } from '../../services/feedPlannerService';
 import TypingIndicator from '../../chatbot/components/TypingIndicator';
 
@@ -66,8 +67,8 @@ const QUESTIONS = [
 
 function FeedPlannerChatAssistant({ onRestart, onClose }) {
   const { t } = useTranslation();
+  const navigation = useNavigation();
   const { userProfile } = useContext(AppContext);
-  const { unlockLifetimeFeedPlanner } = usePremium();
   const flatListRef = useRef(null);
   const timerRef = useRef(null);
 
@@ -75,7 +76,6 @@ function FeedPlannerChatAssistant({ onRestart, onClose }) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState({});
   const [isTyping, setIsTyping] = useState(false);
-  const [showPayment, setShowPayment] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [globalUnlock, setGlobalUnlock] = useState(false);
 
@@ -111,7 +111,7 @@ function FeedPlannerChatAssistant({ onRestart, onClose }) {
     return () => timerRef.current && clearTimeout(timerRef.current);
   }, []);
 
-  const hasAccess = globalUnlock || userProfile?.feedPlannerAccess?.hasAccess || userProfile?.isPremium;
+  const hasAccess = hasFeatureAccess(userProfile, { feedPlannerGlobalUnlock: globalUnlock }, 'feedPlanner');
   const isComplete = currentQuestionIndex >= QUESTIONS.length || messages.some(m => m.isResultCard || m.id === 'locked_note');
 
   const handleSelectOption = (opt) => {
@@ -156,34 +156,14 @@ function FeedPlannerChatAssistant({ onRestart, onClose }) {
         timerRef.current = setTimeout(() => {
           setAnalyzing(false);
           const feedResult = feedPlannerService.calculateFeedPlan(nextAnswers);
-          if (hasAccess) {
-            setMessages(prev => [...prev, {
-              id: 'result',
-              sender: 'bot',
-              isResultCard: true,
-              result: feedResult
-            }]);
-          } else {
-            setShowPayment(true);
-          }
+          setMessages(prev => [...prev, {
+            id: 'result',
+            sender: 'bot',
+            isResultCard: true,
+            result: feedResult
+          }]);
         }, 1500);
       }, 800);
-    }
-  };
-
-  const handlePaymentSuccess = async () => {
-    const res = await unlockLifetimeFeedPlanner();
-    if (res.success) {
-      setShowPayment(false);
-      const feedResult = feedPlannerService.calculateFeedPlan(answers);
-      setMessages(prev => [...prev, {
-        id: 'result',
-        sender: 'bot',
-        isResultCard: true,
-        result: feedResult
-      }]);
-    } else {
-      Alert.alert(t('common.error'), res.error || 'Payment failed');
     }
   };
 
@@ -202,22 +182,6 @@ function FeedPlannerChatAssistant({ onRestart, onClose }) {
       );
     }
   };
-
-  if (showPayment) {
-    return (
-      <FeedPlannerUnlockScreen
-        onUnlock={handlePaymentSuccess}
-        onClose={() => {
-          setShowPayment(false);
-          setMessages(prev => [...prev, {
-            id: 'locked_note',
-            sender: 'bot',
-            text: t('feedPlanner.chat.lockDesc')
-          }]);
-        }}
-      />
-    );
-  }
 
   const activeQ = QUESTIONS[currentQuestionIndex];
   const options = (currentQuestionIndex < QUESTIONS.length && !analyzing && !isComplete) ? activeQ.getOptions(answers) : [];

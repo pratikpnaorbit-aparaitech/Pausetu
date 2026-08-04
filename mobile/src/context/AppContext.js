@@ -61,7 +61,13 @@ export const AppProvider = ({ children }) => {
       profilePhoto: user.profilePhoto || '',
       photo: user.profilePhoto || user.photo || '',
       language: user.preferredLanguage || fallbackLanguage,
-      verification: user.verification || { status: 'unverified' }
+      verification: user.verification || { status: 'unverified' },
+      isPremium: Boolean(user.isPremium),
+      premiumExpiresAt: user.premiumExpiresAt || null,
+      currentSubscription: user.currentSubscription || null,
+      subscriptionStatus: user.subscriptionStatus || (user.isPremium ? 'active' : 'inactive'),
+      feedPlannerAccess: user.feedPlannerAccess || { hasAccess: Boolean(user.isPremium) },
+      marketPriceAccess: user.marketPriceAccess || { hasAccess: Boolean(user.isPremium) }
     };
   };
 

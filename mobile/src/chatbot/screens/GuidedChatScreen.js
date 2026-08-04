@@ -1,9 +1,10 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useContext } from 'react';
 import { StyleSheet, View, FlatList, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import AppText from '../../components/AppText';
+import { AppContext } from '../../context/AppContext';
 import { useChatEngine } from '../engine/ChatEngine';
 import { chatbotService } from '../services/chatbotService';
 import BotMessage from '../components/BotMessage';
@@ -14,6 +15,8 @@ import ProgressIndicator from '../components/ProgressIndicator';
 import SummaryCard from '../components/SummaryCard';
 import ChatHeader from '../components/ChatHeader';
 import FeedPlannerScreen from '../../screens/PremiumAdvisor/FeedPlannerScreen';
+
+import { hasFeatureAccess } from '../../utils/featureAccess';
 
 export default function GuidedChatScreen({ onClose, isPremium, onShowPayment }) {
   const { t } = useTranslation();
@@ -41,7 +44,14 @@ export default function GuidedChatScreen({ onClose, isPremium, onShowPayment }) 
     }
   }, [messages, isTyping]);
 
+  const { userProfile } = useContext(AppContext);
+
   const handleStartFlow = (flowId) => {
+    const accessAllowed = isPremium || hasFeatureAccess(userProfile, null, 'aiAdvisor');
+    if (!accessAllowed) {
+      if (onShowPayment) onShowPayment();
+      return;
+    }
     setSelectedFlowId(flowId);
     startFlow(flowId);
   };
