@@ -191,15 +191,19 @@ export default function NotificationsScreen({ navigation }) {
   };
 
   const handleDeleteNotification = async (id) => {
+    console.log('[DELETE NOTIFICATION] Deleting single notification ID:', id);
     try {
       await api.deleteNotification(id);
-      setNotifications(notifications.filter((item) => item.id !== id));
+      setNotifications(prev => prev.filter((item) => item.id !== id));
+      refreshManager.emit(REFRESH_EVENTS.NOTIFICATION_UPDATED);
     } catch (err) {
+      console.error('[DELETE NOTIFICATION ERROR]', err?.response?.data || err.message);
       Alert.alert(t('common.error'), t('notifications.deleteFailed'));
     }
   };
 
   const handleDeleteAll = () => {
+    console.log('[DELETE ALL] Button clicked');
     setIsMenuVisible(false);
     Alert.alert(
       t('notifications.clearTitle'),
@@ -210,11 +214,19 @@ export default function NotificationsScreen({ navigation }) {
           text: t('notifications.clearAll'),
           style: 'destructive',
           onPress: async () => {
-              try {
-                await api.clearAllNotifications();
-                setNotifications([]);
+            console.log('[DELETE ALL] User confirmed deletion. Calling API...');
+            setLoading(true);
+            try {
+              const res = await api.clearAllNotifications();
+              console.log('[DELETE ALL] API Response:', res);
+              setNotifications([]);
+              console.log('[DELETE ALL] Local UI state set to empty array');
+              refreshManager.emit(REFRESH_EVENTS.NOTIFICATION_UPDATED);
             } catch (err) {
+              console.error('[DELETE ALL ERROR]', err?.response?.data || err.message);
               Alert.alert(t('common.error'), t('notifications.clearFailed'));
+            } finally {
+              setLoading(false);
             }
           },
         },

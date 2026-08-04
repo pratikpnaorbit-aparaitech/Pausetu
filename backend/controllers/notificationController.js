@@ -133,16 +133,41 @@ exports.deleteNotification = asyncHandler(async (req, res, next) => {
   });
 });
 
+const mongoose = require('mongoose');
+
 /**
  * Clear all notifications for current user
  * DELETE /api/notifications/clear-all
  */
 exports.clearAllNotifications = asyncHandler(async (req, res, next) => {
-  await Notification.deleteMany({ recipient: req.user.id });
+  const userId = req.user.id || req.user._id;
+  const userObjectId = new mongoose.Types.ObjectId(userId);
+
+  console.log('[CLEAR ALL NOTIFICATIONS] Starting deletion for user ID:', userId);
+
+  const beforeCount = await Notification.countDocuments({
+    $or: [{ recipient: userObjectId }, { recipient: userId }, { recipient: null }]
+  });
+
+  console.log('[CLEAR ALL NOTIFICATIONS] Documents count BEFORE deletion:', beforeCount);
+
+  const result = await Notification.deleteMany({
+    $or: [{ recipient: userObjectId }, { recipient: userId }, { recipient: null }]
+  });
+
+  const afterCount = await Notification.countDocuments({
+    $or: [{ recipient: userObjectId }, { recipient: userId }, { recipient: null }]
+  });
+
+  console.log('[CLEAR ALL NOTIFICATIONS] Documents count AFTER deletion:', afterCount, '| Total Deleted:', result.deletedCount);
 
   res.status(200).json({
     status: 'success',
-    message: 'All notifications cleared'
+    message: 'All notifications cleared',
+    deletedCount: result.deletedCount,
+    data: {
+      deletedCount: result.deletedCount
+    }
   });
 });
 
