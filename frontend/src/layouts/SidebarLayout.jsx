@@ -3,7 +3,7 @@ import { AdminContext } from '../context/AdminContext';
 import {
   LayoutDashboard, Clock, Layers, Users, UserCheck,
   FolderTree, Tag, MapPin, Shield, BarChart3, Settings,
-  AlertCircle, HelpCircle, LogOut, Search, User, X, Menu, Archive, Star
+  AlertCircle, HelpCircle, LogOut, Search, User, X, Menu, Archive, Star, CreditCard, Bell
 } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -14,6 +14,10 @@ const NAV_ITEMS = [
   { name: 'History',          icon: Archive,         section: 'main' },
   { name: 'Sellers',          icon: Users,           section: 'main' },
   { name: 'Buyers',           icon: UserCheck,       section: 'main' },
+  { name: 'Push Notification Manager', icon: Bell,    section: 'notifications' },
+  { name: 'Subscription Dashboard', icon: BarChart3, section: 'monetization' },
+  { name: 'Subscription Plans', icon: CreditCard,   section: 'monetization' },
+  { name: 'Subscribers',       icon: UserCheck,      section: 'monetization' },
   { name: 'Categories',       icon: FolderTree,      section: 'catalog' },
   { name: 'Breeds',           icon: Tag,             section: 'catalog' },
   { name: 'Locations',        icon: MapPin,          section: 'catalog' },
@@ -26,9 +30,11 @@ const NAV_ITEMS = [
 ];
 
 const SECTIONS = [
-  { key: 'main',    label: 'Overview' },
-  { key: 'catalog', label: 'Master Data' },
-  { key: 'system',  label: 'System' },
+  { key: 'main',          label: 'Overview' },
+  { key: 'notifications', label: 'Push Notifications' },
+  { key: 'monetization',  label: 'Subscriptions' },
+  { key: 'catalog',       label: 'Master Data' },
+  { key: 'system',        label: 'System' },
 ];
 
 export default function SidebarLayout({ children }) {

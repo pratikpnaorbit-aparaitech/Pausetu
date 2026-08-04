@@ -95,6 +95,7 @@ const mapBackendNotification = (n, lang = 'en') => {
 
   return {
     id: n._id || n.id,
+    imageUrl: n.imageUrl || null,
     category,
     title: parseLocalizedText(n.title, lang),
     description: parseLocalizedText(n.message, lang),
@@ -107,8 +108,8 @@ const mapBackendNotification = (n, lang = 'en') => {
     badgeColor,
     badgeTextColor,
     priority,
-    targetScreen: n.targetScreen,
-    relatedId: n.relatedId
+    targetScreen: n.targetScreen || n.deepLink?.screen,
+    relatedId: n.relatedId || n.deepLink?.params?.id
   };
 };
 
@@ -236,7 +237,14 @@ export default function NotificationsScreen({ navigation }) {
     } else if (item.targetScreen === 'Verification') {
       navigation.navigate('Verification');
     } else if (item.targetScreen === 'Chat' && item.relatedId) {
-      navigation.navigate('ChatScreen', { conversationId: item.relatedId });
+      const routeNames = navigation.getState()?.routeNames || [];
+      if (routeNames.includes('ChatScreen')) {
+        navigation.navigate('ChatScreen', { conversationId: item.relatedId });
+      } else if (routeNames.includes('Chat')) {
+        navigation.navigate('Chat', { conversationId: item.relatedId });
+      } else {
+        navigation.navigate('MainApp', { screen: 'Post' });
+      }
     } else if (item.targetScreen === 'MyListings') {
       navigation.navigate('MyListings');
     } else if (item.targetScreen === 'Profile') {

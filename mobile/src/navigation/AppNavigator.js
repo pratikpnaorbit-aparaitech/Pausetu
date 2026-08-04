@@ -1,7 +1,8 @@
-import React, { useContext } from 'react';
+import React, { useContext, useEffect, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { AppContext } from '../context/AppContext';
+import mobileNotificationService from '../services/notificationService';
 
 // Import Screens
 import SplashScreen from '../screens/SplashScreen';
@@ -19,8 +20,25 @@ import ProfileScreen from '../screens/ProfileScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import VerificationScreen from '../screens/VerificationScreen';
+import SubscriptionScreen from '../screens/SubscriptionScreen';
 
 const Stack = createNativeStackNavigator();
+
+const linking = {
+  prefixes: ['pashusetu://', 'https://pashusetu.com'],
+  config: {
+    screens: {
+      Subscription: 'subscription/payment',
+      FeedPlanner: 'feed-planner',
+      Bid: 'marketplace',
+      AnimalDetails: 'animal/:id',
+      Profile: 'profile',
+      Notifications: 'notifications',
+      Verification: 'verification',
+      MyListings: 'my-listings'
+    }
+  }
+};
 
 export default function AppNavigator() {
   const {
@@ -31,8 +49,25 @@ export default function AppNavigator() {
     hasLocationPermission,
   } = useContext(AppContext);
 
+  const navigationRef = useRef(null);
+
+  useEffect(() => {
+    if (userToken && userToken !== 'guest') {
+      mobileNotificationService.registerForPushNotifications();
+    }
+  }, [userToken]);
+
+  useEffect(() => {
+    if (navigationRef.current) {
+      mobileNotificationService.attachNavigationListener(navigationRef.current);
+    }
+    return () => {
+      mobileNotificationService.cleanup();
+    };
+  }, []);
+
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef} linking={linking}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {isLoading ? (
           // 1. Splash Screen
@@ -66,6 +101,7 @@ export default function AppNavigator() {
             <Stack.Screen name="Notifications" component={NotificationsScreen} />
             <Stack.Screen name="Settings" component={SettingsScreen} />
             <Stack.Screen name="Verification" component={VerificationScreen} />
+            <Stack.Screen name="Subscription" component={SubscriptionScreen} />
           </>
         )}
       </Stack.Navigator>

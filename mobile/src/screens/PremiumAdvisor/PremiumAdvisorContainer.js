@@ -1,31 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, View, Modal, ActivityIndicator } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { usePremium } from '../../hooks/usePremium';
-import PremiumAdvisorLockScreen from './PremiumAdvisorLockScreen';
-import PremiumAdvisorPaymentScreen from './PremiumAdvisorPaymentScreen';
 import GuidedChatScreen from '../../chatbot/screens/GuidedChatScreen';
 
 export default function PremiumAdvisorContainer({ visible, onClose }) {
+  const navigation = useNavigation();
   const { isPremium, loading, checkPremiumStatus } = usePremium();
-  const [currentScreen, setCurrentScreen] = useState('chat'); // 'lock' | 'payment' | 'chat'
 
-  // Sync premium status when the container becomes visible
   useEffect(() => {
     if (visible) {
-      checkPremiumStatus(true).then(() => {
-        setCurrentScreen('chat');
-      });
+      checkPremiumStatus(true);
     }
   }, [visible, checkPremiumStatus]);
 
-  const handlePaymentSuccess = () => {
-    checkPremiumStatus(true).then(() => {
-      setCurrentScreen('chat');
-    });
-  };
-
-  const handleBackToLock = () => {
-    setCurrentScreen('chat');
+  const handleShowPayment = () => {
+    onClose();
+    navigation.navigate('Subscription');
   };
 
   const renderContent = () => {
@@ -37,38 +28,13 @@ export default function PremiumAdvisorContainer({ visible, onClose }) {
       );
     }
 
-    switch (currentScreen) {
-      case 'lock':
-        return (
-          <PremiumAdvisorLockScreen
-            onUnlock={() => setCurrentScreen('payment')}
-            onClose={onClose}
-          />
-        );
-      case 'payment':
-        return (
-          <PremiumAdvisorPaymentScreen
-            onPaymentSuccess={handlePaymentSuccess}
-            onBack={handleBackToLock}
-          />
-        );
-      case 'chat':
-        return (
-          <GuidedChatScreen
-            onClose={onClose}
-            isPremium={isPremium}
-            onShowPayment={() => setCurrentScreen('payment')}
-          />
-        );
-      default:
-        return (
-          <GuidedChatScreen
-            onClose={onClose}
-            isPremium={isPremium}
-            onShowPayment={() => setCurrentScreen('payment')}
-          />
-        );
-    }
+    return (
+      <GuidedChatScreen
+        onClose={onClose}
+        isPremium={isPremium}
+        onShowPayment={handleShowPayment}
+      />
+    );
   };
 
   return (

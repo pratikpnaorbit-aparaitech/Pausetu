@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { StyleSheet, View, Animated, PanResponder, TouchableOpacity, Dimensions } from 'react-native';
+import { StyleSheet, View, Animated, PanResponder, TouchableOpacity, Dimensions, Image } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import AppText from './AppText';
@@ -109,6 +109,21 @@ function NotificationCard({ item, onMarkAsRead, onDelete, onPressCard }) {
               <AppText style={styles.cardDesc} numberOfLines={2}>
                 {item.description}
               </AppText>
+
+              {/* Render Notification Banner Image if present */}
+              {Boolean(item.imageUrl && typeof item.imageUrl === 'string' && item.imageUrl.trim()) ? (
+                <Image
+                  source={{ uri: item.imageUrl }}
+                  style={{
+                    width: '100%',
+                    height: 180,
+                    borderRadius: 12,
+                    resizeMode: 'cover',
+                    marginTop: 8,
+                    marginBottom: 4
+                  }}
+                />
+              ) : null}
 
               <View style={styles.metaRow}>
                 <AppText style={styles.cardTime}>{item.time}</AppText>

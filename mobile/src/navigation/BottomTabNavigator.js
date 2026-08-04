@@ -1,9 +1,11 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useContext } from 'react';
 import { StyleSheet, View, Platform, Animated } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AppContext } from '../context/AppContext';
+import { hasFeatureAccess } from '../utils/featureAccess';
 
 // Import Screens
 import BuyScreen from '../screens/BuyScreen';
@@ -81,6 +83,7 @@ function AnimatedTabLabel({ focused, labelText }) {
 export default function BottomTabNavigator() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
+  const { userProfile } = useContext(AppContext);
 
   return (
     <Tab.Navigator
@@ -181,6 +184,14 @@ export default function BottomTabNavigator() {
         options={{
           title: t('tabs.marketPrice'),
         }}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            if (!hasFeatureAccess(userProfile, null, 'marketEstimator')) {
+              e.preventDefault();
+              navigation.navigate('Subscription');
+            }
+          },
+        })}
       />
 
       <Tab.Screen
@@ -189,6 +200,14 @@ export default function BottomTabNavigator() {
         options={{
           title: t('tabs.feedPlanner'),
         }}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            if (!hasFeatureAccess(userProfile, null, 'feedPlanner')) {
+              e.preventDefault();
+              navigation.navigate('Subscription');
+            }
+          },
+        })}
       />
     </Tab.Navigator>
   );

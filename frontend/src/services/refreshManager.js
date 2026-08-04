@@ -13,8 +13,11 @@ export const REFRESH_EVENTS = {
   VERIFICATION_REJECTED: 'verification_rejected',
   VERIFICATION_UPDATED: 'verification_updated',
   NOTIFICATION_UPDATED: 'notification_updated',
+  NOTIFICATION_SENT: 'notification_sent',
   FAVORITE_UPDATED: 'favorite_updated',
-  CHAT_UPDATED: 'chat_updated'
+  CHAT_UPDATED: 'chat_updated',
+  SUBSCRIPTION_UPDATED: 'subscription_updated',
+  PLAN_UPDATED: 'plan_updated'
 };
 
 class RefreshEventManager {

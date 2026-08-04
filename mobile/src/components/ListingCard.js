@@ -21,7 +21,7 @@ function ListingCard({ item, onViewDetailsPress, style }) {
   
   const [imageError, setImageError] = useState(false);
   const fallbackUrl = 'https://images.unsplash.com/photo-1570042225831-d98fa7577f1e?auto=format&fit=crop&w=300&q=80';
-  const resolvedUrl = resolveMediaUrl(item.photos && item.photos.length > 0 ? item.photos[0] : null);
+  const resolvedUrl = resolveMediaUrl(item?.photos && item.photos.length > 0 ? item.photos[0] : null);
   const imageUrl = imageError ? fallbackUrl : resolvedUrl;
 
   // Category-aware determination of milk applicability

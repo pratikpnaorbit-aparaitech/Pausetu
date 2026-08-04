@@ -9,11 +9,14 @@ import { useTranslation } from 'react-i18next';
 import { resolveMediaUrl } from '../api/api';
 import AppText from '../components/AppText';
 import { usePremium } from '../hooks/usePremium';
+import { useNavigation } from '@react-navigation/native';
+import { hasFeatureAccess } from '../utils/featureAccess';
 import DashboardPremiumCard from '../components/PremiumAdvisor/DashboardPremiumCard';
 import PremiumBadge from '../components/PremiumAdvisor/PremiumBadge';
 import PremiumAdvisorContainer from './PremiumAdvisor/PremiumAdvisorContainer';
 
 export default function HomeScreen() {
+  const navigation = useNavigation();
   const { userProfile, userToken } = useContext(AppContext);
   const { t } = useTranslation();
   const isGuest = userToken === 'guest';
@@ -62,8 +65,8 @@ export default function HomeScreen() {
         </LinearGradient>
 
         <DashboardPremiumCard
-          isPremium={isPremium}
-          onPress={() => setShowPremiumAdvisor(true)}
+          isPremium={hasFeatureAccess(userProfile, null, 'aiAdvisor')}
+          onPress={() => hasFeatureAccess(userProfile, null, 'aiAdvisor') ? setShowPremiumAdvisor(true) : navigation.navigate('Subscription')}
         />
 
         {/* Dashboard Title */}

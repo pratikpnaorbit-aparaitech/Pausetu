@@ -1,13 +1,14 @@
 const express = require('express');
 const animalController = require('../controllers/animalController');
 const { protect, restrictTo, optionalProtect } = require('../middleware/authMiddleware');
+const { checkListingLimit } = require('../middleware/subscriptionMiddleware');
 
 const router = express.Router();
 
 router
   .route('/')
   .get(optionalProtect, animalController.getAllAnimals)
-  .post(protect, animalController.createAnimal);
+  .post(protect, checkListingLimit, animalController.createAnimal);
 
 // Admin-only dedicated approve / reject endpoints (hardened — no generic status patch)
 router.patch('/:id/approve', protect, restrictTo('admin'), animalController.approveListing);

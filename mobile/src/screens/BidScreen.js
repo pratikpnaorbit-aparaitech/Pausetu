@@ -12,7 +12,8 @@ import { AppContext } from '../context/AppContext';
 import { verificationApi } from '../api/verificationApi';
 import { useAutoRefresh } from '../hooks/useAutoRefresh';
 import { REFRESH_EVENTS } from '../services/refreshManager';
-import MarketPriceUnlockScreen from './PremiumAdvisor/MarketPriceUnlockScreen';
+import { useNavigation } from '@react-navigation/native';
+import { hasFeatureAccess } from '../utils/featureAccess';
 import PriceCard from '../components/PriceCard';
 import ConfidenceMeter from '../components/ConfidenceMeter';
 import MarketTrendCard from '../components/MarketTrendCard';
@@ -78,8 +79,8 @@ const QUESTIONS = [
 
 function MarketPriceChatAssistant({ onRestart }) {
   const { t } = useTranslation();
+  const navigation = useNavigation();
   const { userProfile } = useContext(AppContext);
-  const { unlockLifetimeMarketPrice } = usePremium();
   const flatListRef = useRef(null);
   const timerRef = useRef(null);
 
@@ -87,7 +88,6 @@ function MarketPriceChatAssistant({ onRestart }) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState({});
   const [isTyping, setIsTyping] = useState(false);
-  const [showPayment, setShowPayment] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [globalUnlock, setGlobalUnlock] = useState(false);
 
@@ -123,7 +123,7 @@ function MarketPriceChatAssistant({ onRestart }) {
     return () => timerRef.current && clearTimeout(timerRef.current);
   }, []);
 
-  const hasAccess = globalUnlock || userProfile?.marketPriceAccess?.hasAccess || userProfile?.isPremium;
+  const hasAccess = hasFeatureAccess(userProfile, { marketPriceGlobalUnlock: globalUnlock }, 'marketEstimator');
   const isComplete = currentQuestionIndex >= QUESTIONS.length || messages.some(m => m.isResultCard || m.id === 'locked_note');
 
   const runPriceEstimation = (ans) => {
@@ -224,42 +224,14 @@ function MarketPriceChatAssistant({ onRestart }) {
         timerRef.current = setTimeout(() => {
           setAnalyzing(false);
           const priceResult = runPriceEstimation(nextAnswers);
-          if (hasAccess) {
-            setMessages(prev => [...prev, {
-              id: 'result',
-              sender: 'bot',
-              isResultCard: true,
-              result: priceResult
-            }]);
-          } else {
-            setMessages(prev => [...prev, {
-              id: 'locked_result',
-              sender: 'bot',
-              isLockedCard: true,
-              result: priceResult
-            }]);
-          }
+          setMessages(prev => [...prev, {
+            id: 'result',
+            sender: 'bot',
+            isResultCard: true,
+            result: priceResult
+          }]);
         }, 1500);
       }, 800);
-    }
-  };
-
-  const handlePaymentSuccess = async () => {
-    const res = await unlockLifetimeMarketPrice();
-    if (res.success) {
-      setShowPayment(false);
-      const priceResult = runPriceEstimation(answers);
-      setMessages(prev => {
-        const filtered = prev.filter(m => !m.isLockedCard);
-        return [...filtered, {
-          id: 'result',
-          sender: 'bot',
-          isResultCard: true,
-          result: priceResult
-        }];
-      });
-    } else {
-      Alert.alert(t('common.error'), res.error || 'Payment failed');
     }
   };
 
@@ -280,22 +252,6 @@ function MarketPriceChatAssistant({ onRestart }) {
       );
     }
   };
-
-  if (showPayment) {
-    return (
-      <MarketPriceUnlockScreen
-        onUnlock={handlePaymentSuccess}
-        onClose={() => {
-          setShowPayment(false);
-          setMessages(prev => [...prev, {
-            id: 'locked_note',
-            sender: 'bot',
-            text: "🔒 " + t('estimator.chat.premiumRequiredDesc')
-          }]);
-        }}
-      />
-    );
-  }
 
   const activeQ = QUESTIONS[currentQuestionIndex];
   const options = (currentQuestionIndex < QUESTIONS.length && !analyzing && !isComplete) ? activeQ.getOptions(answers) : [];
@@ -381,16 +337,16 @@ function MarketPriceChatAssistant({ onRestart }) {
                   </AppText>
                 </View>
                 <AppText style={styles.lockedCardDesc}>
-                  {t('estimator.locked.desc', { defaultValue: 'AI ने तुमच्या पशूचे मूल्यांकन पूर्ण केले आहे.\n\nपूर्ण निकाल पाहण्यासाठी कृपया पेमेंट / सत्यापन पूर्ण करा.' })}
+                  {t('estimator.locked.desc', { defaultValue: 'AI ने तुमच्या पशूचे मूल्यांकन पूर्ण केले आहे.\n\nपूर्ण निकाल पाहण्यासाठी कृपया PashuSetu Premium चे सदस्य व्हा.' })}
                 </AppText>
                 <TouchableOpacity
                   style={styles.unlockBtnPrimary}
-                  onPress={() => setShowPayment(true)}
+                  onPress={() => navigation.navigate('Subscription')}
                   activeOpacity={0.85}
                 >
-                  <MaterialCommunityIcons name="lock-open-variant" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                  <MaterialCommunityIcons name="crown" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
                   <AppText style={styles.unlockBtnPrimaryText}>
-                    {t('estimator.locked.unlockBtn', { defaultValue: 'Unlock Now (अनलॉक करा)' })}
+                    {t('estimator.locked.unlockBtn', { defaultValue: 'Subscribe to Premium' })}
                   </AppText>
                 </TouchableOpacity>
               </View>

@@ -89,6 +89,10 @@ const userSchema = new mongoose.Schema(
     premiumExpiresAt: {
       type: Date
     },
+    currentSubscription: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Subscription'
+    },
     marketPriceAccess: {
       hasAccess: {
         type: Boolean,
@@ -120,6 +124,22 @@ const userSchema = new mongoose.Schema(
       paymentId: {
         type: String
       }
+    },
+    fcmToken: {
+      type: String,
+      default: null,
+      index: true
+    },
+    fcmTokens: [
+      {
+        token: { type: String, required: true },
+        platform: { type: String, default: 'android' },
+        updatedAt: { type: Date, default: Date.now }
+      }
+    ],
+    pushNotificationEnabled: {
+      type: Boolean,
+      default: true
     },
     createdAt: {
       type: Date,
