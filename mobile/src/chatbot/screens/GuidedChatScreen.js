@@ -73,7 +73,7 @@ export default function GuidedChatScreen({ onClose, isPremium, onShowPayment }) 
 
   if (!selectedFlowId) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
             <Ionicons name="close" size={24} color="#0F172A" />
@@ -120,7 +120,7 @@ export default function GuidedChatScreen({ onClose, isPremium, onShowPayment }) 
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <ChatHeader 
         title={t(flows[selectedFlowId]?.titleKey || '', { defaultValue: selectedFlowId })} 
         onClose={handleRestart} 

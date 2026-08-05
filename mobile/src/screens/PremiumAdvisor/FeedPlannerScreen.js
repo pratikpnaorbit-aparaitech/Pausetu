@@ -187,7 +187,7 @@ function FeedPlannerChatAssistant({ onRestart, onClose }) {
   const options = (currentQuestionIndex < QUESTIONS.length && !analyzing && !isComplete) ? activeQ.getOptions(answers) : [];
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header with Enterprise Status Badge using CustomHeader */}
       <CustomHeader
         title={t('feedPlanner.title')}

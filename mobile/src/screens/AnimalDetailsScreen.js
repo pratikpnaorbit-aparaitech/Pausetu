@@ -22,15 +22,13 @@ const GALLERY_HEIGHT = Math.min(Math.round(INITIAL_WIDTH * (4 / 3)), 420);
 const ImageWithLoader = ({ uri, style, resizeMode = 'cover', onPress }) => {
   const [loading, setLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   const fallbackUri = 'https://images.unsplash.com/photo-1546445317-29f4545e6d52?auto=format&fit=crop&w=800&q=80';
 
   useEffect(() => {
     setHasError(false);
     setLoading(true);
-    fadeAnim.setValue(0);
-  }, [uri, fadeAnim]);
+  }, [uri]);
 
   const isValidUri = useMemo(() => {
     if (!uri || typeof uri !== 'string') return false;
@@ -53,24 +51,14 @@ const ImageWithLoader = ({ uri, style, resizeMode = 'cover', onPress }) => {
 
   const handleLoadEnd = useCallback(() => {
     setLoading(false);
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 280,
-      useNativeDriver: true,
-    }).start();
-  }, [fadeAnim]);
+  }, []);
 
   const handleError = useCallback((e) => {
     const errObj = e?.nativeEvent?.error || e;
     console.warn(`[ImageWithLoader] Failed to load image URI "${uri}":`, errObj);
     setHasError(true);
     setLoading(false);
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 280,
-      useNativeDriver: true,
-    }).start();
-  }, [uri, fadeAnim]);
+  }, [uri]);
 
   return (
     <TouchableOpacity
@@ -78,16 +66,16 @@ const ImageWithLoader = ({ uri, style, resizeMode = 'cover', onPress }) => {
       onPress={onPress}
       style={[style, { overflow: 'hidden', backgroundColor: '#0F172A' }]}
     >
-      {/* Ambient Blurred Backdrop Layer: fills letterbox space smoothly with color-matched tones */}
+      {/* Ambient Blurred Backdrop Layer */}
       {resizeMode === 'contain' && (
-        <Animated.Image
+        <Image
           source={source}
-          style={[StyleSheet.absoluteFillObject, { opacity: fadeAnim, transform: [{ scale: 1.15 }] }]}
+          style={[StyleSheet.absoluteFillObject, { opacity: 0.35, transform: [{ scale: 1.15 }] }]}
           resizeMode="cover"
           blurRadius={Platform.OS === 'ios' ? 25 : 15}
         />
       )}
-      {/* Dark tint overlay for pristine contrast behind foreground subject */}
+      {/* Dark tint overlay */}
       {resizeMode === 'contain' && (
         <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(15, 23, 42, 0.45)' }]} />
       )}
@@ -99,13 +87,13 @@ const ImageWithLoader = ({ uri, style, resizeMode = 'cover', onPress }) => {
           </View>
         </View>
       )}
-      {/* Foreground Crisp Main Image — contain ensures 100% of animal is visible without cropping */}
-      <Animated.Image
+      {/* Foreground Crisp Main Image */}
+      <Image
         source={source}
-        style={[StyleSheet.absoluteFillObject, { opacity: fadeAnim }]}
+        style={StyleSheet.absoluteFillObject}
         resizeMode={resizeMode}
         onLoadStart={handleLoadStart}
-        onLoad={handleLoadEnd}
+        onLoadEnd={handleLoadEnd}
         onError={handleError}
       />
     </TouchableOpacity>
@@ -236,7 +224,7 @@ export default function AnimalDetailsScreen({ route, navigation }) {
   const detectIsVideo = useCallback((item) => {
     if (!item) return false;
     if (typeof item === 'string') {
-      const lower = item.toLowerCase();
+      const lower = item.toLowerCase().trim();
       return (
         lower.endsWith('.mp4') ||
         lower.endsWith('.mov') ||
@@ -245,13 +233,18 @@ export default function AnimalDetailsScreen({ route, navigation }) {
         lower.endsWith('.avi') ||
         lower.endsWith('.webm') ||
         lower.includes('/videos/') ||
-        lower.includes('/video/')
+        lower.includes('/video/') ||
+        lower.includes('video/upload') ||
+        lower.includes('resource_type=video')
       );
     }
     if (typeof item === 'object') {
       if (item.type === 'video') return true;
+      if (item.resource_type === 'video') return true;
       if (item.mime?.startsWith('video/') || item.mimeType?.startsWith('video/')) return true;
       if (item.uri && detectIsVideo(item.uri)) return true;
+      if (item.url && detectIsVideo(item.url)) return true;
+      if (item.fileUrl && detectIsVideo(item.fileUrl)) return true;
     }
     return false;
   }, []);
@@ -1388,8 +1381,10 @@ export default function AnimalDetailsScreen({ route, navigation }) {
               <VideoView
                 player={player}
                 style={styles.fullscreenVideo}
-                resizeMode="contain"
-                controls={isPlayerPlaying}
+                contentFit="contain"
+                nativeControls={true}
+                allowsFullscreen
+                allowsPictureInPicture
               />
               {!isPlayerPlaying && (
                 <TouchableOpacity 
@@ -2207,12 +2202,15 @@ const styles = StyleSheet.create({
     height: '100%',
     position: 'relative',
     justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000000',
   },
   videoOverlayPlayContainer: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.25)',
+    zIndex: 5,
   },
   centerPlayButtonCircle: {
     width: 76,
