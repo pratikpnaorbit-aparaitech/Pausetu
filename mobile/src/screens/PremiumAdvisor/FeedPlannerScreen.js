@@ -187,7 +187,7 @@ function FeedPlannerChatAssistant({ onRestart, onClose }) {
   const options = (currentQuestionIndex < QUESTIONS.length && !analyzing && !isComplete) ? activeQ.getOptions(answers) : [];
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header with Enterprise Status Badge using CustomHeader */}
       <CustomHeader
         title={t('feedPlanner.title')}
@@ -380,7 +380,7 @@ function ResultCard({ result, onRecalculate }) {
 export default function FeedPlannerScreen({ onClose }) {
   const [sessionKey, setSessionKey] = useState(0);
   const handleRestart = () => setSessionKey(prev => prev + 1);
-  return <FeedPlannerChatAssistant key={sessionKey} onRestart={handleRestart} />;
+  return <FeedPlannerChatAssistant key={sessionKey} onRestart={handleRestart} onClose={onClose} />;
 }
 
 const styles = StyleSheet.create({

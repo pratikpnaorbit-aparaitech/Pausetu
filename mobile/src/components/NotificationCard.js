@@ -14,13 +14,15 @@ function NotificationCard({ item, onMarkAsRead, onDelete, onPressCard }) {
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gestureState) => {
-        // Only set responder if moving left horizontally
-        return Math.abs(gestureState.dx) > 10 && gestureState.dx < 0;
+        // Only set responder if moving left horizontally faster than vertically
+        return Math.abs(gestureState.dx) > 10 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) && gestureState.dx < 0;
       },
       onPanResponderMove: (_, gestureState) => {
-        // Only allow swiping to the left, up to a limit
+        // Only allow swiping to the left, clamped strictly between -90 and 0
         if (gestureState.dx < 0) {
-          translateX.setValue(Math.max(gestureState.dx, -120));
+          translateX.setValue(Math.max(gestureState.dx, -90));
+        } else {
+          translateX.setValue(0);
         }
       },
       onPanResponderRelease: (_, gestureState) => {
@@ -114,14 +116,9 @@ function NotificationCard({ item, onMarkAsRead, onDelete, onPressCard }) {
               {Boolean(item.imageUrl && typeof item.imageUrl === 'string' && item.imageUrl.trim()) ? (
                 <Image
                   source={{ uri: item.imageUrl }}
-                  style={{
-                    width: '100%',
-                    height: 180,
-                    borderRadius: 12,
-                    resizeMode: 'cover',
-                    marginTop: 8,
-                    marginBottom: 4
-                  }}
+                  style={styles.cardImage}
+                  resizeMode="cover"
+                  onError={(e) => console.warn('[NotificationCard] Image load error:', e.nativeEvent?.error || 'Unknown image error')}
                 />
               ) : null}
 
@@ -148,18 +145,24 @@ const styles = StyleSheet.create({
     position: 'relative',
     marginBottom: 16,
     borderRadius: 20,
-    backgroundColor: '#EF4444', // Red backdrop matching delete buttons background
+    backgroundColor: 'transparent',
     overflow: 'hidden',
   },
   deleteBackground: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'flex-end',
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    right: 0,
+    width: 90,
     backgroundColor: '#EF4444',
+    borderTopRightRadius: 20,
+    borderBottomRightRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
     zIndex: 1,
   },
   deleteButton: {
-    width: 90,
+    width: '100%',
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
@@ -245,6 +248,14 @@ const styles = StyleSheet.create({
     color: '#64748B',
     lineHeight: 17,
     marginTop: 4,
+  },
+  cardImage: {
+    width: '100%',
+    height: 160,
+    borderRadius: 12,
+    marginTop: 8,
+    marginBottom: 4,
+    backgroundColor: '#F1F5F9',
   },
   metaRow: {
     flexDirection: 'row',

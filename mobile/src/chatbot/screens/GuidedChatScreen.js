@@ -16,10 +16,12 @@ import SummaryCard from '../components/SummaryCard';
 import ChatHeader from '../components/ChatHeader';
 import FeedPlannerScreen from '../../screens/PremiumAdvisor/FeedPlannerScreen';
 
+import { useNavigation } from '@react-navigation/native';
 import { hasFeatureAccess } from '../../utils/featureAccess';
 
 export default function GuidedChatScreen({ onClose, isPremium, onShowPayment }) {
   const { t } = useTranslation();
+  const navigation = useNavigation();
   const [selectedFlowId, setSelectedFlowId] = useState(null);
   const flows = chatbotService.getFlows();
 
@@ -52,6 +54,11 @@ export default function GuidedChatScreen({ onClose, isPremium, onShowPayment }) 
       if (onShowPayment) onShowPayment();
       return;
     }
+    if (flowId === 'marketPrice') {
+      if (onClose) onClose();
+      navigation.navigate('MainApp', { screen: 'Bid' });
+      return;
+    }
     setSelectedFlowId(flowId);
     startFlow(flowId);
   };
@@ -73,7 +80,7 @@ export default function GuidedChatScreen({ onClose, isPremium, onShowPayment }) 
 
   if (!selectedFlowId) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
             <Ionicons name="close" size={24} color="#0F172A" />
@@ -120,7 +127,7 @@ export default function GuidedChatScreen({ onClose, isPremium, onShowPayment }) 
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <ChatHeader 
         title={t(flows[selectedFlowId]?.titleKey || '', { defaultValue: selectedFlowId })} 
         onClose={handleRestart} 

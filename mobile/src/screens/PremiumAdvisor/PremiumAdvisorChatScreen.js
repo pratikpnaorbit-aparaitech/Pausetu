@@ -133,7 +133,7 @@ export default function PremiumAdvisorChatScreen({ onClose }) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header bar */}
             <CustomHeader
         title={t('premiumAdvisor.chatbot.title')}

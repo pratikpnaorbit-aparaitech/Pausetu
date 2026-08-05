@@ -10,12 +10,12 @@ export default function PremiumAdvisorContainer({ visible, onClose }) {
 
   useEffect(() => {
     if (visible) {
-      checkPremiumStatus(true);
+      checkPremiumStatus(false);
     }
-  }, [visible, checkPremiumStatus]);
+  }, [visible]);
 
   const handleShowPayment = () => {
-    onClose();
+    if (onClose) onClose();
     navigation.navigate('Subscription');
   };
 
@@ -39,7 +39,7 @@ export default function PremiumAdvisorContainer({ visible, onClose }) {
 
   return (
     <Modal
-      visible={visible}
+      visible={Boolean(visible)}
       animationType="slide"
       onRequestClose={onClose}
       presentationStyle="fullScreen"
@@ -63,3 +63,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   }
 });
+

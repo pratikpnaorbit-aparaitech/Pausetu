@@ -711,16 +711,16 @@ function BuyScreenComponent({ navigation }) {
             </View>
             {/* Title and Tagline */}
             <View style={styles.brandTextContainer}>
-              <AppText style={styles.headerTitle}>
+              <AppText style={styles.headerTitle} numberOfLines={1}>
                 {t('app.name')}
               </AppText>
-              <AppText style={styles.headerTagline}>{t('buy.marketplaceCare')}</AppText>
+              <AppText style={styles.headerTagline} numberOfLines={1}>{t('buy.marketplaceCare')}</AppText>
             </View>
           </View>
 
           {/* Right Controls */}
           <View style={styles.headerActions}>
-            <LanguageSelector style={{ marginRight: 8 }} />
+            <LanguageSelector style={{ marginRight: 6 }} />
             <TouchableOpacity style={styles.notificationHeaderBtn} onPress={() => navigation.navigate('Notifications')}>
               <Ionicons name="notifications-outline" size={20} color="#0F172A" />
               <View style={styles.notificationHeaderBadge} />
@@ -931,8 +931,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9', // Softer header border
     backgroundColor: '#FFFFFF',
@@ -940,44 +940,52 @@ const styles = StyleSheet.create({
   logoAndBrand: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+    flexShrink: 1,
+    marginRight: 6,
   },
   logoCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 8,
     overflow: 'visible',
     shadowColor: '#16A34A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 3,
   },
   logoIconImage: {
-    width: 58,
-    height: 58,
+    width: 40,
+    height: 40,
     overflow: 'visible',
   },
   brandTextContainer: {
     justifyContent: 'center',
+    flex: 1,
+    flexShrink: 1,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '800',
     color: '#0F172A',
     letterSpacing: 0.2,
+    flexShrink: 1,
   },
   headerTagline: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#64748B',
     marginTop: 1,
+    flexShrink: 1,
   },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexShrink: 0,
   },
   sellButton: {
     backgroundColor: '#16A34A',
@@ -1006,6 +1014,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
+    flexShrink: 0,
   },
   avatarImage: {
     width: '100%',
@@ -1025,8 +1034,9 @@ const styles = StyleSheet.create({
     borderColor: '#F1F5F9',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 10,
+    marginRight: 6,
     position: 'relative',
+    flexShrink: 0,
   },
   notificationHeaderBadge: {
     position: 'absolute',

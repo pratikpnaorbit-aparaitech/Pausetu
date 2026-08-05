@@ -10,6 +10,7 @@ if (Platform.OS !== 'web') {
       shouldShowAlert: true,
       shouldPlaySound: true,
       shouldSetBadge: true,
+      priority: Notifications.AndroidNotificationPriority.MAX,
     }),
   });
 }
@@ -44,36 +45,42 @@ class MobileNotificationService {
         await Notifications.setNotificationChannelAsync(NOTIFICATION_CHANNELS.MARKETPLACE, {
           name: 'Marketplace Updates',
           description: 'Notifications for animal approvals, inquiries, price drops & listing status.',
-          importance: Notifications.AndroidImportance.HIGH,
+          importance: Notifications.AndroidImportance.MAX,
           vibrationPattern: [0, 250, 250, 250],
           lightColor: '#16A34A',
           sound: 'default',
           enableVibrate: true,
-          showBadge: true
+          showBadge: true,
+          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+          bypassDnd: false
         });
 
         // 2. Premium Channel
         await Notifications.setNotificationChannelAsync(NOTIFICATION_CHANNELS.PREMIUM, {
           name: 'PashuSetu Premium',
           description: 'Subscription status, renewal reminders, and AI advisor updates.',
-          importance: Notifications.AndroidImportance.HIGH,
+          importance: Notifications.AndroidImportance.MAX,
           vibrationPattern: [0, 500, 250, 500],
           lightColor: '#7C3AED',
           sound: 'default',
           enableVibrate: true,
-          showBadge: true
+          showBadge: true,
+          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+          bypassDnd: false
         });
 
         // 3. Orders Channel
         await Notifications.setNotificationChannelAsync(NOTIFICATION_CHANNELS.ORDERS, {
           name: 'Orders & Payments',
           description: 'Transaction receipts and payment status notifications.',
-          importance: Notifications.AndroidImportance.HIGH,
+          importance: Notifications.AndroidImportance.MAX,
           vibrationPattern: [0, 250, 250, 250],
           lightColor: '#2563EB',
           sound: 'default',
           enableVibrate: true,
-          showBadge: true
+          showBadge: true,
+          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+          bypassDnd: true
         });
 
         // 4. Admin Channel
@@ -85,19 +92,23 @@ class MobileNotificationService {
           lightColor: '#DC2626',
           sound: 'default',
           enableVibrate: true,
-          showBadge: true
+          showBadge: true,
+          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+          bypassDnd: true
         });
 
         // 5. General Channel
         await Notifications.setNotificationChannelAsync(NOTIFICATION_CHANNELS.GENERAL, {
           name: 'General Notifications',
           description: 'Tips, community news and general app alerts.',
-          importance: Notifications.AndroidImportance.HIGH,
+          importance: Notifications.AndroidImportance.MAX,
           vibrationPattern: [0, 250, 250, 250],
           lightColor: '#059669',
           sound: 'default',
           enableVibrate: true,
-          showBadge: true
+          showBadge: true,
+          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+          bypassDnd: false
         });
 
         // 6. High Priority Channel
@@ -109,7 +120,9 @@ class MobileNotificationService {
           lightColor: '#EA580C',
           sound: 'default',
           enableVibrate: true,
-          showBadge: true
+          showBadge: true,
+          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+          bypassDnd: true
         });
 
         console.log('[NotificationService] Android notification channels initialized successfully.');

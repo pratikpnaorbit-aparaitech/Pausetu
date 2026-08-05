@@ -40,6 +40,7 @@ const protect = asyncHandler(async (req, res, next) => {
     // Attach user info to request
     req.user = {
       id: currentUser._id.toString(),
+      _id: currentUser._id,
       role: currentUser.role,
       isPremium: currentUser.isPremium,
       email: currentUser.email

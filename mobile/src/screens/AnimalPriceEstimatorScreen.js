@@ -5,6 +5,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { StyleSheet, View, ScrollView, TouchableOpacity, TextInput, Dimensions, Platform } from 'react-native';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { useNavigation } from '@react-navigation/native';
 import { AppContext } from '../context/AppContext';
 import AppText from '../components/AppText';
 import CustomHeader from '../components/CustomHeader';
@@ -26,6 +27,7 @@ const BREEDS = {
 
 export default function AnimalPriceEstimatorScreen() {
   const { t } = useTranslation();
+  const navigation = useNavigation();
   const { userProfile } = useContext(AppContext);
 
   const [step, setStep] = useState(1);
@@ -115,6 +117,7 @@ export default function AnimalPriceEstimatorScreen() {
     <CustomHeader
       title={t('estimator.title', { defaultValue: 'किंमत अंदाजक' })}
       subtitle={t('estimator.subtitle', { defaultValue: 'AI द्वारे अचूक मूल्यांकन' })}
+      onBackPress={navigation?.canGoBack?.() ? () => navigation.goBack() : undefined}
       rightComponent={
         <TouchableOpacity style={styles.refreshBtn} onPress={handleReset} activeOpacity={0.7}>
           <Ionicons name="refresh" size={24} color="#FFFFFF" />

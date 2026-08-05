@@ -6,15 +6,16 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-  SafeAreaView,
   Dimensions,
   Platform
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import AppText from '../components/AppText';
 import CustomHeader from '../components/CustomHeader';
 import { getActivePlans, getSubscriptionStatus, createRazorpayOrder, verifyPayment } from '../api/subscriptionApi';
+import { showRazorpayErrorAlert } from '../utils/razorpayErrorHandler';
 
 const { width } = Dimensions.get('window');
 
@@ -117,7 +118,9 @@ export default function SubscriptionScreen({ navigation }) {
           modal: {
             ondismiss: function () {
               setProcessing(false);
-              Alert.alert('Payment Cancelled', 'You cancelled the payment transaction.');
+              showRazorpayErrorAlert({ code: 2, description: 'Payment cancelled by user' }, {
+                onRetry: () => handleBuyPlan(plan)
+              });
             }
           }
         };
@@ -144,16 +147,16 @@ export default function SubscriptionScreen({ navigation }) {
           })
           .catch((error) => {
             setProcessing(false);
-            if (error && (error.code === 2 || error.code === '2' || error.description?.includes('cancelled'))) {
-              Alert.alert('Payment Cancelled', 'You cancelled the payment process.');
-            } else {
-              Alert.alert('Payment Error', error.description || error.message || 'Payment could not be completed.');
-            }
+            showRazorpayErrorAlert(error, {
+              onRetry: () => handleBuyPlan(plan)
+            });
           });
       }
     } catch (err) {
       setProcessing(false);
-      Alert.alert(t('common.error') || 'Error', err.message || 'Failed to initialize payment order');
+      showRazorpayErrorAlert(err, {
+        onRetry: () => handleBuyPlan(plan)
+      });
     }
   };
 
@@ -176,7 +179,9 @@ export default function SubscriptionScreen({ navigation }) {
         );
       }
     } catch (err) {
-      Alert.alert('Verification Failed', err.message || 'Could not verify Razorpay signature');
+      showRazorpayErrorAlert(err, {
+        onRetry: () => handleBuyPlan(plans.find(p => p._id === planId) || selectedPlan)
+      });
     } finally {
       setProcessing(false);
     }
@@ -202,7 +207,7 @@ export default function SubscriptionScreen({ navigation }) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.loadingContainer}>
+      <SafeAreaView style={styles.loadingContainer} edges={['top']}>
         <ActivityIndicator size="large" color="#7C3AED" />
         <AppText style={styles.loadingText}>Loading Subscription Details...</AppText>
       </SafeAreaView>
@@ -210,7 +215,7 @@ export default function SubscriptionScreen({ navigation }) {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <CustomHeader
         title="Premium Membership"
         onBackPress={() => navigation.goBack()}

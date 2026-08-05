@@ -21,6 +21,7 @@ import NotificationsScreen from '../screens/NotificationsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import VerificationScreen from '../screens/VerificationScreen';
 import SubscriptionScreen from '../screens/SubscriptionScreen';
+import AnimalPriceEstimatorScreen from '../screens/AnimalPriceEstimatorScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -102,6 +103,7 @@ export default function AppNavigator() {
             <Stack.Screen name="Settings" component={SettingsScreen} />
             <Stack.Screen name="Verification" component={VerificationScreen} />
             <Stack.Screen name="Subscription" component={SubscriptionScreen} />
+            <Stack.Screen name="AnimalPriceEstimator" component={AnimalPriceEstimatorScreen} />
           </>
         )}
       </Stack.Navigator>
