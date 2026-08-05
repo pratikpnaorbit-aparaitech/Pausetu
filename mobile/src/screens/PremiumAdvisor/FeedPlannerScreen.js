@@ -380,7 +380,7 @@ function ResultCard({ result, onRecalculate }) {
 export default function FeedPlannerScreen({ onClose }) {
   const [sessionKey, setSessionKey] = useState(0);
   const handleRestart = () => setSessionKey(prev => prev + 1);
-  return <FeedPlannerChatAssistant key={sessionKey} onRestart={handleRestart} />;
+  return <FeedPlannerChatAssistant key={sessionKey} onRestart={handleRestart} onClose={onClose} />;
 }
 
 const styles = StyleSheet.create({

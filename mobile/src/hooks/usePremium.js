@@ -1,48 +1,53 @@
-import { useState, useEffect, useCallback, useContext } from 'react';
+import { useState, useEffect, useCallback, useContext, useRef } from 'react';
 import { premiumApi } from '../api/premiumApi';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppContext } from '../context/AppContext';
 
 export const usePremium = () => {
-  const { userProfile, refreshProfileData } = useContext(AppContext);
-  const [isPremium, setIsPremium] = useState(false);
-  const [premiumExpiresAt, setPremiumExpiresAt] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { userProfile, refreshProfileData, userToken } = useContext(AppContext);
+  const [isPremium, setIsPremium] = useState(Boolean(userProfile?.isPremium));
+  const [premiumExpiresAt, setPremiumExpiresAt] = useState(userProfile?.premiumExpiresAt || null);
+  const [loading, setLoading] = useState(false);
   const [chatSessions, setChatSessions] = useState([]);
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [activeSessionTitle, setActiveSessionTitle] = useState('');
   const [chatMessages, setChatMessages] = useState([]);
   const [chatLoading, setChatLoading] = useState(false);
 
-  // Sync premium status from user profile context or storage
+  // Sync premium status directly whenever userProfile changes
   useEffect(() => {
-    if (userProfile?.isPremium !== undefined) {
-      setIsPremium(!!userProfile.isPremium);
-      setLoading(false);
-    }
-  }, [userProfile?.isPremium]);
+    setIsPremium(Boolean(userProfile?.isPremium));
+    setPremiumExpiresAt(userProfile?.premiumExpiresAt || null);
+    setLoading(false);
+  }, [userProfile?.isPremium, userProfile?.premiumExpiresAt]);
 
+  // Stable check function that does NOT recreate itself endlessly
   const checkPremiumStatus = useCallback(async (forceFetch = false) => {
-    setLoading(true);
-    try {
-      if (refreshProfileData && forceFetch) {
+    if (!userToken || userToken === 'guest') {
+      setIsPremium(false);
+      setLoading(false);
+      return;
+    }
+    if (forceFetch && refreshProfileData) {
+      setLoading(true);
+      try {
         await refreshProfileData();
+      } catch (err) {
+        console.warn('[usePremium] Failed to check status:', err.message);
+      } finally {
+        setLoading(false);
       }
-      setIsPremium(!!userProfile?.isPremium);
-    } catch (err) {
-      console.warn('[usePremium] Failed to check status:', err.message);
-    } finally {
+    } else {
+      setIsPremium(Boolean(userProfile?.isPremium));
       setLoading(false);
     }
-  }, [refreshProfileData, userProfile?.isPremium]);
+  }, [userToken, refreshProfileData, userProfile?.isPremium]);
 
-  // Boot status verification
-  useEffect(() => {
-    checkPremiumStatus();
-  }, [checkPremiumStatus]);
-
-  // Fetch all chat history / sessions list
+  // Fetch all chat history / sessions list safely
   const loadChatSessions = useCallback(async () => {
+    if (!userToken || userToken === 'guest') {
+      setChatSessions([]);
+      return;
+    }
     try {
       const res = await premiumApi.getChatHistory();
       if (res?.status === 'success' && res.data) {
@@ -51,11 +56,11 @@ export const usePremium = () => {
     } catch (err) {
       console.warn('[usePremium] Failed to load chat sessions:', err.message);
     }
-  }, []);
+  }, [userToken]);
 
-  // Fetch messages for a specific session
+  // Fetch messages for a specific session safely
   const loadSessionMessages = useCallback(async (sessionId) => {
-    if (!sessionId) return;
+    if (!sessionId || !userToken || userToken === 'guest') return;
     setChatLoading(true);
     try {
       const res = await premiumApi.getChatHistory(sessionId);
@@ -72,7 +77,7 @@ export const usePremium = () => {
     } finally {
       setChatLoading(false);
     }
-  }, [chatSessions]);
+  }, [chatSessions, userToken]);
 
   // Send message
   const sendMessage = async (text, imageUrl = null) => {
@@ -104,7 +109,7 @@ export const usePremium = () => {
         // Replace user message with db record and add AI response
         setChatMessages(prev => {
           const filtered = prev.filter(m => m._id !== tempUserMessage._id);
-          return [...filtered, res.data.userMessage, aiMessage];
+          return [...filtered, res.data.userMessage || tempUserMessage, aiMessage];
         });
 
         // Refresh sessions list in background
@@ -166,3 +171,4 @@ export const usePremium = () => {
     startNewChat
   };
 };
+

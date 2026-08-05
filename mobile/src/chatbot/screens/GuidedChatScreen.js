@@ -16,10 +16,12 @@ import SummaryCard from '../components/SummaryCard';
 import ChatHeader from '../components/ChatHeader';
 import FeedPlannerScreen from '../../screens/PremiumAdvisor/FeedPlannerScreen';
 
+import { useNavigation } from '@react-navigation/native';
 import { hasFeatureAccess } from '../../utils/featureAccess';
 
 export default function GuidedChatScreen({ onClose, isPremium, onShowPayment }) {
   const { t } = useTranslation();
+  const navigation = useNavigation();
   const [selectedFlowId, setSelectedFlowId] = useState(null);
   const flows = chatbotService.getFlows();
 
@@ -50,6 +52,11 @@ export default function GuidedChatScreen({ onClose, isPremium, onShowPayment }) 
     const accessAllowed = isPremium || hasFeatureAccess(userProfile, null, 'aiAdvisor');
     if (!accessAllowed) {
       if (onShowPayment) onShowPayment();
+      return;
+    }
+    if (flowId === 'marketPrice') {
+      if (onClose) onClose();
+      navigation.navigate('MainApp', { screen: 'Bid' });
       return;
     }
     setSelectedFlowId(flowId);
